@@ -146,7 +146,7 @@ fun TimelineContainer(
                     modifier = Modifier.size(32.dp).testTag("timeline_split_button")
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.CallSplit,
+                        imageVector = Icons.Default.CallSplit,
                         contentDescription = "Split",
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(18.dp)
