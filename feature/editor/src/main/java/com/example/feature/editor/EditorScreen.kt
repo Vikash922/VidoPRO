@@ -53,6 +53,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -597,12 +599,14 @@ private fun EditorPreviewArea(
                     .background(Color.Black.copy(alpha = 0.6f))
                     .testTag("preview_play_pause_button")
             ) {
-                Icon(
-                    imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (uiState.isPlaying) "Pause" else "Play",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
+                androidx.compose.animation.Crossfade(targetState = uiState.isPlaying, label = "play_pause") { playing ->
+                    Icon(
+                        imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (playing) "Pause" else "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
         }
 
@@ -646,14 +650,20 @@ private fun EditorBottomToolPanel(
             val isSelected = activeTool == tool
             val icon = getToolIcon(tool)
 
+            val backgroundColor by androidx.compose.animation.animateColorAsState(
+                targetValue = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent,
+                label = "tool_bg"
+            )
+            val contentColor by androidx.compose.animation.animateColorAsState(
+                targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                label = "tool_color"
+            )
+
             Column(
                 modifier = Modifier
                     .clip(RoundedCornerShape(AppRadius.medium))
                     .clickable { onToolClick(tool) }
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                        else Color.Transparent
-                    )
+                    .background(backgroundColor)
                     .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
@@ -661,16 +671,14 @@ private fun EditorBottomToolPanel(
                 Icon(
                     imageVector = icon,
                     contentDescription = tool.label,
-                    tint = if (isSelected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = contentColor,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = tool.label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (isSelected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = contentColor
                 )
             }
         }
