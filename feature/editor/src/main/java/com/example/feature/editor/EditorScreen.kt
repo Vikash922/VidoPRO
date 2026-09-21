@@ -160,7 +160,7 @@ fun EditorScreen(
                         modifier = Modifier.testTag("editor_back_button")
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = Icons.Default.Close,
                             contentDescription = "Back",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
@@ -203,7 +203,7 @@ fun EditorScreen(
                             .testTag("export_button")
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color.Black, 
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )

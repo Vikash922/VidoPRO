@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "1.4",
+  "versionCode": 6,
+  "versionName": "1.5",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "Fix: Compile errors (Coil AsyncImage dependency and ClipType import)."
+  "releaseNotes": "Huge Pro UI Update: Redesigned Home Screen like CapCut and updated Editor styling."
 }
