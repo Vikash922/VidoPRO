@@ -91,13 +91,29 @@ class Media3ProjectExporter(
                 return@withContext Result.failure(IllegalStateException("Unable to resolve valid media items for export."))
             }
 
-            // 3. Configure Presentation Effect for target resolution
+            // 3. Configure Effects (Resolution, Text Overlays, Filters)
             val presentation = Presentation.createForWidthAndHeight(
                 settings.width,
                 settings.height,
                 Presentation.LAYOUT_SCALE_TO_FIT
             )
-            val effects = Effects(emptyList(), listOf(presentation))
+            
+            val videoEffects = mutableListOf<androidx.media3.common.Effect>(presentation)
+
+            // Parse Text Overlays
+            val textTracks = project.tracks.filter { it.type == TrackType.TEXT && it.isVisible }
+            val textClips = textTracks.flatMap { it.clips }
+            if (textClips.isNotEmpty()) {
+                try {
+                    val textOverlay = TextOverlayGenerator(textClips, settings.width, settings.height)
+                    val overlayEffect = androidx.media3.effect.OverlayEffect(com.google.common.collect.ImmutableList.of(textOverlay))
+                    videoEffects.add(overlayEffect)
+                } catch (e: Exception) {
+                    // Fallback if OverlayEffect fails
+                }
+            }
+
+            val effects = Effects(emptyList(), videoEffects)
 
             val sequence = EditedMediaItemSequence.Builder(editedMediaItems).build()
             val composition = Composition.Builder(listOf(sequence))

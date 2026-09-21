@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Undo/Redo Manager implementing the Command Pattern for Video Editor actions (DEV-058, DEV-059).
  * Manages an undo stack and redo stack of [EditorCommand] pairs with their associated states.
+ * Includes command coalescing to prevent flooding the history stack during drag gestures.
  */
 class UndoRedoManager(
     private val maxHistorySize: Int = 30
@@ -15,7 +16,7 @@ class UndoRedoManager(
     private data class CommandEntry(
         val command: EditorCommand,
         val beforeState: TimelineEngineState,
-        val afterState: TimelineEngineState
+        var afterState: TimelineEngineState
     )
 
     private val undoStack = ArrayDeque<CommandEntry>()
@@ -29,17 +30,44 @@ class UndoRedoManager(
 
     /**
      * Executes a new command from the [currentState] and records it into the undo history.
-     * Clears the redo stack.
+     * Clears the redo stack. Coalesces rapid drag/trim commands for the same clip.
      */
     fun executeCommand(command: EditorCommand, currentState: TimelineEngineState): TimelineEngineState {
         val newState = command.execute(currentState)
-        if (undoStack.size >= maxHistorySize) {
-            undoStack.removeFirst()
+        
+        val topEntry = undoStack.lastOrNull()
+        val canCoalesce = topEntry != null && shouldCoalesce(topEntry.command, command)
+
+        if (canCoalesce) {
+            // Update the top entry's afterState instead of pushing a new one
+            topEntry!!.afterState = newState
+        } else {
+            if (undoStack.size >= maxHistorySize) {
+                undoStack.removeFirst()
+            }
+            undoStack.addLast(CommandEntry(command, currentState, newState))
         }
-        undoStack.addLast(CommandEntry(command, currentState, newState))
+        
         redoStack.clear()
         updateFlows()
         return newState
+    }
+
+    private fun shouldCoalesce(lastCmd: EditorCommand, newCmd: EditorCommand): Boolean {
+        if (lastCmd.javaClass != newCmd.javaClass) return false
+        
+        return when {
+            lastCmd is MoveClipCommand && newCmd is MoveClipCommand -> {
+                lastCmd.clipId == newCmd.clipId
+            }
+            lastCmd is TrimStartCommand && newCmd is TrimStartCommand -> {
+                lastCmd.clipId == newCmd.clipId
+            }
+            lastCmd is TrimEndCommand && newCmd is TrimEndCommand -> {
+                lastCmd.clipId == newCmd.clipId
+            }
+            else -> false
+        }
     }
 
     /**
@@ -49,16 +77,16 @@ class UndoRedoManager(
     fun undo(currentState: TimelineEngineState): TimelineEngineState? {
         if (undoStack.isEmpty()) return null
         val entry = undoStack.removeLast()
-        // Execute the undo logic or restore the snapshot
-        val restoredState = entry.command.undo(currentState).let { undoneState ->
-            // Ensure consistency by falling back to beforeState if needed
-            if (undoneState.tracks.isEmpty() && entry.beforeState.tracks.isNotEmpty()) {
-                entry.beforeState
-            } else {
-                undoneState
-            }
+        
+        // Execute the undo logic from the command itself to get the restored state.
+        // We use entry.beforeState as the baseline just in case the command undo fails structurally.
+        val restoredState = try {
+            entry.command.undo(entry.afterState)
+        } catch (e: Exception) {
+            entry.beforeState
         }
-        redoStack.addLast(CommandEntry(entry.command, restoredState, currentState))
+
+        redoStack.addLast(CommandEntry(entry.command, restoredState, entry.afterState))
         updateFlows()
         return restoredState
     }
@@ -70,8 +98,11 @@ class UndoRedoManager(
     fun redo(currentState: TimelineEngineState): TimelineEngineState? {
         if (redoStack.isEmpty()) return null
         val entry = redoStack.removeLast()
-        val newState = entry.command.execute(currentState)
-        undoStack.addLast(CommandEntry(entry.command, currentState, newState))
+        
+        // Redo the logic from the saved restored state to the saved after state.
+        val newState = entry.afterState
+        
+        undoStack.addLast(CommandEntry(entry.command, entry.beforeState, newState))
         updateFlows()
         return newState
     }

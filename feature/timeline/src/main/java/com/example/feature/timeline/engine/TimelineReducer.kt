@@ -319,11 +319,20 @@ object TimelineReducer {
         val safeSpeed = speed.coerceIn(0.1f, 10.0f)
         val updatedTracks = state.tracks.map { track ->
             val updated = track.clips.map { c ->
-                if (c.id == clipId) c.copy(speed = safeSpeed) else c
+                if (c.id == clipId) {
+                    // Recalculate timeline duration based on the speed
+                    val rawDuration = c.outPointMs - c.inPointMs
+                    val newDuration = (rawDuration / safeSpeed).toLong()
+                    c.copy(speed = safeSpeed, durationMs = newDuration)
+                } else c
             }
-            track.copy(clips = updated)
+            if (track.type == com.example.core.model.TrackType.VIDEO && track.order == 0) {
+                track.copy(clips = resolveMainTrackOverlaps(updated))
+            } else {
+                track.copy(clips = updated)
+            }
         }
-        return state.copy(tracks = updatedTracks)
+        return state.copy(tracks = updatedTracks, durationMs = TimelineUtils.recalculateProjectDuration(updatedTracks))
     }
 
     private fun handleUpdateClipVolume(state: TimelineEngineState, clipId: String, volume: Float): TimelineEngineState {
@@ -352,18 +361,20 @@ object TimelineReducer {
     }
 
     /**
-     * Resolves overlaps for clips on the primary track:
-     * Sorts clips by their current startTimeMs and ripples each subsequent clip
-     * so it begins immediately at or after the previous clip's endTimeMs without gap collisions.
+     * Resolves overlaps and gaps for clips on the primary track:
+     * Sorts clips by their current startTimeMs and ripples each clip
+     * so it begins immediately at the previous clip's endTimeMs.
+     * This creates a strictly gapless main track, which ensures 
+     * ExoPlayer sequential playback stays in perfect sync.
      */
     fun resolveMainTrackOverlaps(clips: List<Clip>): List<Clip> {
-        if (clips.size <= 1) return clips
+        if (clips.isEmpty()) return clips
         val sorted = clips.sortedWith(compareBy<Clip> { it.startTimeMs }.thenBy { it.id })
         val resolved = mutableListOf<Clip>()
         var currentEndTime = 0L
 
         sorted.forEach { clip ->
-            val actualStart = maxOf(clip.startTimeMs, currentEndTime)
+            val actualStart = currentEndTime
             val updated = if (actualStart != clip.startTimeMs) {
                 clip.copy(startTimeMs = actualStart)
             } else {

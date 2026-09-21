@@ -628,45 +628,6 @@ private fun EditorPreviewArea(
  * Timeline Area placeholder showing timecode, ruler, playhead, and multi-track lanes.
  */
 @Composable
-private fun EditorTimelineArea(
-    uiState: EditorUiState,
-    onEvent: (EditorEvent) -> Unit,
-    onAddMediaClick: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .background(EditorColors.timelineBackground)
-            .border(width = 1.dp, color = MaterialTheme.colorScheme.outline)
-    ) {
-        // Controls Row above timeline
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AppSpacing.md, vertical = AppSpacing.xs),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = TimeUtils.formatTimecode(uiState.playheadPositionMs),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onAddMediaClick,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("timeline_add_media_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add Media",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
 
                 IconButton(
                     onClick = { onEvent(EditorEvent.PlayPauseClicked) },
