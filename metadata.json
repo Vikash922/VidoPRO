@@ -1,0 +1,6 @@
+{
+  "name": "Video Editor",
+  "description": "Original mobile video editor featuring a multi-track timeline, precision trimming, split editing, text, filters, and MP4 export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

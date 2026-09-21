@@ -1,0 +1,33 @@
+package com.example.feature.timeline.engine
+
+import com.example.core.model.Clip
+import com.example.core.model.Track
+import com.example.core.model.Transform
+
+/**
+ * Pure sealed interface of timeline engine actions according to TIMELINE_ENGINE_SPEC.md.
+ */
+sealed interface TimelineAction {
+    data class LoadProject(val tracks: List<Track>, val durationMs: Long? = null) : TimelineAction
+    data class SetTracks(val tracks: List<Track>) : TimelineAction
+    data class Seek(val positionMs: Long) : TimelineAction
+    data class SeekPlayhead(val positionMs: Long) : TimelineAction
+    data class SelectClip(val clipId: String?) : TimelineAction
+    data class AddClip(val trackId: String, val clip: Clip, val atTimeMs: Long? = null) : TimelineAction
+    data class MoveClip(val clipId: String, val targetTrackId: String, val newStartTimeMs: Long) : TimelineAction
+    data class TrimStart(val clipId: String, val newStartTimeMs: Long) : TimelineAction
+    data class TrimClipStart(val clipId: String, val newStartTimeMs: Long) : TimelineAction
+    data class TrimEnd(val clipId: String, val newEndTimeMs: Long) : TimelineAction
+    data class TrimClipEnd(val clipId: String, val newEndTimeMs: Long) : TimelineAction
+    data class SplitAtPlayhead(val clipId: String? = null) : TimelineAction
+    data class SplitClip(val clipId: String, val splitPointMs: Long) : TimelineAction
+    data class DeleteClip(val clipId: String) : TimelineAction
+    data class RemoveClip(val clipId: String) : TimelineAction
+    data class DuplicateClip(val clipId: String) : TimelineAction
+    data class UpdateClipSpeed(val clipId: String, val speed: Float) : TimelineAction
+    data class UpdateClipVolume(val clipId: String, val volume: Float) : TimelineAction
+    data class UpdateClipTransform(val clipId: String, val transform: Transform) : TimelineAction
+    data class SetZoom(val zoom: Float) : TimelineAction
+    data class SetSnapping(val enabled: Boolean) : TimelineAction
+    data class SetScrollOffset(val offsetPx: Float) : TimelineAction
+}
