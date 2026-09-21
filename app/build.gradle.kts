@@ -9,6 +9,22 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+val updateJsonFile = rootProject.file("update.json")
+var currentVersionCode = 1
+var currentVersionName = "1.0"
+
+if (updateJsonFile.exists()) {
+    val content = updateJsonFile.readText()
+    val vcMatch = "\"versionCode\"\\s*:\\s*(\\d+)".toRegex().find(content)
+    if (vcMatch != null) {
+        currentVersionCode = vcMatch.groupValues[1].toInt()
+    }
+    val vnMatch = "\"versionName\"\\s*:\\s*\"([^\"]+)\"".toRegex().find(content)
+    if (vnMatch != null) {
+        currentVersionName = vnMatch.groupValues[1]
+    }
+}
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -17,8 +33,8 @@ android {
     applicationId = "com.aistudio.videoeditor.vked"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = currentVersionCode
+    versionName = currentVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
