@@ -113,6 +113,11 @@ fun ClipCard(
         label = "clip_scale"
     )
 
+    val currentOnSelect by rememberUpdatedState(onSelect)
+    val currentOnMoveDelta by rememberUpdatedState(onMoveDelta)
+    val currentOnTrimStartDelta by rememberUpdatedState(onTrimStartDelta)
+    val currentOnTrimEndDelta by rememberUpdatedState(onTrimEndDelta)
+
     Box(
         modifier = modifier
             .width(clipWidthDp)
@@ -154,7 +159,7 @@ fun ClipCard(
                         },
                         onTap = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onSelect()
+                            currentOnSelect()
                         }
                     )
                 }
@@ -178,7 +183,7 @@ fun ClipCard(
                             accumulatedMovePx += dragAmount.x
                             val deltaMs = (accumulatedMovePx / pixelsPerMs).toLong()
                             if (deltaMs != 0L) {
-                                onMoveDelta(deltaMs)
+                                currentOnMoveDelta(deltaMs)
                                 accumulatedMovePx -= deltaMs * pixelsPerMs
                             }
                         }
@@ -244,7 +249,7 @@ fun ClipCard(
                                 accumulatedTrimStartPx += dragAmount.x
                                 val deltaMs = (accumulatedTrimStartPx / pixelsPerMs).toLong()
                                 if (deltaMs != 0L) {
-                                    onTrimStartDelta(deltaMs)
+                                    currentOnTrimStartDelta(deltaMs)
                                     accumulatedTrimStartPx -= deltaMs * pixelsPerMs
                                 }
                             }
@@ -284,7 +289,7 @@ fun ClipCard(
                                 accumulatedTrimEndPx += dragAmount.x
                                 val deltaMs = (accumulatedTrimEndPx / pixelsPerMs).toLong()
                                 if (deltaMs != 0L) {
-                                    onTrimEndDelta(deltaMs)
+                                    currentOnTrimEndDelta(deltaMs)
                                     accumulatedTrimEndPx -= deltaMs * pixelsPerMs
                                 }
                             }

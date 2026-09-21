@@ -509,41 +509,50 @@ class EditorViewModel(
                     }
                 }
 
-                // Find or create main video track
+                // We group incoming clips by trackId so we can append them to the correct tracks.
                 val tracks = currentProject.tracks.toMutableList()
-                val targetTrackIndex = tracks.indexOfFirst { it.type == TrackType.VIDEO }
-                val targetTrack = if (targetTrackIndex >= 0) {
-                    tracks[targetTrackIndex]
-                } else {
-                    val newTrack = Track(
-                        id = UUID.randomUUID().toString(),
-                        projectId = currentProject.id,
-                        type = TrackType.VIDEO,
-                        order = 0
-                    )
-                    tracks.add(newTrack)
-                    newTrack
-                }
-
-                var currentEnd = targetTrack.clips.maxOfOrNull { it.endTimeMs } ?: 0L
-                val newClips = assetsAndClips.map { (asset, clip) ->
-                    val positionedClip = clip.copy(
-                        trackId = targetTrack.id,
-                        startTimeMs = currentEnd,
-                        assetId = asset.id
-                    )
-                    currentEnd += positionedClip.durationMs
-                    positionedClip
-                }
-
-                val updatedClips = targetTrack.clips + newClips
-                val updatedTrack = targetTrack.copy(clips = updatedClips)
-                val finalTrackIndex = tracks.indexOfFirst { it.id == targetTrack.id }
-                tracks[finalTrackIndex] = updatedTrack
-
-                val newTotalDuration = tracks.maxOfOrNull { t -> t.clips.maxOfOrNull { it.endTimeMs } ?: 0L } ?: 0L
                 val newThumbnail = currentProject.thumbnailPath ?: assetsAndClips.firstOrNull()?.first?.thumbnailPath
 
+                val trackUpdates = assetsAndClips.groupBy { it.second.trackId }
+                
+                trackUpdates.forEach { (trackId, mediaList) ->
+                    var trackIndex = tracks.indexOfFirst { it.id == trackId }
+                    if (trackIndex < 0) {
+                        // Create the track if it doesn't exist
+                        val newTrackType = mediaList.first().second.type.let {
+                            if (it == ClipType.AUDIO) TrackType.AUDIO
+                            else if (it == ClipType.IMAGE || it == ClipType.TEXT) TrackType.OVERLAY
+                            else TrackType.VIDEO
+                        }
+                        val newTrack = Track(
+                            id = trackId,
+                            projectId = currentProject.id,
+                            type = newTrackType,
+                            order = tracks.size
+                        )
+                        tracks.add(newTrack)
+                        trackIndex = tracks.size - 1
+                    }
+
+                    val targetTrack = tracks[trackIndex]
+                    var currentEnd = targetTrack.clips.maxOfOrNull { it.endTimeMs } ?: 0L
+                    
+                    val positionedClips = mediaList.map { (asset, clip) ->
+                        val positionedClip = clip.copy(
+                            startTimeMs = currentEnd,
+                            assetId = asset.id
+                        )
+                        currentEnd += positionedClip.durationMs
+                        positionedClip
+                    }
+                    
+                    tracks[trackIndex] = targetTrack.copy(
+                        clips = targetTrack.clips + positionedClips
+                    )
+                }
+
+                val newTotalDuration = tracks.maxOfOrNull { t -> t.clips.maxOfOrNull { it.endTimeMs } ?: 0L } ?: 0L
+                
                 val updatedProject = currentProject.copy(
                     tracks = tracks,
                     durationMs = newTotalDuration,

@@ -254,7 +254,8 @@ object TimelineReducer {
                         newClips.add(c)
                     }
                 }
-                track.copy(clips = newClips)
+                val resolvedClips = if (track.type == TrackType.VIDEO) resolveMainTrackOverlaps(newClips) else newClips
+                track.copy(clips = resolvedClips)
             } else track
         }
 

@@ -536,10 +536,10 @@ private fun EditorPreviewArea(
                 if (player != null && hasClips) {
                     AndroidView(
                         factory = { ctx ->
-                            PlayerView(ctx).apply {
+                            val inflater = android.view.LayoutInflater.from(ctx)
+                            val playerView = inflater.inflate(com.example.feature.editor.R.layout.texture_player_view, null) as PlayerView
+                            playerView.apply {
                                 this.player = player
-                                useController = false
-                                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                             }
                         },
                         update = { playerView ->
