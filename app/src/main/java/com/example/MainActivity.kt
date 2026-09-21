@@ -34,6 +34,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Auto-updater check
+        AppUpdater.checkForUpdates(this)
+        
         val projectRepository = RepositoryModule.provideProjectRepository(applicationContext)
         val assetRepository = RepositoryModule.provideAssetRepository(applicationContext)
 
