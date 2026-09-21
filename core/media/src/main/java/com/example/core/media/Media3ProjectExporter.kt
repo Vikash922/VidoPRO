@@ -106,7 +106,7 @@ class Media3ProjectExporter(
             if (textClips.isNotEmpty()) {
                 try {
                     val textOverlay = TextOverlayGenerator(textClips, settings.width, settings.height)
-                    val overlayEffect = androidx.media3.effect.OverlayEffect(com.google.common.collect.ImmutableList.of(textOverlay))
+                    val overlayEffect = androidx.media3.effect.OverlayEffect(com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(textOverlay))
                     videoEffects.add(overlayEffect)
                 } catch (e: Exception) {
                     // Fallback if OverlayEffect fails
