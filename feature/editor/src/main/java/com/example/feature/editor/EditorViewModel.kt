@@ -520,8 +520,8 @@ class EditorViewModel(
                     if (trackIndex < 0) {
                         // Create the track if it doesn't exist
                         val newTrackType = mediaList.first().second.type.let {
-                            if (it == ClipType.AUDIO) TrackType.AUDIO
-                            else if (it == ClipType.IMAGE || it == ClipType.TEXT) TrackType.OVERLAY
+                            if (it == com.example.core.model.ClipType.AUDIO) TrackType.AUDIO
+                            else if (it == com.example.core.model.ClipType.IMAGE || it == com.example.core.model.ClipType.TEXT) TrackType.OVERLAY
                             else TrackType.VIDEO
                         }
                         val newTrack = Track(
