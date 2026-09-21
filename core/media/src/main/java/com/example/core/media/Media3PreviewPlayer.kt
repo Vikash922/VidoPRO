@@ -101,11 +101,18 @@ class Media3PreviewPlayer(
                 .setEndPositionMs(clip.outPointMs)
                 .build()
 
-            MediaItem.Builder()
+            val isImage = asset.mimeType?.startsWith("image") == true || clip.type == com.example.core.model.ClipType.IMAGE
+
+            val builder = MediaItem.Builder()
                 .setUri(Uri.parse(asset.uri))
                 .setMediaId(clip.id)
                 .setClippingConfiguration(clippingConfig)
-                .build()
+
+            if (isImage) {
+                builder.setImageDurationMs(clip.durationMs)
+            }
+
+            builder.build()
         }
 
         exoPlayer.setMediaItems(mediaItems)

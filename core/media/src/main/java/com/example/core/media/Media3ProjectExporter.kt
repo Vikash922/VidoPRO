@@ -80,10 +80,16 @@ class Media3ProjectExporter(
                     .setClippingConfiguration(clippingConfig)
                     .build()
 
-                val editedItem = EditedMediaItem.Builder(mediaItem)
+                val isImage = asset.mimeType?.startsWith("image") == true || clip.type == com.example.core.model.ClipType.IMAGE
+                val editedItemBuilder = EditedMediaItem.Builder(mediaItem)
                     .setRemoveAudio(false)
-                    .build()
-
+                
+                if (isImage) {
+                    editedItemBuilder.setDurationUs(clip.durationMs * 1000L)
+                    editedItemBuilder.setFrameRate(settings.fps)
+                }
+                
+                val editedItem = editedItemBuilder.build()
                 editedMediaItems.add(editedItem)
             }
 
@@ -107,6 +113,19 @@ class Media3ProjectExporter(
                 try {
                     val textOverlay = TextOverlayGenerator(textClips, settings.width, settings.height)
                     val overlayEffect = androidx.media3.effect.OverlayEffect(com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(textOverlay))
+                    videoEffects.add(overlayEffect)
+                } catch (e: Exception) {
+                    // Fallback if OverlayEffect fails
+                }
+            }
+
+            // Parse Image Overlays (PiP)
+            val overlayTracks = project.tracks.filter { it.type == TrackType.OVERLAY && it.isVisible }
+            val imageClips = overlayTracks.flatMap { it.clips }
+            if (imageClips.isNotEmpty()) {
+                try {
+                    val imageOverlay = ImageOverlayGenerator(context, imageClips, assets, settings.width, settings.height)
+                    val overlayEffect = androidx.media3.effect.OverlayEffect(com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(imageOverlay))
                     videoEffects.add(overlayEffect)
                 } catch (e: Exception) {
                     // Fallback if OverlayEffect fails

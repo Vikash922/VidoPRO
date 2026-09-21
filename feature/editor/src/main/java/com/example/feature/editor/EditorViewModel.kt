@@ -134,10 +134,11 @@ class EditorViewModel(
 
     private fun syncClipsToPlayer(project: com.example.core.model.Project) {
         viewModelScope.launch {
+            val allClips = project.tracks.flatMap { it.clips }
             val videoClips = project.tracks.filter { it.type == TrackType.VIDEO }.flatMap { it.clips }
             val assetMap = mutableMapOf<String, Asset>()
             assetRepository?.let { repo ->
-                videoClips.forEach { clip ->
+                allClips.forEach { clip ->
                     clip.assetId?.let { assetId ->
                         repo.getAssetById(assetId)?.let { asset ->
                             assetMap[asset.id] = asset
@@ -145,6 +146,7 @@ class EditorViewModel(
                     }
                 }
             }
+            _uiState.update { it.copy(assets = assetMap) }
             previewPlayer?.setClips(videoClips, assetMap)
         }
     }

@@ -55,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import coil.compose.AsyncImage
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -67,6 +68,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -104,7 +106,7 @@ fun EditorScreen(
     onEvent: (EditorEvent) -> Unit,
     onNavigateBack: () -> Unit,
     onNavigateExport: (projectId: String) -> Unit,
-    onNavigateMediaPicker: () -> Unit = {},
+    onNavigateMediaPicker: (TrackType) -> Unit = {},
     onTimelineAction: (TimelineAction) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -249,7 +251,7 @@ fun EditorScreen(
                     isPlaying = uiState.isPlaying,
                     onAction = onTimelineAction,
                     onPlayPause = onPlayPauseClick,
-                    onAddMedia = onNavigateMediaPicker,
+                    onAddMedia = { onNavigateMediaPicker(TrackType.VIDEO) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(210.dp)
@@ -284,8 +286,11 @@ fun EditorScreen(
                                     onEvent(EditorEvent.ToolClicked(tool))
                                 }
                             }
-                            EditorTool.AUDIO, EditorTool.OVERLAY -> {
-                                onNavigateMediaPicker()
+                            EditorTool.AUDIO -> {
+                                onNavigateMediaPicker(TrackType.AUDIO)
+                            }
+                            EditorTool.OVERLAY -> {
+                                onNavigateMediaPicker(TrackType.OVERLAY)
                             }
                             else -> onEvent(EditorEvent.ToolClicked(tool))
                         }
@@ -457,6 +462,17 @@ private fun EditorPreviewArea(
             } ?: emptyList()
     }
 
+    val activeOverlayClips = remember(uiState.project, currentPlayhead) {
+        uiState.project?.tracks
+            ?.filter { it.type == TrackType.OVERLAY && it.isVisible }
+            ?.flatMap { it.clips }
+            ?.filter { clip ->
+                clip.isVisible &&
+                currentPlayhead >= clip.startTimeMs &&
+                currentPlayhead <= clip.endTimeMs
+            } ?: emptyList()
+    }
+
     // Build ColorMatrix and cached Paint for Brightness, Contrast, Saturation filters (DEV-065)
     val filterSettings = uiState.filterSettings
     val cachedFilterPaint = remember(filterSettings) {
@@ -549,6 +565,31 @@ private fun EditorPreviewArea(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+            }
+
+            // Image Overlays (PiP) rendered on top of video, behind text (DEV-070)
+            activeOverlayClips.forEach { clip ->
+                val asset = uiState.assets[clip.assetId] ?: return@forEach
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(AppSpacing.md),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AsyncImage(
+                        model = asset.uri,
+                        contentDescription = "Overlay Image",
+                        modifier = Modifier
+                            .graphicsLayer {
+                                scaleX = clip.transform.scaleX
+                                scaleY = clip.transform.scaleY
+                                rotationZ = clip.transform.rotation
+                                translationX = clip.transform.x
+                                translationY = clip.transform.y
+                                alpha = clip.transform.opacity
+                            }
+                    )
                 }
             }
 

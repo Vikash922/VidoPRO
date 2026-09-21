@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
                 var showMediaPicker by remember { mutableStateOf(false) }
                 var showExportScreen by remember { mutableStateOf(false) }
                 var showSettingsScreen by remember { mutableStateOf(false) }
+                var selectedTrackTypeForPicker by remember { mutableStateOf(TrackType.VIDEO) }
 
                 if (showSettingsScreen) {
                     BackHandler {
@@ -130,7 +131,7 @@ class MainActivity : ComponentActivity() {
                             onMediaItemClick = mediaPickerViewModel::toggleSelection,
                             onConfirmSelection = {
                                 val selectedItems = mediaPickerUiState.selectedItems
-                                val targetTrack = editorUiState.project?.tracks?.firstOrNull { it.type == TrackType.VIDEO }
+                                val targetTrack = editorUiState.project?.tracks?.firstOrNull { it.type == selectedTrackTypeForPicker }
                                 val trackId = targetTrack?.id ?: UUID.randomUUID().toString()
                                 var currentStart = targetTrack?.clips?.maxOfOrNull { it.endTimeMs } ?: 0L
 
@@ -170,7 +171,10 @@ class MainActivity : ComponentActivity() {
                                 activeProjectId = null
                             },
                             onNavigateExport = { showExportScreen = true },
-                            onNavigateMediaPicker = { showMediaPicker = true }
+                            onNavigateMediaPicker = { trackType -> 
+                                selectedTrackTypeForPicker = trackType
+                                showMediaPicker = true 
+                            }
                         )
                     }
                 } else {

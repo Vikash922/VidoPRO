@@ -39,6 +39,7 @@ data class EditorUiState(
     val isCanvasSheetVisible: Boolean = false,
     val isTransformSheetVisible: Boolean = false,
     val filterSettings: com.example.feature.editor.filter.FilterSettings = com.example.feature.editor.filter.FilterSettings(),
+    val assets: Map<String, com.example.core.model.Asset> = emptyMap(),
     val error: String? = null
 ) {
     val selectedClip: Clip?
