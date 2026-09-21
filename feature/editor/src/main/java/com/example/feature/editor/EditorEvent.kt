@@ -24,6 +24,8 @@ sealed interface EditorEvent {
     data class SetVolumeSheetVisible(val visible: Boolean) : EditorEvent
     data class SetCanvasSheetVisible(val visible: Boolean) : EditorEvent
     data class SetTransformSheetVisible(val visible: Boolean) : EditorEvent
+    data class SetKeyframeSheetVisible(val visible: Boolean) : EditorEvent
+    data class SetBeatsSheetVisible(val visible: Boolean) : EditorEvent
     data class ChangeClipSpeed(val speed: Float) : EditorEvent
     data class ChangeClipVolume(val volume: Float) : EditorEvent
     data class ChangeAspectRatio(val ratio: com.example.core.model.AspectRatio) : EditorEvent

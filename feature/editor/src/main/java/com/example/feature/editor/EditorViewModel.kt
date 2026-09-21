@@ -195,6 +195,12 @@ class EditorViewModel(
                     EditorTool.CANVAS -> {
                         _uiState.update { it.copy(isCanvasSheetVisible = true) }
                     }
+                    EditorTool.KEYFRAME -> {
+                        _uiState.update { it.copy(isKeyframeSheetVisible = true) }
+                    }
+                    EditorTool.BEATS -> {
+                        _uiState.update { it.copy(isBeatsSheetVisible = true) }
+                    }
                     EditorTool.TRANSFORM -> {
                         _uiState.update { it.copy(isTransformSheetVisible = true) }
                     }
@@ -236,6 +242,12 @@ class EditorViewModel(
                 _uiState.update { it.copy(isCanvasSheetVisible = event.visible) }
             }
 
+            is EditorEvent.SetKeyframeSheetVisible -> {
+                _uiState.update { it.copy(isKeyframeSheetVisible = event.visible) }
+            }
+            is EditorEvent.SetBeatsSheetVisible -> {
+                _uiState.update { it.copy(isBeatsSheetVisible = event.visible) }
+            }
             is EditorEvent.SetTransformSheetVisible -> {
                 _uiState.update { it.copy(isTransformSheetVisible = event.visible) }
             }

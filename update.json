@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.6",
+  "versionCode": 8,
+  "versionName": "1.7",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "Fix: Compile errors related to Material Icons and duplicate arguments in UI revamp."
+  "releaseNotes": "Added Keyframe Animations UI, Audio Ducking, and Auto Beat Sync."
 }

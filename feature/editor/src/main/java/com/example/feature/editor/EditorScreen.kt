@@ -379,6 +379,21 @@ fun EditorScreen(
         }
 
         // Speed Adjustment Bottom Sheet
+        if (uiState.isKeyframeSheetVisible) {
+            KeyframeBottomSheet(
+                onDismiss = {
+                    onEvent(EditorEvent.SetKeyframeSheetVisible(false))
+                }
+            )
+        }
+
+        if (uiState.isBeatsSheetVisible) {
+            BeatsBottomSheet(
+                onDismiss = {
+                    onEvent(EditorEvent.SetBeatsSheetVisible(false))
+                }
+            )
+        }
         if (uiState.isSpeedSheetVisible) {
             val currentSpeed = uiState.selectedClip?.speed ?: 1.0f
             SpeedBottomSheet(
@@ -739,6 +754,8 @@ private fun getToolIcon(tool: EditorTool): ImageVector {
         EditorTool.FILTERS -> Icons.Default.Filter
         EditorTool.TRANSFORM -> Icons.Default.CropRotate
         EditorTool.CANVAS -> Icons.Default.AspectRatio
+        EditorTool.KEYFRAME -> Icons.Default.Star
+        EditorTool.BEATS -> Icons.Default.Build
         EditorTool.DELETE -> Icons.Default.Delete
     }
 }

@@ -15,6 +15,8 @@ enum class EditorTool(val label: String) {
     FILTERS("Filters"),
     TRANSFORM("Transform"),
     CANVAS("Canvas"),
+    KEYFRAME("Keyframes"),
+    BEATS("Beats"),
     DELETE("Delete")
 }
 
@@ -38,6 +40,8 @@ data class EditorUiState(
     val isVolumeSheetVisible: Boolean = false,
     val isCanvasSheetVisible: Boolean = false,
     val isTransformSheetVisible: Boolean = false,
+    val isKeyframeSheetVisible: Boolean = false,
+    val isBeatsSheetVisible: Boolean = false,
     val filterSettings: com.example.feature.editor.filter.FilterSettings = com.example.feature.editor.filter.FilterSettings(),
     val assets: Map<String, com.example.core.model.Asset> = emptyMap(),
     val error: String? = null
