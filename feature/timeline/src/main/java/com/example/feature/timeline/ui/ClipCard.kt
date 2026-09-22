@@ -7,18 +7,21 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,24 +37,25 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.model.Clip
 import com.example.core.model.ClipType
 import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 /**
- * ClipCard — visual representation of a clip on the timeline.
- * Matches reference UI: Video=purple-blue thumbnails, Text=GREEN, Audio=cyan waveform.
+ * ClipCard — Professional flat dark-mode timeline clip without gradients.
+ * Supports tap to select, tap-and-hold/drag to move left-right,
+ * and trim handles for selected clips.
  */
 @Composable
 fun ClipCard(
@@ -66,40 +70,39 @@ fun ClipCard(
 ) {
     val haptic = LocalHapticFeedback.current
     val clipWidthDp = remember(clip.durationMs, pixelsPerMs) {
-        maxOf(44.dp, (clip.durationMs * pixelsPerMs).dp)
+        maxOf(48.dp, (clip.durationMs * pixelsPerMs).dp)
     }
 
-    // Colors matching reference image EXACTLY:
-    // Video: dark purple/blue gradient (thumbnail-like)
-    // Text: GREEN gradient
-    // Audio: dark blue/cyan gradient
-    val bgGradient = remember(clip.type) {
+    // Flat solid colors (NO GRADIENTS)
+    val bgColor = remember(clip.type) {
         when (clip.type) {
-            ClipType.VIDEO, ClipType.IMAGE -> listOf(Color(0xFF3D2B6B), Color(0xFF2A1F4E), Color(0xFF4A2D7A))
-            ClipType.TEXT -> listOf(Color(0xFF1B5E20), Color(0xFF2E7D32), Color(0xFF388E3C))
-            ClipType.AUDIO -> listOf(Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1976D2))
-            ClipType.COLOR, ClipType.SHAPE -> listOf(Color(0xFF2C3248), Color(0xFF161925))
+            ClipType.VIDEO, ClipType.IMAGE -> Color(0xFF1E2230)
+            ClipType.TEXT -> Color(0xFF1B5E20)
+            ClipType.AUDIO -> Color(0xFF0F3658)
+            ClipType.COLOR, ClipType.SHAPE -> Color(0xFF242A38)
         }
     }
 
     val borderColor = remember(clip.type, isSelected) {
-        if (isSelected) Color.White
+        if (isSelected) Color(0xFFFFFFFF)
         else when (clip.type) {
-            ClipType.VIDEO, ClipType.IMAGE -> Color(0xFF5E35B1).copy(alpha = 0.5f)
-            ClipType.TEXT -> Color(0xFF4CAF50).copy(alpha = 0.5f)
-            ClipType.AUDIO -> Color(0xFF42A5F5).copy(alpha = 0.5f)
-            else -> Color(0xFF2C3248)
+            ClipType.VIDEO, ClipType.IMAGE -> Color(0xFF384055)
+            ClipType.TEXT -> Color(0xFF2E7D32)
+            ClipType.AUDIO -> Color(0xFF1D5688)
+            else -> Color(0xFF323A4D)
         }
     }
 
     val cornerShape = remember { RoundedCornerShape(6.dp) }
-    var accumulatedMovePx by remember { mutableFloatStateOf(0f) }
-    var accumulatedTrimStartPx by remember { mutableFloatStateOf(0f) }
-    var accumulatedTrimEndPx by remember { mutableFloatStateOf(0f) }
+    var dragOffsetX by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
     var isPressed by remember { mutableStateOf(false) }
 
+    var accumulatedTrimStartPx by remember { mutableFloatStateOf(0f) }
+    var accumulatedTrimEndPx by remember { mutableFloatStateOf(0f) }
+
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else if (isSelected) 1.01f else 1f,
+        targetValue = if (isDragging) 1.04f else if (isPressed) 0.98f else if (isSelected) 1.01f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "clip_scale"
     )
@@ -111,138 +114,129 @@ fun ClipCard(
 
     Box(
         modifier = modifier
+            .offset { IntOffset(dragOffsetX.roundToInt(), 0) }
             .width(clipWidthDp)
             .height(52.dp)
             .scale(scale)
-            .shadow(if (isSelected) 4.dp else 0.dp, cornerShape)
+            .shadow(if (isDragging || isSelected) 6.dp else 0.dp, cornerShape)
             .clip(cornerShape)
-            .background(Brush.horizontalGradient(bgGradient))
-            .border(if (isSelected) 2.dp else 0.dp, borderColor, cornerShape)
+            .background(bgColor)
+            .border(if (isSelected) 2.dp else 1.dp, borderColor, cornerShape)
     ) {
-        // Main body — tap and move
+        // Main body: Tap to select, Drag / Tap & Hold to move left/right
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = if (isSelected) 14.dp else 0.dp)
-                .pointerInput(clip.id, pixelsPerMs) {
-                    val touchSlop = 8f
-                    var touchStartX = 0f
-                    var isDragging = false
-
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val changes = event.changes
-                            val downChange = changes.find { change -> change.pressed }
-
-                            if (downChange != null && !isPressed) {
-                                touchStartX = downChange.position.x
-                                isPressed = true
-                            }
-
-                            if (isPressed && !isDragging) {
-                                val totalDragX = changes
-                                    .filter { change -> change.pressed }
-                                    .sumOf { change -> (change.position.x - touchStartX).absoluteValue.toDouble() }
-                                    .toFloat()
-                                if (totalDragX > touchSlop) {
-                                    isDragging = true
-                                    accumulatedMovePx = 0f
-                                }
-                            }
-
-                            if (isDragging) {
-                                val dragAmount = changes
-                                    .filter { change -> change.pressed }
-                                    .sumOf { change -> change.positionChange().x.toDouble() }
-                                    .toFloat()
-                                if (dragAmount != 0f) {
-                                    changes.forEach { change -> change.consume() }
-                                    accumulatedMovePx += dragAmount
-                                    val deltaMs = (accumulatedMovePx / pixelsPerMs).toLong()
-                                    if (deltaMs != 0L) {
-                                        currentOnMoveDelta(deltaMs)
-                                        accumulatedMovePx -= deltaMs * pixelsPerMs
-                                    }
-                                }
-                            }
-
-                            if (changes.all { change -> !change.pressed }) {
-                                if (!isDragging) {
-                                    currentOnSelect()
-                                }
-                                isPressed = false
-                                isDragging = false
-                                accumulatedMovePx = 0f
-                            }
+                .pointerInput(clip.id) {
+                    detectTapGestures(
+                        onTap = {
+                            currentOnSelect()
                         }
-                    }
+                    )
+                }
+                .pointerInput(clip.id, pixelsPerMs) {
+                    detectDragGestures(
+                        onDragStart = {
+                            isDragging = true
+                            isPressed = true
+                            dragOffsetX = 0f
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffsetX += dragAmount.x
+                        },
+                        onDragEnd = {
+                            isDragging = false
+                            isPressed = false
+                            val deltaMs = (dragOffsetX / pixelsPerMs).toLong()
+                            if (deltaMs != 0L) {
+                                currentOnMoveDelta(deltaMs)
+                            }
+                            dragOffsetX = 0f
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            isPressed = false
+                            dragOffsetX = 0f
+                        }
+                    )
                 },
             contentAlignment = Alignment.CenterStart
         ) {
-            // Visual content per clip type
+            // Visual content per clip type (NO GRADIENTS)
             when (clip.type) {
                 ClipType.AUDIO -> {
-                    // Audio waveform bars — cyan
-                    Canvas(modifier = Modifier.fillMaxSize().padding(vertical = 6.dp, horizontal = 4.dp)) {
-                        val barSpacing = 4f
-                        val barWidth = 2.5f
-                        val numBars = ((size.width - 4f) / (barWidth + barSpacing)).toInt()
-                        val random = Random(clip.id.hashCode())
-                        for (i in 0 until numBars) {
-                            val heightRatio = 0.15f + random.nextFloat() * 0.85f
-                            val barHeight = size.height * heightRatio
-                            val x = i * (barWidth + barSpacing) + barWidth / 2f + 2f
-                            val y = (size.height - barHeight) / 2f
-                            drawLine(
-                                color = Color(0xFF4FC3F7),
-                                start = Offset(x, y),
-                                end = Offset(x, y + barHeight),
-                                strokeWidth = barWidth,
-                                cap = StrokeCap.Round
-                            )
+                    // Audio waveform with clear rhythmic beat spikes
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = Color(0xFF00D2FF),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Canvas(modifier = Modifier.fillMaxSize().padding(vertical = 6.dp)) {
+                            val barSpacing = 4f
+                            val barWidth = 2.5f
+                            val numBars = ((size.width - 4f) / (barWidth + barSpacing)).toInt().coerceAtLeast(1)
+                            val random = Random(clip.id.hashCode())
+                            for (i in 0 until numBars) {
+                                // Every 4th bar is a major BEAT spike
+                                val isBeat = (i % 4 == 0)
+                                val heightRatio = if (isBeat) {
+                                    0.75f + random.nextFloat() * 0.25f
+                                } else {
+                                    0.15f + random.nextFloat() * 0.45f
+                                }
+                                val barHeight = size.height * heightRatio
+                                val x = i * (barWidth + barSpacing) + barWidth / 2f
+                                val y = (size.height - barHeight) / 2f
+                                drawLine(
+                                    color = if (isBeat) Color(0xFF00D2FF) else Color(0xFF00D2FF).copy(alpha = 0.5f),
+                                    start = Offset(x, y),
+                                    end = Offset(x, y + barHeight),
+                                    strokeWidth = if (isBeat) barWidth * 1.2f else barWidth,
+                                    cap = StrokeCap.Round
+                                )
+                            }
                         }
                     }
                 }
 
                 ClipType.TEXT -> {
-                    // Green text clip — show text label
-                    val textLabel = clip.textData?.text ?: "Text"
+                    // Solid green text clip with clear title
+                    val textLabel = clip.textData?.text ?: "Good Vibes"
                     Text(
                         text = textLabel,
                         color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(start = 10.dp)
                     )
                 }
 
                 else -> {
-                    // Video/Image — simulated thumbnail segments
+                    // Video/Image: solid segments simulating frames
                     Row(modifier = Modifier.fillMaxSize()) {
-                        val numThumbs = (clipWidthDp.value / 36f).toInt().coerceIn(1, 20)
-                        val random = Random(clip.id.hashCode())
+                        val numThumbs = (clipWidthDp.value / 38f).toInt().coerceIn(1, 15)
                         for (i in 0 until numThumbs) {
-                            val shade = random.nextFloat() * 0.15f
                             Box(
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .weight(1f)
-                                    .padding(horizontal = 0.5.dp)
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color(0xFF5C3FA0).copy(alpha = 0.6f + shade),
-                                                Color(0xFF2A1F4E).copy(alpha = 0.8f + shade)
-                                            )
-                                        )
-                                    )
+                                    .padding(horizontal = 1.dp)
+                                    .background(Color(0xFF282D3F))
                             ) {
                                 if (i == 0) {
                                     Icon(
                                         Icons.Default.Movie,
                                         contentDescription = null,
-                                        tint = Color.White.copy(alpha = 0.35f),
+                                        tint = Color.White.copy(alpha = 0.4f),
                                         modifier = Modifier.align(Alignment.Center).size(14.dp)
                                     )
                                 }
@@ -253,7 +247,7 @@ fun ClipCard(
             }
         }
 
-        // Left Trim Handle
+        // Left Trim Handle (white with dark grip)
         if (isSelected) {
             Box(
                 modifier = Modifier
@@ -283,12 +277,12 @@ fun ClipCard(
                         .width(2.dp)
                         .height(14.dp)
                         .clip(RoundedCornerShape(1.dp))
-                        .background(Color.Black.copy(alpha = 0.4f))
+                        .background(Color.Black.copy(alpha = 0.6f))
                 )
             }
         }
 
-        // Right Trim Handle
+        // Right Trim Handle (white with dark grip)
         if (isSelected) {
             Box(
                 modifier = Modifier
@@ -318,7 +312,7 @@ fun ClipCard(
                         .width(2.dp)
                         .height(14.dp)
                         .clip(RoundedCornerShape(1.dp))
-                        .background(Color.Black.copy(alpha = 0.4f))
+                        .background(Color.Black.copy(alpha = 0.6f))
                 )
             }
         }

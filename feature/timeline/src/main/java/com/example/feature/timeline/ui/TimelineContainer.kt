@@ -1,5 +1,6 @@
 package com.example.feature.timeline.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -35,7 +35,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,9 +51,13 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * Main Timeline Container — matches the reference UI design exactly.
- * Left side: track type labels (Cover, text icon, + for audio).
- * Right side: scrollable timeline with TimeRuler, ClipCards, Playhead.
+ * Main Timeline Container — Flat dark mode without gradients.
+ * Features:
+ * - Left side track indicators ("Cover", Text, Audio Add)
+ * - Time ruler
+ * - Beat markers (Pink vertical line highlighting beat positions)
+ * - Tapping the white playhead toggles a beat marker with pink highlight line
+ * - Clip dragging left/right
  */
 @Composable
 fun TimelineContainer(
@@ -80,7 +86,9 @@ fun TimelineContainer(
         { timeMs: Long -> onAction(TimelineAction.Seek(timeMs)) }
     }
 
+    // Flat solid dark background (NO GRADIENT)
     val bgColor = Color(0xFF0A0D14)
+    val pinkBeatColor = Color(0xFFFF2D75)
 
     Column(
         modifier = modifier.background(bgColor)
@@ -91,7 +99,7 @@ fun TimelineContainer(
             // LEFT SIDE: Track type labels
             Column(
                 modifier = Modifier
-                    .width(40.dp)
+                    .width(42.dp)
                     .fillMaxHeight()
                     .background(bgColor)
                     .padding(top = 28.dp) // Offset for time ruler height
@@ -99,17 +107,15 @@ fun TimelineContainer(
                 Spacer(modifier = Modifier.height(AppSpacing.xs))
 
                 if (state.tracks.isEmpty()) {
-                    // Empty state — just show add button
                     Box(
-                        modifier = Modifier
-                            .size(40.dp, 56.dp),
+                        modifier = Modifier.size(42.dp, 56.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
                             modifier = Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFF7B61FF))
+                                .background(Color(0xFF6B4BFF))
                                 .clickable { onAddMedia() },
                             contentAlignment = Alignment.Center
                         ) {
@@ -141,7 +147,7 @@ fun TimelineContainer(
                                         Text(
                                             "Cover",
                                             color = Color.White.copy(alpha = 0.5f),
-                                            fontSize = 8.sp
+                                            fontSize = 9.sp
                                         )
                                     }
                                 }
@@ -149,7 +155,7 @@ fun TimelineContainer(
                                     Icon(
                                         Icons.Default.TextFields,
                                         contentDescription = "Text",
-                                        tint = Color(0xFF4CAF50).copy(alpha = 0.7f),
+                                        tint = Color(0xFF4CAF50),
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -158,14 +164,15 @@ fun TimelineContainer(
                                         modifier = Modifier
                                             .size(24.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFF00B4D8).copy(alpha = 0.2f))
+                                            .background(Color(0xFF0F3658))
+                                            .border(1.dp, Color(0xFF00D2FF), CircleShape)
                                             .clickable { onAddMedia() },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             Icons.Default.Add,
                                             contentDescription = "Add Audio",
-                                            tint = Color(0xFF00B4D8),
+                                            tint = Color(0xFF00D2FF),
                                             modifier = Modifier.size(14.dp)
                                         )
                                     }
@@ -177,12 +184,12 @@ fun TimelineContainer(
                 }
             }
 
-            // Thin separator line
+            // Thin vertical separator line
             Box(
                 modifier = Modifier
                     .width(1.dp)
                     .fillMaxHeight()
-                    .background(Color.White.copy(alpha = 0.06f))
+                    .background(Color.White.copy(alpha = 0.08f))
             )
 
             // RIGHT SIDE: Scrollable timeline
@@ -210,15 +217,25 @@ fun TimelineContainer(
                                     .fillMaxWidth()
                                     .height(56.dp)
                                     .padding(horizontal = 8.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFF161925))
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF1E2230))
+                                    .border(1.dp, Color(0xFF384055), RoundedCornerShape(6.dp))
                                     .clickable { onAddMedia() },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF7B61FF), modifier = Modifier.size(18.dp))
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = null,
+                                        tint = Color(0xFF6B4BFF),
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Tap to add media", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                                    Text(
+                                        "Tap to add media",
+                                        color = Color.White.copy(alpha = 0.6f),
+                                        fontSize = 12.sp
+                                    )
                                 }
                             }
                         } else {
@@ -235,13 +252,37 @@ fun TimelineContainer(
                         }
                     }
 
-                    // 3. Playhead Overlay
+                    // 3. Pink Beat Marker Lines (Highlighting exact beat time)
+                    state.beatMarkers.forEach { beatTimeMs ->
+                        val markerX = (beatTimeMs * pixelsPerMs).dp
+                        Box(
+                            modifier = Modifier
+                                .offset(x = markerX)
+                                .width(2.dp)
+                                .fillMaxHeight()
+                                .background(pinkBeatColor)
+                        )
+                        // Top pink diamond icon
+                        Box(
+                            modifier = Modifier
+                                .offset(x = markerX - 4.dp, y = 2.dp)
+                                .size(10.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(pinkBeatColor)
+                        )
+                    }
+
+                    // 4. White Playhead Overlay — tap to toggle beat marker (pink line)!
                     PlayheadView(
                         playheadPositionMs = state.playheadPositionMs,
                         pixelsPerMs = pixelsPerMs,
                         onSeekDelta = { deltaMs ->
                             val newTime = (state.playheadPositionMs + deltaMs).coerceIn(0L, state.durationMs)
                             onAction(TimelineAction.Seek(newTime))
+                        },
+                        onTapPlayhead = {
+                            // Tapping white playhead adds/toggles pink beat line at this timestamp!
+                            onAction(TimelineAction.ToggleBeatMarker(state.playheadPositionMs))
                         },
                         modifier = Modifier.offset {
                             val currentPlayheadPx = (state.playheadPositionMs * pixelsPerMs).roundToInt()

@@ -91,14 +91,14 @@ fun EditBottomSheet(
             // Contextual Tools
             if (clip.type == ClipType.VIDEO) {
                 items.add(BottomSheetItem("Speed", Icons.Default.Speed, onSpeed))
-                items.add(BottomSheetItem("Transform", Icons.Default.Transform, onTransform))
+                items.add(BottomSheetItem("Transform", Icons.Default.CropRotate, onTransform))
             }
             if (clip.type == ClipType.VIDEO || clip.type == ClipType.AUDIO) {
                 items.add(BottomSheetItem("Volume", Icons.Default.VolumeUp, onVolume))
                 items.add(BottomSheetItem("Audio", Icons.Default.Audiotrack, onAudio))
             }
             if (clip.type == ClipType.VIDEO || clip.type == ClipType.IMAGE) {
-                items.add(BottomSheetItem("Filters", Icons.Default.CameraFilter, onFilters))
+                items.add(BottomSheetItem("Filters", Icons.Default.ColorLens, onFilters))
                 items.add(BottomSheetItem("Keyframe", Icons.Default.Star, onKeyframe))
                 items.add(BottomSheetItem("Canvas", Icons.Default.AspectRatio, onCanvas))
             }

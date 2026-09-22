@@ -187,18 +187,22 @@ class EditorViewModel(
                     EditorTool.AUDIO -> { _uiState.update { it.copy(isVolumeSheetVisible = true) } }
                     EditorTool.TEXT -> { _uiState.update { it.copy(isTextSheetVisible = true) } }
                     EditorTool.FILTERS -> { _uiState.update { it.copy(isFiltersSheetVisible = true) } }
-                    EditorTool.SPLIT -> { _uiState.update { it.copy(isEditSheetVisible = true) } }
+                    EditorTool.SPLIT -> {
+                        onTimelineAction(TimelineAction.SplitAtPlayhead(currentClipId))
+                    }
                     EditorTool.SPEED -> { _uiState.update { it.copy(isSpeedSheetVisible = true) } }
                     EditorTool.VOLUME -> { _uiState.update { it.copy(isVolumeSheetVisible = true) } }
                     EditorTool.CANVAS -> { _uiState.update { it.copy(isCanvasSheetVisible = true) } }
                     EditorTool.KEYFRAME -> { _uiState.update { it.copy(isKeyframeSheetVisible = true) } }
-                    EditorTool.BEATS -> { _uiState.update { it.copy(isBeatsSheetVisible = true) } }
+                    EditorTool.BEATS -> {
+                        // Tapping BEATS toggles beat marker at playhead!
+                        onTimelineAction(TimelineAction.ToggleBeatMarker(_uiState.value.playheadPositionMs))
+                    }
                     EditorTool.TRANSFORM -> { _uiState.update { it.copy(isTransformSheetVisible = true) } }
                     EditorTool.DELETE -> {
                         currentClipId?.let { onTimelineAction(TimelineAction.DeleteClip(it)) }
                     }
                     else -> {
-                        // For newly added UI tools, just open edit sheet as placeholder
                         _uiState.update { it.copy(isEditSheetVisible = true) }
                     }
                 }
@@ -347,14 +351,15 @@ class EditorViewModel(
 
         _uiState.update { current ->
             val sheetVisible = when (action) {
-                is TimelineAction.SelectClip -> action.clipId != null
+                is TimelineAction.SelectClip -> false
                 is TimelineAction.DeleteClip -> false
-                is TimelineAction.SplitAtPlayhead, is TimelineAction.SplitClip, is TimelineAction.DuplicateClip -> true
+                is TimelineAction.SplitAtPlayhead, is TimelineAction.SplitClip, is TimelineAction.DuplicateClip -> false
                 else -> current.isEditSheetVisible && timelineEngineState.selectedClipId != null
             }
             current.copy(
                 playheadPositionMs = timelineEngineState.playheadPositionMs,
                 selectedClipId = timelineEngineState.selectedClipId,
+                beatMarkers = timelineEngineState.beatMarkers,
                 isEditSheetVisible = sheetVisible,
                 project = if (tracksChanged) current.project?.copy(
                     tracks = updatedTracks,

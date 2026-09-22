@@ -79,7 +79,7 @@ fun ExportScreen(
                         .fillMaxWidth()
                         .height(180.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Brush.linearGradient(listOf(Color(0xFF2C3248), Color(0xFF161925)))),
+                        .background(Color(0xFF1E2230)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Image, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
@@ -194,7 +194,7 @@ fun ExportScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Brush.horizontalGradient(listOf(Color(0xFF6B4BFF), Color(0xFF9E84FF)))),
+                                .background(Color(0xFF6B4BFF)),
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {

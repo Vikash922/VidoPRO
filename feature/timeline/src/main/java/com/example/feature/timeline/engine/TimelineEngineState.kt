@@ -16,7 +16,8 @@ data class TimelineEngineState(
     val selectedClipId: String? = null,
     val zoomLevel: Float = 1.0f,
     val isSnappingEnabled: Boolean = true,
-    val scrollOffsetPx: Float = 0f
+    val scrollOffsetPx: Float = 0f,
+    val beatMarkers: Set<Long> = emptySet()
 ) {
     val selectedClip: Clip?
         get() = tracks.flatMap { it.clips }.find { it.id == selectedClipId }

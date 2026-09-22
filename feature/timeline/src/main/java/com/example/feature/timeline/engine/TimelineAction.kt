@@ -30,4 +30,5 @@ sealed interface TimelineAction {
     data class SetZoom(val zoom: Float) : TimelineAction
     data class SetSnapping(val enabled: Boolean) : TimelineAction
     data class SetScrollOffset(val offsetPx: Float) : TimelineAction
+    data class ToggleBeatMarker(val positionMs: Long) : TimelineAction
 }

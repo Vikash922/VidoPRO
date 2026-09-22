@@ -33,6 +33,7 @@ fun PlayheadView(
     playheadPositionMs: Long,
     pixelsPerMs: Float,
     onSeekDelta: (Long) -> Unit,
+    onTapPlayhead: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -54,6 +55,12 @@ fun PlayheadView(
             .width(handleWidth)
             .fillMaxHeight()
             .scale(scale)
+            .pointerInput(Unit) {
+                androidx.compose.foundation.gestures.detectTapGestures {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onTapPlayhead()
+                }
+            }
             .pointerInput(pixelsPerMs) {
                 detectDragGestures(
                     onDragStart = { 

@@ -35,6 +35,15 @@ object TimelineReducer {
             is TimelineAction.SetZoom -> state.copy(zoomLevel = action.zoom.coerceIn(TimelineEngineState.MIN_ZOOM, TimelineEngineState.MAX_ZOOM))
             is TimelineAction.SetSnapping -> state.copy(isSnappingEnabled = action.enabled)
             is TimelineAction.SetScrollOffset -> state.copy(scrollOffsetPx = action.offsetPx.coerceAtLeast(0f))
+            is TimelineAction.ToggleBeatMarker -> {
+                val existing = state.beatMarkers
+                val updated = if (existing.contains(action.positionMs)) {
+                    existing - action.positionMs
+                } else {
+                    existing + action.positionMs
+                }
+                state.copy(beatMarkers = updated)
+            }
         }
     }
 

@@ -222,7 +222,7 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 ToolIconItem("Effects", Icons.Default.AutoFixHigh)
-                ToolIconItem("Filters", Icons.Default.CameraFilter)
+                ToolIconItem("Filters", Icons.Default.ColorLens)
                 ToolIconItem("Text", Icons.Default.Title)
                 ToolIconItem("Stickers", Icons.Default.EmojiEmotions)
                 ToolIconItem("Overlay", Icons.Default.Layers)

@@ -51,6 +51,7 @@ data class EditorUiState(
     val isBeatsSheetVisible: Boolean = false,
     val filterSettings: com.example.feature.editor.filter.FilterSettings = com.example.feature.editor.filter.FilterSettings(),
     val assets: Map<String, com.example.core.model.Asset> = emptyMap(),
+    val beatMarkers: Set<Long> = emptySet(),
     val error: String? = null
 ) {
     val selectedClip: Clip?
