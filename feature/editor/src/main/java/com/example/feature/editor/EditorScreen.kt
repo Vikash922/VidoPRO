@@ -83,7 +83,7 @@ fun EditorScreen(
                     
                     // Export Button
                     Button(
-                        onClick = onNavigateToExport,
+                        onClick = { uiState.project?.id?.let { onNavigateExport(it) } },
                         modifier = Modifier.height(32.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -136,7 +136,7 @@ fun EditorScreen(
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
-                        onClick = { if (uiState.isPlaying) onEvent(EditorEvent.PlayPauseClickedPauseClicked) else onEvent(EditorEvent.PlayPauseClicked) }
+                        onClick = { if (uiState.isPlaying) onEvent(EditorEvent.PlayPauseClicked) else onEvent(EditorEvent.PlayPauseClicked) }
                     ) {
                         Icon(
                             if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
