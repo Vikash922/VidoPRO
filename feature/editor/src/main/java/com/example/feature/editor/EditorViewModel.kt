@@ -207,6 +207,28 @@ class EditorViewModel(
                 _uiState.update { it.copy(isEditSheetVisible = event.visible) }
             }
 
+            
+            is EditorEvent.SplitSelectedClip -> onTimelineAction(TimelineAction.SplitAtPlayhead(_uiState.value.selectedClipId))
+            is EditorEvent.DeleteSelectedClip -> _uiState.value.selectedClipId?.let { onTimelineAction(TimelineAction.DeleteClip(it)) }
+            is EditorEvent.DuplicateSelectedClip -> _uiState.value.selectedClipId?.let { onTimelineAction(TimelineAction.DuplicateClip(it)) }
+            is EditorEvent.ApplyTextClip -> {
+                _uiState.update { it.copy(isTextSheetVisible = false) }
+            }
+            is EditorEvent.ChangeAspectRatio -> {
+                val proj = _uiState.value.project
+                if (proj != null) {
+                    val updated = proj.copy(aspectRatio = event.ratio)
+                    _uiState.update { it.copy(project = updated) }
+                }
+            }
+            is EditorEvent.ChangeClipSpeed -> {}
+            is EditorEvent.ChangeClipTransform -> {}
+            is EditorEvent.ChangeClipVolume -> {}
+            is EditorEvent.CloseToolPanel -> {}
+            is EditorEvent.UpdateFilterSettings -> {}
+            is EditorEvent.ResetFilterSettings -> {}
+            is EditorEvent.AddMediaClicked -> {}
+
             is EditorEvent.SaveImmediately -> {
                 flushAutosave()
             }

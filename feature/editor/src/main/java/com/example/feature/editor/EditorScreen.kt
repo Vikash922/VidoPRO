@@ -1,6 +1,5 @@
 package com.example.feature.editor
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -28,16 +27,25 @@ import com.example.core.model.ClipType
 import com.example.core.ui.components.LoadingView
 import com.example.core.ui.theme.AppSpacing
 import com.example.core.ui.theme.EditorColors
-import com.example.feature.editor.components.*
-import com.example.feature.timeline.ui.TimelineView
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+import com.example.feature.timeline.engine.TimelineEngineState
+import com.example.feature.timeline.engine.TimelineAction
+import com.example.feature.timeline.ui.TimelineContainer
+import com.example.core.model.TrackType
+import androidx.media3.common.Player
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
 fun EditorScreen(
     uiState: EditorUiState,
+    player: Player? = null,
     onEvent: (EditorEvent) -> Unit,
     onNavigateBack: () -> Unit,
-    onNavigateToExport: () -> Unit,
+    onNavigateExport: (projectId: String) -> Unit,
+    onNavigateMediaPicker: (TrackType) -> Unit = {},
+    onTimelineAction: (TimelineAction) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -50,13 +58,7 @@ fun EditorScreen(
         }
     }
 
-    BackHandler {
-        if (uiState.selectedClipId != null) {
-            onEvent(EditorEvent.SelectClip(null))
-        } else {
-            onNavigateBack()
         }
-    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -145,7 +147,7 @@ fun EditorScreen(
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
-                        onClick = { if (uiState.isPlaying) onEvent(EditorEvent.Pause) else onEvent(EditorEvent.Play) }
+                        onClick = { if (uiState.isPlaying) onEvent(EditorEvent.PlayPauseClickedPauseClicked) else onEvent(EditorEvent.PlayPauseClicked) }
                     ) {
                         Icon(
                             if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -153,10 +155,10 @@ fun EditorScreen(
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    IconButton(onClick = { onEvent(EditorEvent.Undo) }, enabled = uiState.canUndo) {
+                    IconButton(onClick = { onEvent(EditorEvent.UndoClicked) }, enabled = uiState.canUndo) {
                         Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo", tint = if(uiState.canUndo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    IconButton(onClick = { onEvent(EditorEvent.Redo) }, enabled = uiState.canRedo) {
+                    IconButton(onClick = { onEvent(EditorEvent.RedoClicked) }, enabled = uiState.canRedo) {
                         Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo", tint = if(uiState.canRedo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = { /* Fullscreen */ }) {
@@ -178,7 +180,7 @@ fun EditorScreen(
                         selectedClipId = uiState.selectedClipId,
                         playheadPositionMs = uiState.playheadPositionMs,
                         onClipSelected = { onEvent(EditorEvent.SelectClip(it)) },
-                        onPlayheadScrub = { onEvent(EditorEvent.Seek(it)) }
+                        onPlayheadScrub = { onEvent(EditorEvent.SeekTo(it)) }
                     )
                 }
             }
@@ -231,13 +233,32 @@ fun EditorScreen(
         }
 
         // Bottom Sheets (Omitted for brevity, but they will be mapped here)
-        if (uiState.isEditSheetVisible) { EditBottomSheet(onDismiss = { onEvent(EditorEvent.SetEditSheetVisible(false)) }, onSplit = { onEvent(EditorEvent.ToolClicked(EditorTool.SPLIT)) }) }
+                if (uiState.isEditSheetVisible && uiState.selectedClip != null) { 
+            EditBottomSheet(
+                clip = uiState.selectedClip!!,
+                playheadPositionMs = uiState.playheadPositionMs,
+                onDismiss = { onEvent(EditorEvent.SetEditSheetVisible(false)) }, 
+                onSplit = { onEvent(EditorEvent.ToolClicked(EditorTool.SPLIT)) },
+                onDuplicate = { onEvent(EditorEvent.DuplicateSelectedClip) },
+                onDelete = { onEvent(EditorEvent.DeleteSelectedClip) },
+                onSpeed = { onEvent(EditorEvent.ToolClicked(EditorTool.SPEED)) },
+                onVolume = { onEvent(EditorEvent.ToolClicked(EditorTool.VOLUME)) },
+                onAudio = { onEvent(EditorEvent.ToolClicked(EditorTool.AUDIO)) },
+                onText = { onEvent(EditorEvent.ToolClicked(EditorTool.TEXT)) },
+                onOverlay = { onEvent(EditorEvent.ToolClicked(EditorTool.OVERLAY)) },
+                onFilters = { onEvent(EditorEvent.ToolClicked(EditorTool.FILTERS)) },
+                onTransform = { onEvent(EditorEvent.ToolClicked(EditorTool.TRANSFORM)) },
+                onCanvas = { onEvent(EditorEvent.ToolClicked(EditorTool.CANVAS)) },
+                onKeyframe = { onEvent(EditorEvent.ToolClicked(EditorTool.KEYFRAME)) },
+                onBeats = { onEvent(EditorEvent.ToolClicked(EditorTool.BEATS)) }
+            ) 
+        }
         if (uiState.isKeyframeSheetVisible) { KeyframeBottomSheet(onDismiss = { onEvent(EditorEvent.SetKeyframeSheetVisible(false)) }) }
         if (uiState.isBeatsSheetVisible) { BeatsBottomSheet(onDismiss = { onEvent(EditorEvent.SetBeatsSheetVisible(false)) }) }
-        if (uiState.isSpeedSheetVisible) { SpeedBottomSheet(onDismiss = { onEvent(EditorEvent.SetSpeedSheetVisible(false)) }) }
-        if (uiState.isTransformSheetVisible) { TransformBottomSheet(onDismiss = { onEvent(EditorEvent.SetTransformSheetVisible(false)) }) }
-        if (uiState.isVolumeSheetVisible) { VolumeBottomSheet(onDismiss = { onEvent(EditorEvent.SetVolumeSheetVisible(false)) }) }
-        if (uiState.isCanvasSheetVisible) { CanvasBottomSheet(onDismiss = { onEvent(EditorEvent.SetCanvasSheetVisible(false)) }) }
+        if (uiState.isSpeedSheetVisible) { SpeedBottomSheet(currentSpeed = 1.0f, onSpeedChanged = {}, onDismiss = { onEvent(EditorEvent.SetSpeedSheetVisible(false)) }) }
+        if (uiState.isTransformSheetVisible) { TransformBottomSheet(currentTransform = com.example.core.model.Transform.DEFAULT, onTransformChanged = {}, onDismiss = { onEvent(EditorEvent.SetTransformSheetVisible(false)) }) }
+        if (uiState.isVolumeSheetVisible) { VolumeBottomSheet(currentVolume = 1.0f, onVolumeChanged = {}, onDismiss = { onEvent(EditorEvent.SetVolumeSheetVisible(false)) }) }
+        if (uiState.isCanvasSheetVisible) { CanvasBottomSheet(currentRatio = com.example.core.model.AspectRatio.RATIO_9_16, onRatioSelected = {}, onDismiss = { onEvent(EditorEvent.SetCanvasSheetVisible(false)) }) }
     }
 }
 
