@@ -16,9 +16,10 @@ data class TrackWithClips(
 
     @Relation(
         parentColumn = "id",
-        entityColumn = "trackId"
+        entityColumn = "trackId",
+        entity = ClipEntity::class
     )
-    val clips: List<ClipEntity>
+    val clips: List<ClipWithDetails>
 )
 
 data class ProjectWithTracks(

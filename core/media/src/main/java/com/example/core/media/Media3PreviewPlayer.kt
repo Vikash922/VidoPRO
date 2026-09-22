@@ -28,7 +28,22 @@ class Media3PreviewPlayer(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main + Job())
 ) : PreviewPlayerController {
 
-    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context.applicationContext).build()
+    private val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context.applicationContext)
+        .setEnableDecoderFallback(true)
+        .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+
+    private val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+        .setBufferDurationsMs(
+            /* minBufferMs = */ 15_000,
+            /* maxBufferMs = */ 50_000,
+            /* bufferForPlaybackMs = */ 1_000,
+            /* bufferForPlaybackAfterRebufferMs = */ 2_000
+        )
+        .build()
+
+    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context.applicationContext, renderersFactory)
+        .setLoadControl(loadControl)
+        .build()
     private val audioPlayer: ExoPlayer = ExoPlayer.Builder(context.applicationContext).build()
 
     override val player: Player
@@ -110,7 +125,7 @@ class Media3PreviewPlayer(
             // Avoid setting endPositionMs if not trimmed, preventing IllegalClippingException.
             val isTrimmedStart = clip.inPointMs > 0L
             val assetDuration = asset.durationMs ?: 0L
-            val isTrimmedEnd = clip.outPointMs > 0L && (assetDuration > 0L && clip.outPointMs < assetDuration)
+            val isTrimmedEnd = clip.outPointMs > 0L && (assetDuration <= 0L || clip.outPointMs < assetDuration)
             if (isTrimmedStart || isTrimmedEnd) {
                 val clippingConfig = MediaItem.ClippingConfiguration.Builder().apply {
                     if (isTrimmedStart) {
@@ -147,7 +162,7 @@ class Media3PreviewPlayer(
 
             val isTrimmedStart = clip.inPointMs > 0L
             val assetDuration = asset.durationMs ?: 0L
-            val isTrimmedEnd = clip.outPointMs > 0L && (assetDuration > 0L && clip.outPointMs < assetDuration)
+            val isTrimmedEnd = clip.outPointMs > 0L && (assetDuration <= 0L || clip.outPointMs < assetDuration)
             if (isTrimmedStart || isTrimmedEnd) {
                 val clippingConfig = MediaItem.ClippingConfiguration.Builder().apply {
                     if (isTrimmedStart) {

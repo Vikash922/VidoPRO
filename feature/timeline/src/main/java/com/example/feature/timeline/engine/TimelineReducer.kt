@@ -233,7 +233,7 @@ object TimelineReducer {
         splitPointMs: Long
     ): TimelineEngineState {
         val clip = state.findClip(clipId) ?: return state
-        val minDuration = 100L
+        val minDuration = 50L
 
         // Validation: split point must be within clip bounds and not too close to ends
         val minValidSplit = clip.startTimeMs + minDuration

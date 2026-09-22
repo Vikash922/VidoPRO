@@ -41,7 +41,7 @@ fun PlayheadView(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-    val handleWidth = 32.dp
+    val handleWidth = 44.dp
     val playheadColor = Color.White
     
     var isDragging by remember { mutableStateOf(false) }
@@ -90,9 +90,9 @@ fun PlayheadView(
             .drawWithCache {
                 val centerX = size.width / 2f
                 val height = size.height
-                val handleHeight = 13.dp.toPx()
-                val handleCapWidth = 6.dp.toPx()
-                val lineWidth = 1.5.dp.toPx()
+                val handleHeight = 11.dp.toPx()
+                val handleCapWidth = 5.dp.toPx()
+                val lineWidth = 1.dp.toPx()
 
                 val handlePath = Path().apply {
                     moveTo(centerX - handleCapWidth, 0f)

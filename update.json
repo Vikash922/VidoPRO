@@ -1,6 +1,6 @@
 {
-  "versionCode": 13,
-  "versionName": "2.0.4",
+  "versionCode": 14,
+  "versionName": "2.0.5",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "Release 2.0.4: Clean solid dark theme (zero purple/gradients), project options dialog (duplicate/rename/delete), real video thumbnails on timeline & projects, smooth overlay dragging & controls, tap-away deselect, ultra-thin 1.5dp playhead with precise splitting, prominent trim handles, and real-time hardware filter rendering."
+  "releaseNotes": "Release 2.0.5: CapCut-style Fold/Unfold dedicated sub-timelines (Overlay, Audio, Text), 4K 60fps zero-copy SurfaceView hardware playback with decoder fallback, visible Text rendering on canvas & timeline, Keyframe button next to Undo/Redo, precision playhead splitting and ultra-thin 1dp line, smooth multi-overlay dragging and up to 10x scaling."
 }

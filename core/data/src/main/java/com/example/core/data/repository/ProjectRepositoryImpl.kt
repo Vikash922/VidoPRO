@@ -71,15 +71,7 @@ class ProjectRepositoryImpl(
     }
 
     override suspend fun getProjectById(projectId: String): Project? = withContext(dispatchers.io) {
-        val projectWithTracks = projectDao.getProjectWithTracks(projectId) ?: return@withContext null
-        val tracks = projectWithTracks.tracks.map { trackWithClips ->
-            val detailedClips = trackWithClips.clips.map { clipEntity ->
-                val clipWithDetails = clipDao.getClipWithDetails(clipEntity.id)
-                clipWithDetails?.toDomain() ?: clipEntity.toDomain()
-            }
-            trackWithClips.track.toDomain(clips = detailedClips)
-        }
-        projectWithTracks.project.toDomain(tracks = tracks)
+        projectDao.getProjectWithTracks(projectId)?.toDomain()
     }
 
     override fun observeProjects(): Flow<List<Project>> {

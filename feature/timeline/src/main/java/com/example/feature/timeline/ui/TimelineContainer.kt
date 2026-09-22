@@ -43,6 +43,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.text.font.FontWeight
 import com.example.core.model.Asset
 import com.example.core.model.Track
 import com.example.core.model.TrackType
@@ -53,20 +55,30 @@ import com.example.feature.timeline.engine.TimelineUtils
 import kotlin.math.max
 import kotlin.math.roundToInt
 
+enum class TimelineMode {
+    MAIN,
+    OVERLAY,
+    AUDIO,
+    TEXT
+}
+
 /**
  * Main Timeline Container — Flat dark mode without gradients.
  * Features:
  * - Left side track indicators ("Cover", Text, Audio Add)
+ * - CapCut-style Fold / Unfold dedicated sub-timeline modes (Overlay, Audio, Text)
  * - Time ruler
  * - Beat markers (Pink vertical line highlighting beat positions)
- * - Tapping the white playhead toggles a beat marker with pink highlight line
- * - Clip dragging left/right
+ * - Sleek 1dp playhead line and smooth dragging
  */
 @Composable
 fun TimelineContainer(
     state: TimelineEngineState,
     isPlaying: Boolean,
     assets: Map<String, Asset> = emptyMap(),
+    timelineMode: TimelineMode = TimelineMode.MAIN,
+    onBackToMain: () -> Unit = {},
+    onAddSubTrackMedia: () -> Unit = {},
     onAction: (TimelineAction) -> Unit,
     onPlayPause: () -> Unit,
     onAddMedia: () -> Unit,
@@ -94,9 +106,87 @@ fun TimelineContainer(
     val bgColor = Color(0xFF0A0D14)
     val pinkBeatColor = Color(0xFFFF2D75)
 
+    val visibleTracks = remember(state.tracks, timelineMode) {
+        when (timelineMode) {
+            TimelineMode.MAIN -> state.tracks.filter { it.type == TrackType.VIDEO }
+            TimelineMode.OVERLAY -> state.tracks.filter { it.type == TrackType.OVERLAY }
+            TimelineMode.AUDIO -> state.tracks.filter { it.type == TrackType.AUDIO }
+            TimelineMode.TEXT -> state.tracks.filter { it.type == TrackType.TEXT }
+        }
+    }
+
     Column(
         modifier = modifier.background(bgColor)
     ) {
+        // CapCut-style Sub-Timeline Header when in dedicated Overlay / Audio / Text mode
+        if (timelineMode != TimelineMode.MAIN) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(34.dp)
+                    .background(Color(0xFF161925))
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { onBackToMain() }
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = when (timelineMode) {
+                            TimelineMode.OVERLAY -> "Overlay Track"
+                            TimelineMode.AUDIO -> "Audio Track"
+                            TimelineMode.TEXT -> "Text Track"
+                            else -> ""
+                        },
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFF1E2230))
+                        .border(1.dp, Color(0xFF384055), RoundedCornerShape(4.dp))
+                        .clickable { onAddSubTrackMedia() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = when (timelineMode) {
+                            TimelineMode.OVERLAY -> "Add Overlay"
+                            TimelineMode.AUDIO -> "Add Audio"
+                            TimelineMode.TEXT -> "Add Text"
+                            else -> "Add"
+                        },
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
         // Main timeline area: Left track labels + Right scrollable tracks
         Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
 
@@ -110,7 +200,7 @@ fun TimelineContainer(
             ) {
                 Spacer(modifier = Modifier.height(AppSpacing.xs))
 
-                if (state.tracks.isEmpty()) {
+                if (visibleTracks.isEmpty()) {
                     Box(
                         modifier = Modifier.size(42.dp, 56.dp),
                         contentAlignment = Alignment.Center
@@ -121,7 +211,9 @@ fun TimelineContainer(
                                 .clip(CircleShape)
                                 .background(Color(0xFF1E2230))
                                 .border(1.dp, Color(0xFF2C3448), CircleShape)
-                                .clickable { onAddMedia() },
+                                .clickable {
+                                    if (timelineMode == TimelineMode.MAIN) onAddMedia() else onAddSubTrackMedia()
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -133,7 +225,7 @@ fun TimelineContainer(
                         }
                     }
                 } else {
-                    state.tracks.forEach { track ->
+                    visibleTracks.forEach { track ->
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -171,7 +263,7 @@ fun TimelineContainer(
                                             .clip(CircleShape)
                                             .background(Color(0xFF0F3658))
                                             .border(1.dp, Color(0xFF00D2FF), CircleShape)
-                                            .clickable { onAddMedia() },
+                                            .clickable { onAddSubTrackMedia() },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -227,7 +319,7 @@ fun TimelineContainer(
                         Spacer(modifier = Modifier.height(AppSpacing.xs))
 
                         // 2. Track Lanes
-                        if (state.tracks.isEmpty()) {
+                        if (visibleTracks.isEmpty()) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -236,7 +328,9 @@ fun TimelineContainer(
                                     .clip(RoundedCornerShape(6.dp))
                                     .background(Color(0xFF1E2230))
                                     .border(1.dp, Color(0xFF384055), RoundedCornerShape(6.dp))
-                                    .clickable { onAddMedia() },
+                                    .clickable {
+                                        if (timelineMode == TimelineMode.MAIN) onAddMedia() else onAddSubTrackMedia()
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -248,14 +342,19 @@ fun TimelineContainer(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        "Tap to add media",
+                                        text = when (timelineMode) {
+                                            TimelineMode.OVERLAY -> "Tap to add overlay"
+                                            TimelineMode.AUDIO -> "Tap to add audio"
+                                            TimelineMode.TEXT -> "Tap to add text"
+                                            else -> "Tap to add media"
+                                        },
                                         color = Color.White.copy(alpha = 0.6f),
                                         fontSize = 12.sp
                                     )
                                 }
                             }
                         } else {
-                            state.tracks.forEach { track ->
+                            visibleTracks.forEach { track ->
                                 TrackLane(
                                     track = track,
                                     selectedClipId = state.selectedClipId,
@@ -263,7 +362,9 @@ fun TimelineContainer(
                                     assets = assets,
                                     onAction = onAction,
                                     onSeek = onSeekAction,
-                                    onAddMedia = onAddMedia
+                                    onAddMedia = {
+                                        if (timelineMode == TimelineMode.MAIN) onAddMedia() else onAddSubTrackMedia()
+                                    }
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                             }
@@ -303,7 +404,7 @@ fun TimelineContainer(
                         },
                         modifier = Modifier.offset {
                             val currentPlayheadPx = (state.playheadPositionMs * pixelsPerMs).roundToInt()
-                            IntOffset(currentPlayheadPx - 16.dp.roundToPx(), 0)
+                            IntOffset(currentPlayheadPx - 22.dp.roundToPx(), 0)
                         }
                     )
                 }

@@ -29,19 +29,25 @@ import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CropRotate
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
 import coil.compose.AsyncImage
+import com.example.feature.timeline.ui.TimelineMode
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
@@ -111,6 +117,7 @@ fun EditorScreen(
     var isFullscreen by remember { mutableStateOf(false) }
     var selectedResolution by remember { mutableStateOf("1080P") }
     var showResolutionMenu by remember { mutableStateOf(false) }
+    var timelineMode by remember { mutableStateOf(TimelineMode.MAIN) }
 
     val hasClips = remember(uiState.project) {
         uiState.project?.tracks?.any { it.clips.isNotEmpty() } == true
@@ -409,6 +416,7 @@ fun EditorScreen(
                                             onTap = {
                                                 onEvent(EditorEvent.SelectClip(overlayClip.id))
                                                 onTimelineAction(TimelineAction.SelectClip(overlayClip.id))
+                                                timelineMode = TimelineMode.OVERLAY
                                             }
                                         )
                                     }
@@ -417,9 +425,10 @@ fun EditorScreen(
                                             if (uiState.selectedClipId != overlayClip.id) {
                                                 onEvent(EditorEvent.SelectClip(overlayClip.id))
                                                 onTimelineAction(TimelineAction.SelectClip(overlayClip.id))
+                                                timelineMode = TimelineMode.OVERLAY
                                             }
                                             val currentT = overlayClip.transform
-                                            val newScale = (currentT.scaleX * zoom).coerceIn(0.2f, 5.0f)
+                                            val newScale = (currentT.scaleX * zoom).coerceIn(0.1f, 10.0f)
                                             val newRotation = (currentT.rotation + rotation) % 360f
                                             val newX = currentT.x + pan.x
                                             val newY = currentT.y + pan.y
@@ -504,10 +513,11 @@ fun EditorScreen(
                                             .background(Color(0xFF1E2230))
                                             .border(1.dp, Color.White, CircleShape)
                                             .pointerInput(overlayClip.id) {
-                                                detectTransformGestures { _, pan, _, _ ->
+                                                detectDragGestures { change, dragAmount ->
+                                                    change.consume()
                                                     val currentT = overlayClip.transform
-                                                    val delta = (pan.x + pan.y) / 100f
-                                                    val newScale = (currentT.scaleX + delta).coerceIn(0.2f, 5.0f)
+                                                    val delta = (dragAmount.x + dragAmount.y) / 80f
+                                                    val newScale = (currentT.scaleX + delta).coerceIn(0.1f, 10.0f)
                                                     onEvent(
                                                         EditorEvent.ChangeClipTransform(
                                                             currentT.copy(scaleX = newScale, scaleY = newScale),
@@ -522,7 +532,7 @@ fun EditorScreen(
                                             imageVector = Icons.Default.OpenInFull,
                                             contentDescription = "Scale Overlay",
                                             tint = Color.White,
-                                            modifier = Modifier.size(12.dp)
+                                            modifier = Modifier.size(13.dp)
                                         )
                                     }
                                 }
@@ -575,6 +585,7 @@ fun EditorScreen(
                                     .clickable {
                                         onEvent(EditorEvent.SelectClip(textClip.id))
                                         onTimelineAction(TimelineAction.SelectClip(textClip.id))
+                                        timelineMode = TimelineMode.TEXT
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -652,7 +663,7 @@ fun EditorScreen(
                         )
                     }
 
-                    // Undo, Redo, Fullscreen icons
+                    // Undo, Redo, Keyframe, Fullscreen icons
                     Row(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.End,
@@ -666,7 +677,7 @@ fun EditorScreen(
                                 .size(20.dp)
                                 .clickable(enabled = uiState.canUndo) { onEvent(EditorEvent.UndoClicked) }
                         )
-                        Spacer(Modifier.width(16.dp))
+                        Spacer(Modifier.width(14.dp))
                         Icon(
                             Icons.AutoMirrored.Filled.Redo,
                             contentDescription = "Redo",
@@ -675,7 +686,44 @@ fun EditorScreen(
                                 .size(20.dp)
                                 .clickable(enabled = uiState.canRedo) { onEvent(EditorEvent.RedoClicked) }
                         )
-                        Spacer(Modifier.width(16.dp))
+                        Spacer(Modifier.width(14.dp))
+                        // Keyframe Diamond Button
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (uiState.selectedClipId != null) Color(0xFF1E2230) else Color.Transparent)
+                                .clickable {
+                                    if (uiState.selectedClipId != null) {
+                                        onEvent(EditorEvent.SetKeyframeSheetVisible(true))
+                                    } else {
+                                        val activeClipId = uiState.project?.tracks?.flatMap { it.clips }?.find {
+                                            uiState.playheadPositionMs in it.startTimeMs..it.endTimeMs
+                                        }?.id
+                                        if (activeClipId != null) {
+                                            onEvent(EditorEvent.SelectClip(activeClipId))
+                                            onTimelineAction(TimelineAction.SelectClip(activeClipId))
+                                            onEvent(EditorEvent.SetKeyframeSheetVisible(true))
+                                        }
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Canvas(modifier = Modifier.size(14.dp)) {
+                                val path = Path().apply {
+                                    moveTo(size.width / 2f, 0f)
+                                    lineTo(size.width, size.height / 2f)
+                                    lineTo(size.width / 2f, size.height)
+                                    lineTo(0f, size.height / 2f)
+                                    close()
+                                }
+                                drawPath(
+                                    path = path,
+                                    color = if (uiState.selectedClipId != null) Color(0xFF00D2FF) else Color.White.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(14.dp))
                         Icon(
                             Icons.Default.Fullscreen,
                             contentDescription = "Fullscreen",
@@ -715,6 +763,20 @@ fun EditorScreen(
                             state = timelineEngineState,
                             isPlaying = uiState.isPlaying,
                             assets = uiState.assets,
+                            timelineMode = timelineMode,
+                            onBackToMain = {
+                                timelineMode = TimelineMode.MAIN
+                                onEvent(EditorEvent.SelectClip(null))
+                                onTimelineAction(TimelineAction.SelectClip(null))
+                            },
+                            onAddSubTrackMedia = {
+                                when (timelineMode) {
+                                    TimelineMode.OVERLAY -> onNavigateMediaPicker(TrackType.OVERLAY)
+                                    TimelineMode.AUDIO -> onNavigateMediaPicker(TrackType.AUDIO)
+                                    TimelineMode.TEXT -> onEvent(EditorEvent.SetTextSheetVisible(true))
+                                    else -> onNavigateMediaPicker(TrackType.VIDEO)
+                                }
+                            },
                             onAction = onTimelineAction,
                             onPlayPause = { onEvent(EditorEvent.PlayPauseClicked) },
                             onAddMedia = { onNavigateMediaPicker(TrackType.VIDEO) },
@@ -738,60 +800,158 @@ fun EditorScreen(
                             .horizontalScroll(scrollState),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        if (uiState.selectedClipId == null) {
-                            // Primary tools
-                            EditorToolButton(EditorTool.EDIT, Icons.Default.ContentCut) { onEvent(EditorEvent.SetEditSheetVisible(true)) }
-                            Spacer(Modifier.width(20.dp))
-                            EditorToolButton(EditorTool.CANVAS, Icons.Default.AspectRatio) { onEvent(EditorEvent.SetCanvasSheetVisible(true)) }
-                            Spacer(Modifier.width(20.dp))
-                            EditorToolButton(EditorTool.AUDIO, Icons.Default.Audiotrack) { onNavigateMediaPicker(TrackType.AUDIO) }
-                            Spacer(Modifier.width(20.dp))
-                            EditorToolButton(EditorTool.TEXT, Icons.Default.Title) { onEvent(EditorEvent.SetTextSheetVisible(true)) }
-                            Spacer(Modifier.width(20.dp))
-                            EditorToolButton(EditorTool.OVERLAY, Icons.Default.Layers) { onNavigateMediaPicker(TrackType.OVERLAY) }
-                            Spacer(Modifier.width(20.dp))
-                            EditorToolButton(EditorTool.EFFECTS, Icons.Default.AutoFixHigh) { onEvent(EditorEvent.SetFiltersSheetVisible(true)) }
-                            Spacer(Modifier.width(20.dp))
-                            EditorToolButton(EditorTool.FILTERS, Icons.Default.ColorLens) { onEvent(EditorEvent.SetFiltersSheetVisible(true)) }
-                        } else {
-                            // Clip-specific tools for selected clip
-                            val clip = uiState.selectedClip
+                        if (timelineMode == TimelineMode.MAIN) {
+                            if (uiState.selectedClipId == null) {
+                                // Primary tools
+                                EditorToolButton(EditorTool.EDIT, Icons.Default.ContentCut) { onEvent(EditorEvent.SetEditSheetVisible(true)) }
+                                Spacer(Modifier.width(20.dp))
+                                EditorToolButton(EditorTool.CANVAS, Icons.Default.AspectRatio) { onEvent(EditorEvent.SetCanvasSheetVisible(true)) }
+                                Spacer(Modifier.width(20.dp))
+                                EditorToolButton(EditorTool.AUDIO, Icons.Default.Audiotrack) { timelineMode = TimelineMode.AUDIO }
+                                Spacer(Modifier.width(20.dp))
+                                EditorToolButton(EditorTool.TEXT, Icons.Default.Title) { timelineMode = TimelineMode.TEXT }
+                                Spacer(Modifier.width(20.dp))
+                                EditorToolButton(EditorTool.OVERLAY, Icons.Default.Layers) { timelineMode = TimelineMode.OVERLAY }
+                                Spacer(Modifier.width(20.dp))
+                                EditorToolButton(EditorTool.EFFECTS, Icons.Default.AutoFixHigh) { onEvent(EditorEvent.SetFiltersSheetVisible(true)) }
+                                Spacer(Modifier.width(20.dp))
+                                EditorToolButton(EditorTool.FILTERS, Icons.Default.ColorLens) { onEvent(EditorEvent.SetFiltersSheetVisible(true)) }
+                            } else {
+                                // Clip-specific tools for selected clip
+                                val clip = uiState.selectedClip
+                                EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
+                                    onEvent(EditorEvent.SplitSelectedClip)
+                                }
+                                if (clip?.type == ClipType.TEXT) {
+                                    EditorToolButton(EditorTool.TEXT, Icons.Default.Title) {
+                                        onEvent(EditorEvent.SetTextSheetVisible(true))
+                                    }
+                                    Spacer(Modifier.width(18.dp))
+                                }
+                                if (clip?.type == ClipType.VIDEO) {
+                                    EditorToolButton(EditorTool.SPEED, Icons.Default.Speed) {
+                                        onEvent(EditorEvent.SetSpeedSheetVisible(true))
+                                    }
+                                    Spacer(Modifier.width(18.dp))
+                                }
+                                if (clip?.type == ClipType.VIDEO || clip?.type == ClipType.AUDIO) {
+                                    EditorToolButton(EditorTool.VOLUME, Icons.Default.VolumeUp) {
+                                        onEvent(EditorEvent.SetVolumeSheetVisible(true))
+                                    }
+                                    Spacer(Modifier.width(18.dp))
+                                }
+                                EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
+                                    onEvent(EditorEvent.DeleteSelectedClip)
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.TRANSFORM, Icons.Default.CropRotate) {
+                                    onEvent(EditorEvent.SetTransformSheetVisible(true))
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
+                                    onEvent(EditorEvent.SetKeyframeSheetVisible(true))
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.BEATS, Icons.Default.GraphicEq) {
+                                    // Tapping BEATS toggles pink beat marker line at playhead!
+                                    onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs))
+                                }
+                            }
+                        } else if (timelineMode == TimelineMode.OVERLAY) {
+                            EditorToolButton(EditorTool.EDIT, Icons.AutoMirrored.Filled.ArrowBack) {
+                                timelineMode = TimelineMode.MAIN
+                                onEvent(EditorEvent.SelectClip(null))
+                                onTimelineAction(TimelineAction.SelectClip(null))
+                            }
+                            Spacer(Modifier.width(18.dp))
+                            EditorToolButton(EditorTool.OVERLAY, Icons.Default.Add) {
+                                onNavigateMediaPicker(TrackType.OVERLAY)
+                            }
+                            Spacer(Modifier.width(18.dp))
                             EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
                                 onEvent(EditorEvent.SplitSelectedClip)
                             }
-                            if (clip?.type == ClipType.TEXT) {
-                                EditorToolButton(EditorTool.TEXT, Icons.Default.Title) {
-                                    onEvent(EditorEvent.SetTextSheetVisible(true))
+                            Spacer(Modifier.width(18.dp))
+                            if (uiState.selectedClipId != null) {
+                                EditorToolButton(EditorTool.TRANSFORM, Icons.Default.CropRotate) {
+                                    onEvent(EditorEvent.SetTransformSheetVisible(true))
                                 }
                                 Spacer(Modifier.width(18.dp))
-                            }
-                            if (clip?.type == ClipType.VIDEO) {
                                 EditorToolButton(EditorTool.SPEED, Icons.Default.Speed) {
                                     onEvent(EditorEvent.SetSpeedSheetVisible(true))
                                 }
                                 Spacer(Modifier.width(18.dp))
-                            }
-                            if (clip?.type == ClipType.VIDEO || clip?.type == ClipType.AUDIO) {
                                 EditorToolButton(EditorTool.VOLUME, Icons.Default.VolumeUp) {
                                     onEvent(EditorEvent.SetVolumeSheetVisible(true))
                                 }
                                 Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
+                                    onEvent(EditorEvent.DeleteSelectedClip)
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
+                                    onEvent(EditorEvent.SetKeyframeSheetVisible(true))
+                                }
                             }
-                            EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
-                                onEvent(EditorEvent.DeleteSelectedClip)
+                        } else if (timelineMode == TimelineMode.AUDIO) {
+                            EditorToolButton(EditorTool.EDIT, Icons.AutoMirrored.Filled.ArrowBack) {
+                                timelineMode = TimelineMode.MAIN
+                                onEvent(EditorEvent.SelectClip(null))
+                                onTimelineAction(TimelineAction.SelectClip(null))
                             }
                             Spacer(Modifier.width(18.dp))
-                            EditorToolButton(EditorTool.TRANSFORM, Icons.Default.CropRotate) {
-                                onEvent(EditorEvent.SetTransformSheetVisible(true))
+                            EditorToolButton(EditorTool.AUDIO, Icons.Default.Add) {
+                                onNavigateMediaPicker(TrackType.AUDIO)
                             }
                             Spacer(Modifier.width(18.dp))
-                            EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
-                                onEvent(EditorEvent.SetKeyframeSheetVisible(true))
+                            EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
+                                onEvent(EditorEvent.SplitSelectedClip)
                             }
                             Spacer(Modifier.width(18.dp))
-                            EditorToolButton(EditorTool.BEATS, Icons.Default.GraphicEq) {
-                                // Tapping BEATS toggles pink beat marker line at playhead!
-                                onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs))
+                            if (uiState.selectedClipId != null) {
+                                EditorToolButton(EditorTool.VOLUME, Icons.Default.VolumeUp) {
+                                    onEvent(EditorEvent.SetVolumeSheetVisible(true))
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.SPEED, Icons.Default.Speed) {
+                                    onEvent(EditorEvent.SetSpeedSheetVisible(true))
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
+                                    onEvent(EditorEvent.DeleteSelectedClip)
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.BEATS, Icons.Default.GraphicEq) {
+                                    onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs))
+                                }
+                            }
+                        } else if (timelineMode == TimelineMode.TEXT) {
+                            EditorToolButton(EditorTool.EDIT, Icons.AutoMirrored.Filled.ArrowBack) {
+                                timelineMode = TimelineMode.MAIN
+                                onEvent(EditorEvent.SelectClip(null))
+                                onTimelineAction(TimelineAction.SelectClip(null))
+                            }
+                            Spacer(Modifier.width(18.dp))
+                            EditorToolButton(EditorTool.TEXT, Icons.Default.Add) {
+                                onEvent(EditorEvent.SetTextSheetVisible(true))
+                            }
+                            Spacer(Modifier.width(18.dp))
+                            EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
+                                onEvent(EditorEvent.SplitSelectedClip)
+                            }
+                            Spacer(Modifier.width(18.dp))
+                            if (uiState.selectedClipId != null) {
+                                EditorToolButton(EditorTool.TEXT, Icons.Default.Title) {
+                                    onEvent(EditorEvent.SetTextSheetVisible(true))
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
+                                    onEvent(EditorEvent.DeleteSelectedClip)
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
+                                    onEvent(EditorEvent.SetKeyframeSheetVisible(true))
+                                }
                             }
                         }
                     }

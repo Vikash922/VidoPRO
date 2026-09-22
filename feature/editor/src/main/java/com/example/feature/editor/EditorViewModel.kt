@@ -424,9 +424,18 @@ class EditorViewModel(
                 SplitClipCommand(action.clipId, action.splitPointMs, preActionState)
             }
             is TimelineAction.SplitAtPlayhead -> {
-                val clipId = action.clipId ?: preActionState.selectedClipId
+                val playhead = preActionState.playheadPositionMs
+                val clipId = if (action.clipId != null) {
+                    val c = preActionState.findClip(action.clipId)
+                    if (c != null && playhead >= c.startTimeMs && playhead <= c.endTimeMs) action.clipId
+                    else preActionState.tracks.flatMap { it.clips }.find { playhead >= it.startTimeMs && playhead < it.endTimeMs }?.id
+                } else {
+                    val sel = preActionState.selectedClipId?.let { preActionState.findClip(it) }
+                    if (sel != null && playhead >= sel.startTimeMs && playhead <= sel.endTimeMs) sel.id
+                    else preActionState.tracks.flatMap { it.clips }.find { playhead >= it.startTimeMs && playhead < it.endTimeMs }?.id
+                }
                 if (clipId != null) {
-                    SplitClipCommand(clipId, preActionState.playheadPositionMs, preActionState)
+                    SplitClipCommand(clipId, playhead, preActionState)
                 } else null
             }
             is TimelineAction.DeleteClip -> {
@@ -448,7 +457,7 @@ class EditorViewModel(
                 StateSnapshotCommand("Change clip volume", action, preActionState)
             }
             is TimelineAction.UpdateClipTransform -> {
-                StateSnapshotCommand("Transform clip", action, preActionState)
+                null
             }
             else -> null
         }
