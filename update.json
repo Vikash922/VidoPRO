@@ -1,6 +1,6 @@
 {
-  "versionCode": 10,
-  "versionName": "2.0.1",
+  "versionCode": 11,
+  "versionName": "2.0.2",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "Hotfix: Fixed timeline compilation errors."
+  "releaseNotes": "Hotfix: Fixed drag gestures compilation errors."
 }

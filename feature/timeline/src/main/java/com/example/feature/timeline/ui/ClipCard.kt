@@ -270,7 +270,7 @@ fun ClipCard(
                             onDragEnd = { accumulatedTrimStartPx = 0f },
                             onDragCancel = { accumulatedTrimStartPx = 0f },
                             onDrag = { change, dragAmount ->
-                                changes.forEach { it.consume() }
+                                change.consume()
                                 accumulatedTrimStartPx += dragAmount.x
                                 val deltaMs = (accumulatedTrimStartPx / pixelsPerMs).toLong()
                                 if (deltaMs != 0L) {
@@ -310,7 +310,7 @@ fun ClipCard(
                             onDragEnd = { accumulatedTrimEndPx = 0f },
                             onDragCancel = { accumulatedTrimEndPx = 0f },
                             onDrag = { change, dragAmount ->
-                                changes.forEach { it.consume() }
+                                change.consume()
                                 accumulatedTrimEndPx += dragAmount.x
                                 val deltaMs = (accumulatedTrimEndPx / pixelsPerMs).toLong()
                                 if (deltaMs != 0L) {
