@@ -136,7 +136,7 @@ fun ExportScreen(
                     valueRange = 2f..50f,
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,
-                        activeTrackColor = Color(0xFF7B61FF),
+                        activeTrackColor = Color.White,
                         inactiveTrackColor = Color(0xFF2C3248)
                     )
                 )
@@ -154,7 +154,7 @@ fun ExportScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                         Text("Exporting... ${uiState.progressPercent}%", color = Color.White)
                         Spacer(Modifier.height(8.dp))
-                        LinearProgressIndicator(progress = { uiState.progressFraction }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), color = Color(0xFF7B61FF))
+                        LinearProgressIndicator(progress = { uiState.progressFraction }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), color = Color.White)
                         Spacer(Modifier.height(16.dp))
                         OutlinedButton(onClick = onCancelExport) {
                             Text("Cancel", color = Color.White)
@@ -178,7 +178,7 @@ fun ExportScreen(
                                     }
                                     context.startActivity(intent)
                                 }
-                            }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF))) {
+                            }, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF0A0D14))) {
                                 Text("Play Video")
                             }
                         }
@@ -194,13 +194,13 @@ fun ExportScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color(0xFF6B4BFF)),
+                                .background(Color.White),
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Upload, contentDescription = null, tint = Color.White)
+                                Icon(Icons.Default.Upload, contentDescription = null, tint = Color(0xFF0A0D14))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Export", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text("Export", color = Color(0xFF0A0D14), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -234,13 +234,13 @@ fun <T> ExportOptionRow(
                         .weight(1f)
                         .height(40.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) Color(0xFF7B61FF) else Color(0xFF161925))
+                        .background(if (isSelected) Color.White else Color(0xFF161925))
                         .clickable { onSelect(option) },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = getLabel(option),
-                        color = Color.White,
+                        color = if (isSelected) Color(0xFF0A0D14) else Color.White,
                         fontSize = 12.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                     )

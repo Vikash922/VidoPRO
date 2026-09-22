@@ -21,8 +21,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
+import coil.decode.VideoFrameDecoder
+import coil.request.ImageRequest
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.common.TimeUtils
@@ -59,7 +68,9 @@ fun HomeScreen(
     val scrollState = rememberScrollState()
     val bgColor = Color(0xFF0F111A)
     val cardColor = Color(0xFF161925)
-    val accentColor = Color(0xFF6B4BFF)
+    val accentColor = Color.White
+    val onAccentColor = Color(0xFF0A0D14)
+    var selectedProjectForOptions by remember { mutableStateOf<Project?>(null) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -89,7 +100,7 @@ fun HomeScreen(
                             .background(accentColor, shape = RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("V", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("V", color = onAccentColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("VixEdit", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
@@ -143,7 +154,7 @@ fun HomeScreen(
                         .clickable { onNewProjectClick() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Go", tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Go", tint = onAccentColor)
                 }
             }
 
@@ -154,18 +165,18 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // New Project Button — Solid Purple
+                // New Project Button — Clean Solid White
                 Button(
                     onClick = { onNewProjectClick() },
                     modifier = Modifier.weight(1.5f).height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                    colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = onAccentColor),
                     contentPadding = PaddingValues()
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Add, contentDescription = "New", tint = Color.White)
+                        Icon(Icons.Default.Add, contentDescription = "New", tint = onAccentColor)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("New Project", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text("New Project", color = onAccentColor, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -256,7 +267,8 @@ fun HomeScreen(
                         RecentProjectCard(
                             project = project,
                             onClick = { onProjectClick(project.id) },
-                            onMoreClick = { onProjectDeleteClick(project) }
+                            onLongClick = { selectedProjectForOptions = project },
+                            onMoreClick = { selectedProjectForOptions = project }
                         )
                     }
                 }
@@ -265,6 +277,92 @@ fun HomeScreen(
             }
             
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+
+    if (selectedProjectForOptions != null) {
+        val project = selectedProjectForOptions!!
+        Dialog(onDismissRequest = { selectedProjectForOptions = null }) {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF161925)),
+                border = BorderStroke(1.dp, Color(0xFF2C3448)),
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = project.name,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${TimeUtils.formatDuration(project.durationMs)} • 1080p",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 14.dp)
+                    )
+
+                    HorizontalDivider(color = Color(0xFF2C3448))
+                    Spacer(Modifier.height(8.dp))
+
+                    // Duplicate Action
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                val id = project.id
+                                selectedProjectForOptions = null
+                                onProjectDuplicateClick(id)
+                            }
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate", tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Text("Duplicate Project", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    }
+
+                    // Rename Action
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                val p = project
+                                selectedProjectForOptions = null
+                                onProjectRenameClick(p)
+                            }
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = "Rename", tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Text("Rename Project", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    }
+
+                    // Delete Action
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                val p = project
+                                selectedProjectForOptions = null
+                                onProjectDeleteClick(p)
+                            }
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFE57373), modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Text("Delete Project", color = Color(0xFFE57373), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
         }
     }
 
@@ -311,12 +409,35 @@ fun ToolIconItem(title: String, icon: ImageVector) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun RecentProjectCard(project: Project, onClick: () -> Unit, onMoreClick: () -> Unit) {
+fun RecentProjectCard(
+    project: Project,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onMoreClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val thumbModel = project.thumbnailPath
+    val imageRequest = remember(thumbModel) {
+        if (thumbModel != null) {
+            ImageRequest.Builder(context)
+                .data(thumbModel)
+                .videoFrameMillis(1000L)
+                .decoderFactory(VideoFrameDecoder.Factory())
+                .crossfade(true)
+                .build()
+        } else null
+    }
+
     Column(
         modifier = Modifier
             .width(140.dp)
-            .clickable(onClick = onClick)
+            .clip(RoundedCornerShape(16.dp))
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
     ) {
         Box(
             modifier = Modifier
@@ -326,12 +447,40 @@ fun RecentProjectCard(project: Project, onClick: () -> Unit, onMoreClick: () -> 
                 .background(Color(0xFF1E2230))
                 .border(1.dp, Color(0xFF2C3448), RoundedCornerShape(16.dp))
         ) {
-            Icon(
-                imageVector = Icons.Default.PlayCircle,
-                contentDescription = null,
-                modifier = Modifier.align(Alignment.Center).size(24.dp),
-                tint = Color.White.copy(alpha = 0.5f)
-            )
+            if (imageRequest != null) {
+                AsyncImage(
+                    model = imageRequest,
+                    contentDescription = project.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.PlayCircle,
+                    contentDescription = null,
+                    modifier = Modifier.align(Alignment.Center).size(24.dp),
+                    tint = Color.White.copy(alpha = 0.5f)
+                )
+            }
+
+            // 3-dots button in top-right corner
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .clickable { onMoreClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Project Options",
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
@@ -365,7 +514,7 @@ fun HomeBottomNavigationBar(selectedIndex: Int, onItemSelected: (Int) -> Unit) {
         )
         items.forEachIndexed { index, pair ->
             val isSelected = selectedIndex == index
-            val color = if (isSelected) Color(0xFF6B4BFF) else Color.White.copy(alpha = 0.4f)
+            val color = if (isSelected) Color.White else Color.White.copy(alpha = 0.4f)
             NavigationBarItem(
                 icon = { Icon(pair.second, contentDescription = pair.first, tint = color, modifier = Modifier.size(22.dp)) },
                 label = { Text(pair.first, fontSize = 10.sp, color = color) },

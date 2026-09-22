@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "versionName": "2.0.3",
+  "versionCode": 13,
+  "versionName": "2.0.4",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "Release 2.0.3: Aspect ratio canvas, live text overlay, speed/volume controls, real-time GPU filters & adjustments, undo/redo, multi-track audio playback & export, interactive multi-overlay controls with drag/pinch-zoom/duplicate/remove."
+  "releaseNotes": "Release 2.0.4: Clean solid dark theme (zero purple/gradients), project options dialog (duplicate/rename/delete), real video thumbnails on timeline & projects, smooth overlay dragging & controls, tap-away deselect, ultra-thin 1.5dp playhead with precise splitting, prominent trim handles, and real-time hardware filter rendering."
 }

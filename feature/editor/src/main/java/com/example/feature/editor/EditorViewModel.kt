@@ -292,7 +292,7 @@ class EditorViewModel(
                 }
             }
             is EditorEvent.ChangeClipTransform -> {
-                val clipId = _uiState.value.selectedClipId
+                val clipId = event.clipId ?: _uiState.value.selectedClipId
                 if (clipId != null) {
                     onTimelineAction(TimelineAction.UpdateClipTransform(clipId, event.transform))
                 }

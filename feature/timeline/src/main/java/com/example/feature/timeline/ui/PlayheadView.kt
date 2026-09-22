@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,13 +41,14 @@ fun PlayheadView(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-    val handleWidth = 24.dp
-    val pinkColor = Color(0xFFFF2D75)
+    val handleWidth = 32.dp
+    val playheadColor = Color.White
     
     var isDragging by remember { mutableStateOf(false) }
+    var accumulatedDragPx by remember { mutableFloatStateOf(0f) }
     
     val scale by animateFloatAsState(
-        targetValue = if (isDragging) 1.25f else 1f,
+        targetValue = if (isDragging) 1.15f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -69,15 +71,18 @@ fun PlayheadView(
                 detectDragGestures(
                     onDragStart = { 
                         isDragging = true 
+                        accumulatedDragPx = 0f
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     },
                     onDragEnd = { isDragging = false },
                     onDragCancel = { isDragging = false },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        val deltaMs = (dragAmount.x / pixelsPerMs).toLong()
+                        accumulatedDragPx += dragAmount.x
+                        val deltaMs = (accumulatedDragPx / pixelsPerMs).toLong()
                         if (deltaMs != 0L) {
                             onSeekDelta(deltaMs)
+                            accumulatedDragPx -= deltaMs * pixelsPerMs
                         }
                     }
                 )
@@ -85,32 +90,32 @@ fun PlayheadView(
             .drawWithCache {
                 val centerX = size.width / 2f
                 val height = size.height
-                val handleHeight = 16.dp.toPx()
-                val handleCapWidth = 8.dp.toPx()
-                val lineWidth = 2.5.dp.toPx()
+                val handleHeight = 13.dp.toPx()
+                val handleCapWidth = 6.dp.toPx()
+                val lineWidth = 1.5.dp.toPx()
 
                 val handlePath = Path().apply {
                     moveTo(centerX - handleCapWidth, 0f)
                     lineTo(centerX + handleCapWidth, 0f)
-                    lineTo(centerX + handleCapWidth, handleHeight * 0.65f)
+                    lineTo(centerX + handleCapWidth, handleHeight * 0.6f)
                     lineTo(centerX, handleHeight)
-                    lineTo(centerX - handleCapWidth, handleHeight * 0.65f)
+                    lineTo(centerX - handleCapWidth, handleHeight * 0.6f)
                     close()
                 }
 
                 onDrawBehind {
-                    // Vertical playhead line (Vibrant Pink as requested)
+                    // Vertical thin playhead line (Crisp pure white)
                     drawLine(
-                        color = pinkColor,
+                        color = playheadColor,
                         start = Offset(centerX, handleHeight),
                         end = Offset(centerX, height),
                         strokeWidth = lineWidth
                     )
                     
-                    // Pink handle head
+                    // White handle head
                     drawPath(
                         path = handlePath,
-                        color = pinkColor,
+                        color = playheadColor,
                     )
                 }
             }

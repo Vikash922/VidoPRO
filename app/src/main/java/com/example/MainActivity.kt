@@ -37,6 +37,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
+        // Initialize Coil with VideoFrameDecoder for video thumbnails
+        try {
+            val imageLoader = coil.ImageLoader.Builder(applicationContext)
+                .components {
+                    add(coil.decode.VideoFrameDecoder.Factory())
+                }
+                .crossfade(true)
+                .build()
+            coil.Coil.setImageLoader(imageLoader)
+        } catch (t: Throwable) {
+            android.util.Log.w("MainActivity", "Coil VideoFrameDecoder initialization skipped: ${t.message}")
+        }
+
         // Auto-updater check (fail-safe for emulator environment)
         try {
             AppUpdater.checkForUpdates(this)

@@ -29,7 +29,7 @@ sealed interface EditorEvent {
     data class ChangeClipSpeed(val speed: Float) : EditorEvent
     data class ChangeClipVolume(val volume: Float) : EditorEvent
     data class ChangeAspectRatio(val ratio: com.example.core.model.AspectRatio) : EditorEvent
-    data class ChangeClipTransform(val transform: com.example.core.model.Transform) : EditorEvent
+    data class ChangeClipTransform(val transform: com.example.core.model.Transform, val clipId: String? = null) : EditorEvent
     data class ApplyTextClip(
         val text: String,
         val fontSize: Float,

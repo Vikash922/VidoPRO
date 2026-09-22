@@ -310,10 +310,10 @@ fun FiltersBottomSheet(
                         Icon(
                             imageVector = Icons.Default.RestartAlt,
                             contentDescription = "Reset",
-                            tint = Color(0xFF6B4BFF)
+                            tint = Color.White
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Reset", color = Color(0xFF6B4BFF))
+                        Text("Reset", color = Color.White)
                     }
                     IconButton(
                         onClick = onDismiss,
@@ -342,13 +342,13 @@ fun FiltersBottomSheet(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) Color(0xFF6B4BFF) else Color(0xFF1E2230))
+                            .background(if (isSelected) Color.White else Color(0xFF1E2230))
                             .clickable { selectedTab = index }
                             .padding(horizontal = 14.dp, vertical = 8.dp)
                     ) {
                         Text(
                             text = title,
-                            color = Color.White,
+                            color = if (isSelected) Color(0xFF0A0D14) else Color.White,
                             fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )
@@ -389,7 +389,7 @@ fun FiltersBottomSheet(
                                         modifier = Modifier
                                             .size(60.dp)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isSelected) Color(0xFF6B4BFF) else Color(0xFF1E2230))
+                                            .background(if (isSelected) Color(0xFF2C3448) else Color(0xFF1E2230))
                                             .border(
                                                 width = if (isSelected) 2.dp else 1.dp,
                                                 color = if (isSelected) Color.White else Color(0xFF2C3448),
@@ -407,7 +407,7 @@ fun FiltersBottomSheet(
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
                                         text = preset.displayName,
-                                        color = if (isSelected) Color(0xFF6B4BFF) else Color.White.copy(alpha = 0.8f),
+                                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.8f),
                                         fontSize = 11.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                         maxLines = 1
@@ -694,7 +694,7 @@ fun FiltersBottomSheet(
                             "Shadows Color Tint",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF6B4BFF)
+                            color = Color(0xFF00D2FF)
                         )
                         FilterSliderItem(
                             label = "Shadows Hue",
@@ -716,7 +716,7 @@ fun FiltersBottomSheet(
                             "Midtones Color Tint",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF6B4BFF)
+                            color = Color(0xFF00D2FF)
                         )
                         FilterSliderItem(
                             label = "Midtones Hue",
@@ -738,7 +738,7 @@ fun FiltersBottomSheet(
                             "Highlights Color Tint",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF6B4BFF)
+                            color = Color(0xFF00D2FF)
                         )
                         FilterSliderItem(
                             label = "Highlights Hue",
@@ -798,7 +798,7 @@ private fun FilterSliderItem(
             )
             Text(
                 text = displayValue,
-                color = Color(0xFF6B4BFF),
+                color = Color.White,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -808,8 +808,8 @@ private fun FilterSliderItem(
             onValueChange = onValueChange,
             valueRange = valueRange,
             colors = SliderDefaults.colors(
-                thumbColor = Color(0xFF6B4BFF),
-                activeTrackColor = Color(0xFF6B4BFF),
+                thumbColor = Color.White,
+                activeTrackColor = Color.White,
                 inactiveTrackColor = Color(0xFF2C3448)
             ),
             modifier = Modifier.fillMaxWidth()

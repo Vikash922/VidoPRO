@@ -119,7 +119,8 @@ fun TimelineContainer(
                             modifier = Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFF6B4BFF))
+                                .background(Color(0xFF1E2230))
+                                .border(1.dp, Color(0xFF2C3448), CircleShape)
                                 .clickable { onAddMedia() },
                             contentAlignment = Alignment.Center
                         ) {
@@ -209,6 +210,7 @@ fun TimelineContainer(
                         .fillMaxHeight()
                         .pointerInput(pixelsPerMs, totalTimelineDurationMs) {
                             detectTapGestures { offset ->
+                                onAction(TimelineAction.SelectClip(null))
                                 val tappedTime = (offset.x / pixelsPerMs).toLong().coerceIn(0L, totalTimelineDurationMs)
                                 onSeekAction(tappedTime)
                             }
@@ -241,7 +243,7 @@ fun TimelineContainer(
                                     Icon(
                                         Icons.Default.Add,
                                         contentDescription = null,
-                                        tint = Color(0xFF6B4BFF),
+                                        tint = Color.White,
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -301,7 +303,7 @@ fun TimelineContainer(
                         },
                         modifier = Modifier.offset {
                             val currentPlayheadPx = (state.playheadPositionMs * pixelsPerMs).roundToInt()
-                            IntOffset(currentPlayheadPx - 12.dp.roundToPx(), 0)
+                            IntOffset(currentPlayheadPx - 16.dp.roundToPx(), 0)
                         }
                     )
                 }

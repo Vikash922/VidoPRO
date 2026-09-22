@@ -67,7 +67,7 @@ fun KeyframeBottomSheet(
                 Text("00:20", color = Color.Gray, fontSize = 10.sp)
                 Text("00:30", color = Color.Gray, fontSize = 10.sp)
             }
-            Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(Color(0xFF7B61FF)))
+            Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(Color(0xFF00D2FF)))
             
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -96,7 +96,7 @@ fun KeyframeBottomSheet(
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF))
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF0A0D14))
                 ) {
                     Text("Apply")
                 }
@@ -129,7 +129,7 @@ fun KeyframePropertyRow(title: String, value: String, icon: androidx.compose.ui.
             valueRange = 0f..100f,
             colors = SliderDefaults.colors(
                 thumbColor = Color.White,
-                activeTrackColor = Color(0xFF7B61FF),
+                activeTrackColor = Color(0xFF00D2FF),
                 inactiveTrackColor = Color(0xFF2C3248)
             )
         )
@@ -182,8 +182,8 @@ fun BeatsBottomSheet(
             
             Spacer(modifier = Modifier.height(32.dp))
             
-            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF))) {
-                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF0A0D14))) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF0A0D14))
                 Spacer(Modifier.width(8.dp))
                 Text("Apply & Sync")
             }

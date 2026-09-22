@@ -216,8 +216,15 @@ object TimelineReducer {
     }
 
     private fun handleSplitAtPlayhead(state: TimelineEngineState, targetClipId: String?): TimelineEngineState {
-        val clipIdToSplit = targetClipId ?: state.selectedClipId ?: findClipAtPlayhead(state) ?: return state
-        return handleSplitClip(state, clipIdToSplit, state.playheadPositionMs)
+        val playhead = state.playheadPositionMs
+        val candidateId = targetClipId ?: state.selectedClipId
+        val candidateClip = candidateId?.let { state.findClip(it) }
+        val clipIdToSplit = if (candidateClip != null && playhead >= candidateClip.startTimeMs && playhead <= candidateClip.endTimeMs) {
+            candidateClip.id
+        } else {
+            findClipAtPlayhead(state) ?: return state
+        }
+        return handleSplitClip(state, clipIdToSplit, playhead)
     }
 
     private fun handleSplitClip(
@@ -226,18 +233,19 @@ object TimelineReducer {
         splitPointMs: Long
     ): TimelineEngineState {
         val clip = state.findClip(clipId) ?: return state
-        val minDuration = TimelineEngineState.MIN_CLIP_DURATION_MS
+        val minDuration = 100L
 
         // Validation: split point must be within clip bounds and not too close to ends
         val minValidSplit = clip.startTimeMs + minDuration
         val maxValidSplit = clip.endTimeMs - minDuration
 
-        if (splitPointMs < minValidSplit || splitPointMs > maxValidSplit) {
-            return state // Safe no-op if split point is invalid
+        if (minValidSplit >= maxValidSplit) {
+            return state // Clip is too short to be split
         }
 
-        val firstDuration = splitPointMs - clip.startTimeMs
-        val secondDuration = clip.endTimeMs - splitPointMs
+        val clampedSplit = splitPointMs.coerceIn(minValidSplit, maxValidSplit)
+        val firstDuration = clampedSplit - clip.startTimeMs
+        val secondDuration = clip.endTimeMs - clampedSplit
 
         val firstClip = clip.copy(
             durationMs = firstDuration,
@@ -246,7 +254,7 @@ object TimelineReducer {
 
         val secondClip = clip.copy(
             id = UUID.randomUUID().toString(),
-            startTimeMs = splitPointMs,
+            startTimeMs = clampedSplit,
             durationMs = secondDuration,
             inPointMs = clip.inPointMs + firstDuration,
             outPointMs = clip.outPointMs
@@ -399,6 +407,10 @@ object TimelineReducer {
 
     private fun findClipAtPlayhead(state: TimelineEngineState): String? {
         val playhead = state.playheadPositionMs
+        val videoClips = state.tracks.filter { it.type == TrackType.VIDEO }.flatMap { it.clips }
+        val videoHit = videoClips.find { playhead >= it.startTimeMs && playhead < it.endTimeMs }
+        if (videoHit != null) return videoHit.id
+
         return state.tracks.flatMap { it.clips }
             .find { playhead >= it.startTimeMs && playhead < it.endTimeMs }?.id
     }

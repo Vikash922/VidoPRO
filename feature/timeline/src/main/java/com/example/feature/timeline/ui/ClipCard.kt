@@ -47,7 +47,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.decode.VideoFrameDecoder
+import coil.request.ImageRequest
 import com.example.core.model.Asset
 import com.example.core.model.Clip
 import com.example.core.model.ClipType
@@ -133,7 +138,7 @@ fun ClipCard(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = if (isSelected) 14.dp else 0.dp)
+                .padding(horizontal = if (isSelected) 20.dp else 0.dp)
                 .pointerInput(clip.id, pixelsPerMs, clip.startTimeMs) {
                     detectTapGestures(
                         onTap = { offset ->
@@ -234,6 +239,18 @@ fun ClipCard(
                     val asset = assets[clip.assetId]
                     val thumbModel = asset?.thumbnailPath ?: asset?.uri
                     val numThumbs = (clipWidthDp.value / 44f).toInt().coerceIn(1, 16)
+                    val context = LocalContext.current
+
+                    val imageRequest = remember(thumbModel) {
+                        if (thumbModel != null) {
+                            ImageRequest.Builder(context)
+                                .data(thumbModel)
+                                .videoFrameMillis(1000L)
+                                .decoderFactory(VideoFrameDecoder.Factory())
+                                .crossfade(true)
+                                .build()
+                        } else null
+                    }
 
                     Row(modifier = Modifier.fillMaxSize()) {
                         for (i in 0 until numThumbs) {
@@ -246,9 +263,9 @@ fun ClipCard(
                                     .background(Color(0xFF1E2230)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (thumbModel != null) {
+                                if (imageRequest != null) {
                                     AsyncImage(
-                                        model = thumbModel,
+                                        model = imageRequest,
                                         contentDescription = "Video Thumbnail",
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.fillMaxSize()
@@ -268,12 +285,12 @@ fun ClipCard(
             }
         }
 
-        // Left Trim Handle (white with dark grip)
+        // Left Trim Handle (White pill with Left Arrow chevron)
         if (isSelected) {
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .width(14.dp)
+                    .width(20.dp)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
                     .background(Color.White)
@@ -293,22 +310,21 @@ fun ClipCard(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .width(2.dp)
-                        .height(14.dp)
-                        .clip(RoundedCornerShape(1.dp))
-                        .background(Color.Black.copy(alpha = 0.6f))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = "Trim Left",
+                    tint = Color(0xFF0A0D14),
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
 
-        // Right Trim Handle (white with dark grip)
+        // Right Trim Handle (White pill with Right Arrow chevron)
         if (isSelected) {
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .width(14.dp)
+                    .width(20.dp)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(topEnd = 6.dp, bottomEnd = 6.dp))
                     .background(Color.White)
@@ -328,12 +344,11 @@ fun ClipCard(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .width(2.dp)
-                        .height(14.dp)
-                        .clip(RoundedCornerShape(1.dp))
-                        .background(Color.Black.copy(alpha = 0.6f))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "Trim Right",
+                    tint = Color(0xFF0A0D14),
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }

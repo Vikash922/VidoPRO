@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
@@ -185,19 +186,19 @@ fun EditorScreen(
                             }
                         }
 
-                        // Export button — SOLID PURPLE (NO GRADIENT)
+                        // Export button — SOLID WHITE (NO GRADIENT)
                         Box(
                             modifier = Modifier
                                 .height(32.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF6B4BFF))
+                                .background(Color.White)
                                 .clickable { uiState.project?.id?.let { onNavigateExport(it) } }
                                 .padding(horizontal = 18.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "Export",
-                                color = Color.White,
+                                color = Color(0xFF0A0D14),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -226,7 +227,13 @@ fun EditorScreen(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xFF0A0D14))
-                        .border(1.dp, Color(0xFF1F2432), RoundedCornerShape(8.dp)),
+                        .border(1.dp, Color(0xFF1F2432), RoundedCornerShape(8.dp))
+                        .pointerInput(Unit) {
+                            detectTapGestures {
+                                onEvent(EditorEvent.SelectClip(null))
+                                onTimelineAction(TimelineAction.SelectClip(null))
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     val viewportWidth = maxWidth
@@ -269,6 +276,11 @@ fun EditorScreen(
                                     }
                                     if (uiState.filterSettings.isDefault) {
                                         view.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+                                        view.videoSurfaceView?.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+                                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                            view.setRenderEffect(null)
+                                            view.videoSurfaceView?.setRenderEffect(null)
+                                        }
                                     } else {
                                         val colorArray = com.example.feature.editor.filter.ColorFilterHelper.createColorMatrixArray(uiState.filterSettings)
                                         val paint = android.graphics.Paint().apply {
@@ -276,12 +288,26 @@ fun EditorScreen(
                                             alpha = (uiState.filterSettings.opacity.coerceIn(0f, 100f) / 100f * 255).toInt()
                                         }
                                         view.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, paint)
+                                        view.videoSurfaceView?.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, paint)
+                                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                            val cm = android.graphics.ColorMatrix(colorArray)
+                                            val cf = android.graphics.ColorMatrixColorFilter(cm)
+                                            val effect = android.graphics.RenderEffect.createColorFilterEffect(cf)
+                                            view.setRenderEffect(effect)
+                                        }
                                     }
                                 },
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .clickable {
-                                        onEvent(EditorEvent.PlayPauseClicked)
+                                    .pointerInput(uiState.selectedClipId) {
+                                        detectTapGestures {
+                                            if (uiState.selectedClipId != null) {
+                                                onEvent(EditorEvent.SelectClip(null))
+                                                onTimelineAction(TimelineAction.SelectClip(null))
+                                            } else {
+                                                onEvent(EditorEvent.PlayPauseClicked)
+                                            }
+                                        }
                                     }
                             )
 
@@ -331,7 +357,7 @@ fun EditorScreen(
                                     imageVector = Icons.Default.PlayCircleOutline,
                                     contentDescription = "Add Media",
                                     modifier = Modifier.size(52.dp),
-                                    tint = Color(0xFF6B4BFF).copy(alpha = 0.6f)
+                                    tint = Color.White.copy(alpha = 0.6f)
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
@@ -379,9 +405,18 @@ fun EditorScreen(
                                     }
                                     .size(baseWidth, baseHeight)
                                     .pointerInput(overlayClip.id) {
+                                        detectTapGestures(
+                                            onTap = {
+                                                onEvent(EditorEvent.SelectClip(overlayClip.id))
+                                                onTimelineAction(TimelineAction.SelectClip(overlayClip.id))
+                                            }
+                                        )
+                                    }
+                                    .pointerInput(overlayClip.id) {
                                         detectTransformGestures { _, pan, zoom, rotation ->
                                             if (uiState.selectedClipId != overlayClip.id) {
                                                 onEvent(EditorEvent.SelectClip(overlayClip.id))
+                                                onTimelineAction(TimelineAction.SelectClip(overlayClip.id))
                                             }
                                             val currentT = overlayClip.transform
                                             val newScale = (currentT.scaleX * zoom).coerceIn(0.2f, 5.0f)
@@ -396,13 +431,11 @@ fun EditorScreen(
                                                         scaleX = newScale,
                                                         scaleY = newScale,
                                                         rotation = newRotation
-                                                    )
+                                                    ),
+                                                    clipId = overlayClip.id
                                                 )
                                             )
                                         }
-                                    }
-                                    .clickable {
-                                        onEvent(EditorEvent.SelectClip(overlayClip.id))
                                     }
                             ) {
                                 AsyncImage(
@@ -419,7 +452,7 @@ fun EditorScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .border(2.dp, Color(0xFF6B4BFF), RoundedCornerShape(4.dp))
+                                            .border(2.dp, Color.White, RoundedCornerShape(4.dp))
                                     )
 
                                     // Top-Right: Remove / Delete Button ("X")
@@ -427,9 +460,9 @@ fun EditorScreen(
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
                                             .offset(x = 10.dp, y = (-10).dp)
-                                            .size(24.dp)
+                                            .size(26.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFFFF2D75))
+                                            .background(Color(0xFFE57373))
                                             .clickable { onEvent(EditorEvent.DeleteSelectedClip) },
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -446,9 +479,10 @@ fun EditorScreen(
                                         modifier = Modifier
                                             .align(Alignment.TopStart)
                                             .offset(x = (-10).dp, y = (-10).dp)
-                                            .size(24.dp)
+                                            .size(26.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFF6B4BFF))
+                                            .background(Color(0xFF1E2230))
+                                            .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
                                             .clickable { onEvent(EditorEvent.DuplicateSelectedClip) },
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -464,18 +498,31 @@ fun EditorScreen(
                                     Box(
                                         modifier = Modifier
                                             .align(Alignment.BottomEnd)
-                                            .offset(x = 8.dp, y = 8.dp)
-                                            .size(20.dp)
+                                            .offset(x = 10.dp, y = 10.dp)
+                                            .size(24.dp)
                                             .clip(CircleShape)
                                             .background(Color(0xFF1E2230))
-                                            .border(1.dp, Color(0xFF6B4BFF), CircleShape),
+                                            .border(1.dp, Color.White, CircleShape)
+                                            .pointerInput(overlayClip.id) {
+                                                detectTransformGestures { _, pan, _, _ ->
+                                                    val currentT = overlayClip.transform
+                                                    val delta = (pan.x + pan.y) / 100f
+                                                    val newScale = (currentT.scaleX + delta).coerceIn(0.2f, 5.0f)
+                                                    onEvent(
+                                                        EditorEvent.ChangeClipTransform(
+                                                            currentT.copy(scaleX = newScale, scaleY = newScale),
+                                                            clipId = overlayClip.id
+                                                        )
+                                                    )
+                                                }
+                                            },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.OpenInFull,
                                             contentDescription = "Scale Overlay",
                                             tint = Color.White,
-                                            modifier = Modifier.size(11.dp)
+                                            modifier = Modifier.size(12.dp)
                                         )
                                     }
                                 }
@@ -527,6 +574,7 @@ fun EditorScreen(
                                     .padding(horizontal = 20.dp)
                                     .clickable {
                                         onEvent(EditorEvent.SelectClip(textClip.id))
+                                        onTimelineAction(TimelineAction.SelectClip(textClip.id))
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -539,7 +587,7 @@ fun EditorScreen(
                                     fontWeight = FontWeight.Bold,
                                     modifier = if (isSelected) {
                                         Modifier
-                                            .border(1.5.dp, Color(0xFF6B4BFF), RoundedCornerShape(4.dp))
+                                            .border(1.5.dp, Color.White, RoundedCornerShape(4.dp))
                                             .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
                                             .padding(horizontal = 10.dp, vertical = 6.dp)
                                     } else {
