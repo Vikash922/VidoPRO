@@ -18,6 +18,7 @@ interface PreviewPlayerController {
     val player: Player
 
     fun setClips(clips: List<Clip>, assets: Map<String, Asset>)
+    fun setAudioClips(clips: List<Clip>, assets: Map<String, Asset>) {}
     fun play()
     fun pause()
     fun seekTo(timelinePositionMs: Long)

@@ -22,14 +22,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CropRotate
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.IntOffset
+import coil.compose.AsyncImage
+import kotlin.math.roundToInt
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.GraphicEq
@@ -206,64 +218,356 @@ fun EditorScreen(
 
             Column(modifier = Modifier.fillMaxSize()) {
 
-                // VIDEO PREVIEW AREA — Real Live PlayerView (Media3 ExoPlayer)
-                Box(
+                // VIDEO PREVIEW AREA — Real Live PlayerView (Media3 ExoPlayer) on Project Canvas
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(Color.Black)
+                        .background(Color(0xFF0A0D14))
                         .border(1.dp, Color(0xFF1F2432), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                if (player != null && hasClips) {
-                    AndroidView(
-                        factory = { ctx ->
-                            PlayerView(ctx).apply {
-                                this.player = player
-                                useController = false
-                                layoutParams = ViewGroup.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    ViewGroup.LayoutParams.MATCH_PARENT
+                    val viewportWidth = maxWidth
+                    val viewportHeight = maxHeight
+                    val currentAspectRatio = uiState.project?.aspectRatio ?: com.example.core.model.AspectRatio.RATIO_9_16
+                    val targetRatio = currentAspectRatio.floatRatio
+
+                    val (canvasWidth, canvasHeight) = if (viewportWidth.value / viewportHeight.value > targetRatio) {
+                        val h = viewportHeight
+                        val w = h * targetRatio
+                        w to h
+                    } else {
+                        val w = viewportWidth
+                        val h = w / targetRatio
+                        w to h
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(canvasWidth, canvasHeight)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color.Black),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (player != null && hasClips) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    (android.view.LayoutInflater.from(ctx).inflate(R.layout.texture_player_view, null) as PlayerView).apply {
+                                        this.player = player
+                                        useController = false
+                                        layoutParams = ViewGroup.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.MATCH_PARENT
+                                        )
+                                    }
+                                },
+                                update = { view ->
+                                    if (view.player != player) {
+                                        view.player = player
+                                    }
+                                    if (uiState.filterSettings.isDefault) {
+                                        view.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+                                    } else {
+                                        val colorArray = com.example.feature.editor.filter.ColorFilterHelper.createColorMatrixArray(uiState.filterSettings)
+                                        val paint = android.graphics.Paint().apply {
+                                            colorFilter = android.graphics.ColorMatrixColorFilter(colorArray)
+                                            alpha = (uiState.filterSettings.opacity.coerceIn(0f, 100f) / 100f * 255).toInt()
+                                        }
+                                        view.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, paint)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clickable {
+                                        onEvent(EditorEvent.PlayPauseClicked)
+                                    }
+                            )
+
+                            // Real-time Optical Overlays (Vignette, Fade, Bloom/Glow)
+                            if (uiState.filterSettings.vignette > 0f) {
+                                val vignetteAlpha = (uiState.filterSettings.vignette / 100f * 0.9f).coerceIn(0f, 0.95f)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            androidx.compose.ui.graphics.Brush.radialGradient(
+                                                listOf(
+                                                    Color.Transparent,
+                                                    Color.Black.copy(alpha = vignetteAlpha)
+                                                )
+                                            )
+                                        )
                                 )
                             }
-                        },
-                        update = { view ->
-                            if (view.player != player) {
-                                view.player = player
+
+                            if (uiState.filterSettings.fade > 0f) {
+                                val fadeAlpha = (uiState.filterSettings.fade / 100f * 0.45f).coerceIn(0f, 0.8f)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color(0xFF0A0D14).copy(alpha = fadeAlpha))
+                                )
                             }
-                        },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable {
-                                onEvent(EditorEvent.PlayPauseClicked)
+
+                            if (uiState.filterSettings.glow > 0f) {
+                                val glowAlpha = (uiState.filterSettings.glow / 100f * 0.25f).coerceIn(0f, 0.5f)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.White.copy(alpha = glowAlpha))
+                                )
                             }
-                    )
-                } else {
-                    // Empty state: Tap to add video
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .clickable { onNavigateMediaPicker(TrackType.VIDEO) }
-                            .padding(16.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayCircleOutline,
-                            contentDescription = "Add Media",
-                            modifier = Modifier.size(52.dp),
-                            tint = Color(0xFF6B4BFF).copy(alpha = 0.6f)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Tap to Add Video",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        } else {
+                            // Empty state: Tap to add video
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clickable { onNavigateMediaPicker(TrackType.VIDEO) }
+                                    .padding(16.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayCircleOutline,
+                                    contentDescription = "Add Media",
+                                    modifier = Modifier.size(52.dp),
+                                    tint = Color(0xFF6B4BFF).copy(alpha = 0.6f)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "Tap to Add Video",
+                                    color = Color.White.copy(alpha = 0.6f),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+
+                        // Real-time Visual Overlays (PiP / Images / Videos) active at current playhead
+                        val activeOverlayClips = remember(uiState.project?.tracks, uiState.playheadPositionMs) {
+                            uiState.project?.tracks
+                                ?.filter { it.type == TrackType.OVERLAY && it.isVisible }
+                                ?.flatMap { it.clips }
+                                ?.filter { clip ->
+                                    clip.isVisible &&
+                                    uiState.playheadPositionMs >= clip.startTimeMs &&
+                                    uiState.playheadPositionMs <= clip.endTimeMs &&
+                                    clip.assetId != null
+                                } ?: emptyList()
+                        }
+
+                        activeOverlayClips.forEach { overlayClip ->
+                            val asset = uiState.assets[overlayClip.assetId] ?: return@forEach
+                            val isSelected = uiState.selectedClipId == overlayClip.id
+
+                            val baseWidth = 160.dp
+                            val baseHeight = 110.dp
+
+                            Box(
+                                modifier = Modifier
+                                    .offset {
+                                        IntOffset(
+                                            overlayClip.transform.x.roundToInt(),
+                                            overlayClip.transform.y.roundToInt()
+                                        )
+                                    }
+                                    .graphicsLayer {
+                                        scaleX = overlayClip.transform.scaleX
+                                        scaleY = overlayClip.transform.scaleY
+                                        rotationZ = overlayClip.transform.rotation
+                                        alpha = overlayClip.transform.opacity
+                                    }
+                                    .size(baseWidth, baseHeight)
+                                    .pointerInput(overlayClip.id) {
+                                        detectTransformGestures { _, pan, zoom, rotation ->
+                                            if (uiState.selectedClipId != overlayClip.id) {
+                                                onEvent(EditorEvent.SelectClip(overlayClip.id))
+                                            }
+                                            val currentT = overlayClip.transform
+                                            val newScale = (currentT.scaleX * zoom).coerceIn(0.2f, 5.0f)
+                                            val newRotation = (currentT.rotation + rotation) % 360f
+                                            val newX = currentT.x + pan.x
+                                            val newY = currentT.y + pan.y
+                                            onEvent(
+                                                EditorEvent.ChangeClipTransform(
+                                                    currentT.copy(
+                                                        x = newX,
+                                                        y = newY,
+                                                        scaleX = newScale,
+                                                        scaleY = newScale,
+                                                        rotation = newRotation
+                                                    )
+                                                )
+                                            )
+                                        }
+                                    }
+                                    .clickable {
+                                        onEvent(EditorEvent.SelectClip(overlayClip.id))
+                                    }
+                            ) {
+                                AsyncImage(
+                                    model = asset.uri,
+                                    contentDescription = "Overlay",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(4.dp))
+                                )
+
+                                if (isSelected) {
+                                    // Bounding Box Outline
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .border(2.dp, Color(0xFF6B4BFF), RoundedCornerShape(4.dp))
+                                    )
+
+                                    // Top-Right: Remove / Delete Button ("X")
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .offset(x = 10.dp, y = (-10).dp)
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFF2D75))
+                                            .clickable { onEvent(EditorEvent.DeleteSelectedClip) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Remove Overlay",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+
+                                    // Top-Left: Duplicate Button
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopStart)
+                                            .offset(x = (-10).dp, y = (-10).dp)
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF6B4BFF))
+                                            .clickable { onEvent(EditorEvent.DuplicateSelectedClip) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ContentCopy,
+                                            contentDescription = "Duplicate Overlay",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+
+                                    // Bottom-Right: Resize / Scale Handle
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .offset(x = 8.dp, y = 8.dp)
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF1E2230))
+                                            .border(1.dp, Color(0xFF6B4BFF), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.OpenInFull,
+                                            contentDescription = "Scale Overlay",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Real-time Text Overlays active at current playhead
+                        val activeTextClips = remember(uiState.project?.tracks, uiState.playheadPositionMs) {
+                            uiState.project?.tracks
+                                ?.filter { it.type == TrackType.TEXT && it.isVisible }
+                                ?.flatMap { it.clips }
+                                ?.filter { clip ->
+                                    clip.isVisible &&
+                                    uiState.playheadPositionMs >= clip.startTimeMs &&
+                                    uiState.playheadPositionMs <= clip.endTimeMs &&
+                                    clip.textData != null
+                                } ?: emptyList()
+                        }
+
+                        activeTextClips.forEach { textClip ->
+                            val textData = textClip.textData ?: return@forEach
+                            val isSelected = uiState.selectedClipId == textClip.id
+
+                            val textColor = remember(textData.textColor) {
+                                try {
+                                    val hex = if (!textData.textColor.startsWith("#")) "#${textData.textColor}" else textData.textColor
+                                    Color(android.graphics.Color.parseColor(hex))
+                                } catch (e: Exception) {
+                                    Color.White
+                                }
+                            }
+
+                            val fontFamily = when (textData.fontFamily) {
+                                "Serif" -> androidx.compose.ui.text.font.FontFamily.Serif
+                                "SansSerif" -> androidx.compose.ui.text.font.FontFamily.SansSerif
+                                "Monospace" -> androidx.compose.ui.text.font.FontFamily.Monospace
+                                else -> androidx.compose.ui.text.font.FontFamily.Default
+                            }
+
+                            val textAlign = when (textData.alignment) {
+                                "LEFT" -> androidx.compose.ui.text.style.TextAlign.Start
+                                "RIGHT" -> androidx.compose.ui.text.style.TextAlign.End
+                                else -> androidx.compose.ui.text.style.TextAlign.Center
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp)
+                                    .clickable {
+                                        onEvent(EditorEvent.SelectClip(textClip.id))
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = textData.text,
+                                    color = textColor,
+                                    fontSize = textData.fontSize.sp,
+                                    fontFamily = fontFamily,
+                                    textAlign = textAlign,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = if (isSelected) {
+                                        Modifier
+                                            .border(1.5.dp, Color(0xFF6B4BFF), RoundedCornerShape(4.dp))
+                                            .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    } else {
+                                        Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    }
+                                )
+                            }
+                        }
+
+                        // Canvas Aspect Ratio Badge (tappable quick shortcut)
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFF1E2230).copy(alpha = 0.85f))
+                                .clickable { onEvent(EditorEvent.SetCanvasSheetVisible(true)) }
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = currentAspectRatio.label,
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
-            }
 
             if (!isFullscreen) {
                 // Time Controls Bar: 00:08 / 00:32 | Play/Pause | Undo | Redo | Fullscreen
@@ -390,6 +694,8 @@ fun EditorScreen(
                             // Primary tools
                             EditorToolButton(EditorTool.EDIT, Icons.Default.ContentCut) { onEvent(EditorEvent.SetEditSheetVisible(true)) }
                             Spacer(Modifier.width(20.dp))
+                            EditorToolButton(EditorTool.CANVAS, Icons.Default.AspectRatio) { onEvent(EditorEvent.SetCanvasSheetVisible(true)) }
+                            Spacer(Modifier.width(20.dp))
                             EditorToolButton(EditorTool.AUDIO, Icons.Default.Audiotrack) { onNavigateMediaPicker(TrackType.AUDIO) }
                             Spacer(Modifier.width(20.dp))
                             EditorToolButton(EditorTool.TEXT, Icons.Default.Title) { onEvent(EditorEvent.SetTextSheetVisible(true)) }
@@ -405,7 +711,12 @@ fun EditorScreen(
                             EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
                                 onEvent(EditorEvent.SplitSelectedClip)
                             }
-                            Spacer(Modifier.width(18.dp))
+                            if (clip?.type == ClipType.TEXT) {
+                                EditorToolButton(EditorTool.TEXT, Icons.Default.Title) {
+                                    onEvent(EditorEvent.SetTextSheetVisible(true))
+                                }
+                                Spacer(Modifier.width(18.dp))
+                            }
                             if (clip?.type == ClipType.VIDEO) {
                                 EditorToolButton(EditorTool.SPEED, Icons.Default.Speed) {
                                     onEvent(EditorEvent.SetSpeedSheetVisible(true))
@@ -486,12 +797,51 @@ fun EditorScreen(
         }
         if (uiState.isKeyframeSheetVisible) { KeyframeBottomSheet(onDismiss = { onEvent(EditorEvent.SetKeyframeSheetVisible(false)) }) }
         if (uiState.isBeatsSheetVisible) { BeatsBottomSheet(onDismiss = { onEvent(EditorEvent.SetBeatsSheetVisible(false)) }) }
-        if (uiState.isSpeedSheetVisible) { SpeedBottomSheet(currentSpeed = 1.0f, onSpeedChanged = {}, onDismiss = { onEvent(EditorEvent.SetSpeedSheetVisible(false)) }) }
-        if (uiState.isTransformSheetVisible) { TransformBottomSheet(currentTransform = com.example.core.model.Transform.DEFAULT, onTransformChanged = {}, onDismiss = { onEvent(EditorEvent.SetTransformSheetVisible(false)) }) }
-        if (uiState.isVolumeSheetVisible) { VolumeBottomSheet(currentVolume = 1.0f, onVolumeChanged = {}, onDismiss = { onEvent(EditorEvent.SetVolumeSheetVisible(false)) }) }
-        if (uiState.isCanvasSheetVisible) { CanvasBottomSheet(currentRatio = com.example.core.model.AspectRatio.RATIO_9_16, onRatioSelected = {}, onDismiss = { onEvent(EditorEvent.SetCanvasSheetVisible(false)) }) }
+        if (uiState.isSpeedSheetVisible) {
+            SpeedBottomSheet(
+                currentSpeed = uiState.selectedClip?.speed ?: 1.0f,
+                onSpeedChanged = { newSpeed ->
+                    onEvent(EditorEvent.ChangeClipSpeed(newSpeed))
+                },
+                onDismiss = { onEvent(EditorEvent.SetSpeedSheetVisible(false)) }
+            )
+        }
+        if (uiState.isTransformSheetVisible) {
+            TransformBottomSheet(
+                currentTransform = uiState.selectedClip?.transform ?: com.example.core.model.Transform.DEFAULT,
+                onTransformChanged = { newTransform ->
+                    onEvent(EditorEvent.ChangeClipTransform(newTransform))
+                },
+                onDismiss = { onEvent(EditorEvent.SetTransformSheetVisible(false)) }
+            )
+        }
+        if (uiState.isVolumeSheetVisible) {
+            VolumeBottomSheet(
+                currentVolume = uiState.selectedClip?.volume ?: 1.0f,
+                onVolumeChanged = { newVolume ->
+                    onEvent(EditorEvent.ChangeClipVolume(newVolume))
+                },
+                onDismiss = { onEvent(EditorEvent.SetVolumeSheetVisible(false)) }
+            )
+        }
+        if (uiState.isCanvasSheetVisible) {
+            CanvasBottomSheet(
+                currentRatio = uiState.project?.aspectRatio ?: com.example.core.model.AspectRatio.RATIO_9_16,
+                onRatioSelected = { ratio ->
+                    onEvent(EditorEvent.ChangeAspectRatio(ratio))
+                    onEvent(EditorEvent.SetCanvasSheetVisible(false))
+                },
+                onDismiss = { onEvent(EditorEvent.SetCanvasSheetVisible(false)) }
+            )
+        }
         if (uiState.isTextSheetVisible) {
+            val selectedTextData = uiState.selectedClip?.textData
             com.example.feature.editor.text.TextEditorBottomSheet(
+                initialText = selectedTextData?.text ?: "Your Text Here",
+                initialFontSize = selectedTextData?.fontSize ?: 28f,
+                initialColor = selectedTextData?.textColor ?: "#FFFFFF",
+                initialFontFamily = selectedTextData?.fontFamily ?: "Default",
+                initialAlignment = selectedTextData?.alignment ?: "CENTER",
                 onDismiss = { onEvent(EditorEvent.SetTextSheetVisible(false)) },
                 onApply = { text, size, color, font, align ->
                     onEvent(EditorEvent.ApplyTextClip(text, size, color, font, align))

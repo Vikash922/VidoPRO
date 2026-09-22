@@ -137,6 +137,7 @@ class EditorViewModel(
         viewModelScope.launch {
             val allClips = project.tracks.flatMap { it.clips }
             val videoClips = allClips.filter { it.type == ClipType.VIDEO }
+            val audioClips = allClips.filter { it.type == ClipType.AUDIO }
             val assetMap = _uiState.value.assets.toMutableMap()
             assetRepository?.let { repo ->
                 allClips.forEach { clip ->
@@ -151,6 +152,7 @@ class EditorViewModel(
             }
             _uiState.update { it.copy(assets = assetMap) }
             previewPlayer?.setClips(videoClips, assetMap)
+            previewPlayer?.setAudioClips(audioClips, assetMap)
         }
     }
 
@@ -213,42 +215,148 @@ class EditorViewModel(
             is EditorEvent.SetEditSheetVisible -> {
                 _uiState.update { it.copy(isEditSheetVisible = event.visible) }
             }
-
+            is EditorEvent.SetCanvasSheetVisible -> {
+                _uiState.update { it.copy(isCanvasSheetVisible = event.visible) }
+            }
+            is EditorEvent.SetTextSheetVisible -> {
+                _uiState.update { it.copy(isTextSheetVisible = event.visible) }
+            }
+            is EditorEvent.SetFiltersSheetVisible -> {
+                _uiState.update { it.copy(isFiltersSheetVisible = event.visible) }
+            }
+            is EditorEvent.SetSpeedSheetVisible -> {
+                _uiState.update { it.copy(isSpeedSheetVisible = event.visible) }
+            }
+            is EditorEvent.SetVolumeSheetVisible -> {
+                _uiState.update { it.copy(isVolumeSheetVisible = event.visible) }
+            }
+            is EditorEvent.SetTransformSheetVisible -> {
+                _uiState.update { it.copy(isTransformSheetVisible = event.visible) }
+            }
+            is EditorEvent.SetKeyframeSheetVisible -> {
+                _uiState.update { it.copy(isKeyframeSheetVisible = event.visible) }
+            }
+            is EditorEvent.SetBeatsSheetVisible -> {
+                _uiState.update { it.copy(isBeatsSheetVisible = event.visible) }
+            }
             
             is EditorEvent.SplitSelectedClip -> onTimelineAction(TimelineAction.SplitAtPlayhead(_uiState.value.selectedClipId))
             is EditorEvent.DeleteSelectedClip -> _uiState.value.selectedClipId?.let { onTimelineAction(TimelineAction.DeleteClip(it)) }
             is EditorEvent.DuplicateSelectedClip -> _uiState.value.selectedClipId?.let { onTimelineAction(TimelineAction.DuplicateClip(it)) }
             is EditorEvent.ApplyTextClip -> {
+                val currentSelected = _uiState.value.selectedClip
+                if (currentSelected?.type == ClipType.TEXT && currentSelected.textData != null) {
+                    updateTextClip(
+                        clipId = currentSelected.id,
+                        text = event.text,
+                        fontSize = event.fontSize,
+                        color = event.color,
+                        fontFamily = event.fontFamily,
+                        alignment = event.alignment
+                    )
+                } else {
+                    addTextClip(
+                        text = event.text,
+                        fontSize = event.fontSize,
+                        color = event.color,
+                        fontFamily = event.fontFamily,
+                        alignment = event.alignment
+                    )
+                }
                 _uiState.update { it.copy(isTextSheetVisible = false) }
             }
             is EditorEvent.ChangeAspectRatio -> {
                 val proj = _uiState.value.project
                 if (proj != null) {
-                    val updated = proj.copy(aspectRatio = event.ratio)
+                    val (w, h) = when (event.ratio) {
+                        com.example.core.model.AspectRatio.RATIO_9_16 -> 1080 to 1920
+                        com.example.core.model.AspectRatio.RATIO_16_9 -> 1920 to 1080
+                        com.example.core.model.AspectRatio.RATIO_1_1 -> 1080 to 1080
+                        com.example.core.model.AspectRatio.RATIO_4_5 -> 1080 to 1350
+                    }
+                    val updated = proj.copy(
+                        aspectRatio = event.ratio,
+                        width = w,
+                        height = h,
+                        updatedAt = System.currentTimeMillis()
+                    )
                     _uiState.update { it.copy(project = updated) }
+                    scheduleAutosave(updated)
                 }
             }
-            is EditorEvent.ChangeClipSpeed -> {}
-            is EditorEvent.ChangeClipTransform -> {}
-            is EditorEvent.ChangeClipVolume -> {}
+            is EditorEvent.ChangeClipSpeed -> {
+                val clipId = _uiState.value.selectedClipId
+                if (clipId != null) {
+                    onTimelineAction(TimelineAction.UpdateClipSpeed(clipId, event.speed))
+                    previewPlayer?.setPlaybackSpeed(event.speed)
+                }
+            }
+            is EditorEvent.ChangeClipTransform -> {
+                val clipId = _uiState.value.selectedClipId
+                if (clipId != null) {
+                    onTimelineAction(TimelineAction.UpdateClipTransform(clipId, event.transform))
+                }
+            }
+            is EditorEvent.ChangeClipVolume -> {
+                val clipId = _uiState.value.selectedClipId
+                if (clipId != null) {
+                    onTimelineAction(TimelineAction.UpdateClipVolume(clipId, event.volume))
+                    previewPlayer?.setVolume(event.volume)
+                }
+            }
+            is EditorEvent.UndoClicked -> {
+                val restored = undoRedoManager.undo(timelineEngineState)
+                if (restored != null) {
+                    applyEngineState(restored)
+                }
+            }
+            is EditorEvent.RedoClicked -> {
+                val restored = undoRedoManager.redo(timelineEngineState)
+                if (restored != null) {
+                    applyEngineState(restored)
+                }
+            }
             is EditorEvent.CloseToolPanel -> {}
-            is EditorEvent.UpdateFilterSettings -> {}
-            is EditorEvent.ResetFilterSettings -> {}
-            is EditorEvent.AddMediaClicked -> {}
-
+            is EditorEvent.UpdateFilterSettings -> {
+                _uiState.update { it.copy(filterSettings = event.filterSettings) }
+            }
+            is EditorEvent.ResetFilterSettings -> {
+                _uiState.update { it.copy(filterSettings = com.example.feature.editor.filter.FilterSettings()) }
+            }
             is EditorEvent.SaveImmediately -> {
                 flushAutosave()
             }
-
             is EditorEvent.AddMediaClicked -> {
                 // Handled via onNavigateMediaPicker
             }
-
             is EditorEvent.ExportClicked -> {
                 flushAutosave()
             }
             else -> {}
         }
+    }
+
+    private fun applyEngineState(newState: TimelineEngineState) {
+        timelineEngineState = newState
+        val currentProject = _uiState.value.project ?: return
+        val updatedTracks = newState.tracks
+        val updatedDuration = newState.durationMs
+        val updatedProject = currentProject.copy(
+            tracks = updatedTracks,
+            durationMs = updatedDuration,
+            updatedAt = System.currentTimeMillis()
+        )
+        _uiState.update { current ->
+            current.copy(
+                playheadPositionMs = newState.playheadPositionMs,
+                selectedClipId = newState.selectedClipId,
+                beatMarkers = newState.beatMarkers,
+                project = updatedProject
+            )
+        }
+        scheduleAutosave(updatedProject)
+        syncClipsToPlayer(updatedProject)
+        previewPlayer?.seekTo(newState.playheadPositionMs)
     }
 
     /**
@@ -333,6 +441,15 @@ class EditorViewModel(
             is TimelineAction.AddClip -> {
                 StateSnapshotCommand("Add clip", action, preActionState)
             }
+            is TimelineAction.UpdateClipSpeed -> {
+                StateSnapshotCommand("Change clip speed", action, preActionState)
+            }
+            is TimelineAction.UpdateClipVolume -> {
+                StateSnapshotCommand("Change clip volume", action, preActionState)
+            }
+            is TimelineAction.UpdateClipTransform -> {
+                StateSnapshotCommand("Transform clip", action, preActionState)
+            }
             else -> null
         }
 
@@ -386,6 +503,7 @@ class EditorViewModel(
     fun addMedia(assetsAndClips: List<Pair<Asset, Clip>>) {
         val currentProject = _uiState.value.project ?: return
         if (assetsAndClips.isEmpty()) return
+        val preState = timelineEngineState
 
         viewModelScope.launch {
             try {
@@ -406,10 +524,12 @@ class EditorViewModel(
                     var trackIndex = tracks.indexOfFirst { it.id == trackId }
                     if (trackIndex < 0) {
                         // Create the track if it doesn't exist
-                        val newTrackType = mediaList.first().second.type.let {
-                            if (it == com.example.core.model.ClipType.AUDIO) TrackType.AUDIO
-                            else if (it == com.example.core.model.ClipType.IMAGE || it == com.example.core.model.ClipType.TEXT) TrackType.OVERLAY
-                            else TrackType.VIDEO
+                        val newTrackType = if (mediaList.first().second.type == com.example.core.model.ClipType.AUDIO) {
+                            TrackType.AUDIO
+                        } else if (tracks.any { it.type == TrackType.VIDEO }) {
+                            TrackType.OVERLAY
+                        } else {
+                            TrackType.VIDEO
                         }
                         val newTrack = Track(
                             id = trackId,
@@ -422,14 +542,20 @@ class EditorViewModel(
                     }
 
                     val targetTrack = tracks[trackIndex]
-                    var currentEnd = targetTrack.clips.maxOfOrNull { it.endTimeMs } ?: 0L
+                    val isOverlayTrack = targetTrack.type == TrackType.OVERLAY
+                    var currentEnd = if (isOverlayTrack) {
+                        mediaList.firstOrNull()?.second?.startTimeMs ?: 0L
+                    } else {
+                        targetTrack.clips.maxOfOrNull { it.endTimeMs } ?: 0L
+                    }
                     
                     val positionedClips = mediaList.map { (asset, clip) ->
+                        val start = if (isOverlayTrack) clip.startTimeMs else currentEnd
                         val positionedClip = clip.copy(
-                            startTimeMs = currentEnd,
+                            startTimeMs = start,
                             assetId = asset.id
                         )
-                        currentEnd += positionedClip.durationMs
+                        currentEnd = start + positionedClip.durationMs
                         positionedClip
                     }
                     
@@ -459,10 +585,13 @@ class EditorViewModel(
                     tracks = tracks,
                     durationMs = newTotalDuration
                 )
+                undoRedoManager.recordStateChange("Add media", preState, timelineEngineState)
 
                 val allClips = tracks.flatMap { it.clips }
                 val videoClips = allClips.filter { it.type == ClipType.VIDEO }
+                val audioClips = allClips.filter { it.type == ClipType.AUDIO }
                 previewPlayer?.setClips(videoClips, newAssetsMap)
+                previewPlayer?.setAudioClips(audioClips, newAssetsMap)
 
                 projectRepository.updateProject(updatedProject)
             } catch (e: Exception) {
@@ -534,11 +663,15 @@ class EditorViewModel(
             updatedAt = System.currentTimeMillis()
         )
 
+        val preState = timelineEngineState
+
         timelineEngineState = timelineEngineState.copy(
             tracks = tracks,
             durationMs = newTotalDuration,
             selectedClipId = clipId
         )
+
+        undoRedoManager.recordStateChange("Add text clip", preState, timelineEngineState)
 
         _uiState.update {
             it.copy(
@@ -547,6 +680,54 @@ class EditorViewModel(
             )
         }
 
+        scheduleAutosave(updatedProject)
+    }
+
+    /**
+     * Updates an existing TextClip's text styling and content (DEV-062, DEV-063).
+     */
+    fun updateTextClip(
+        clipId: String,
+        text: String,
+        fontSize: Float,
+        color: String,
+        fontFamily: String,
+        alignment: String
+    ) {
+        val currentProject = _uiState.value.project ?: return
+        val tracks = currentProject.tracks.map { track ->
+            if (track.type == TrackType.TEXT) {
+                val updatedClips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        val updatedData = clip.textData?.copy(
+                            text = text,
+                            fontSize = fontSize,
+                            textColor = color,
+                            fontFamily = fontFamily,
+                            alignment = alignment
+                        ) ?: com.example.core.model.TextClipData(
+                            clipId = clip.id,
+                            text = text,
+                            fontSize = fontSize,
+                            textColor = color,
+                            fontFamily = fontFamily,
+                            alignment = alignment
+                        )
+                        clip.copy(textData = updatedData)
+                    } else clip
+                }
+                track.copy(clips = updatedClips)
+            } else track
+        }
+
+        val preState = timelineEngineState
+        val updatedProject = currentProject.copy(
+            tracks = tracks,
+            updatedAt = System.currentTimeMillis()
+        )
+        timelineEngineState = timelineEngineState.copy(tracks = tracks)
+        undoRedoManager.recordStateChange("Update text clip", preState, timelineEngineState)
+        _uiState.update { it.copy(project = updatedProject) }
         scheduleAutosave(updatedProject)
     }
 

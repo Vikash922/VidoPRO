@@ -134,8 +134,36 @@ class Media3ProjectExporter(
 
             val effects = Effects(emptyList(), videoEffects)
 
-            val sequence = EditedMediaItemSequence.Builder(editedMediaItems).build()
-            val composition = Composition.Builder(listOf(sequence))
+            val sequences = mutableListOf<EditedMediaItemSequence>()
+            sequences.add(EditedMediaItemSequence.Builder(editedMediaItems).build())
+
+            // Include multi-track Audio Sequences (DEV-069)
+            val audioTracks = project.tracks.filter { it.type == TrackType.AUDIO && it.isVisible }
+            for (audioTrack in audioTracks) {
+                val audioClips = audioTrack.clips.filter { it.isVisible && it.assetId != null }.sortedBy { it.startTimeMs }
+                val audioItems = mutableListOf<EditedMediaItem>()
+                for (audioClip in audioClips) {
+                    val asset = assets[audioClip.assetId] ?: continue
+                    val uri = Uri.parse(asset.uri)
+                    val clippingConfig = MediaItem.ClippingConfiguration.Builder().apply {
+                        if (audioClip.inPointMs > 0L) setStartPositionMs(audioClip.inPointMs)
+                        if (audioClip.outPointMs > 0L) setEndPositionMs(audioClip.outPointMs)
+                    }.build()
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(uri)
+                        .setClippingConfiguration(clippingConfig)
+                        .build()
+                    val editedItem = EditedMediaItem.Builder(mediaItem)
+                        .setRemoveVideo(true)
+                        .build()
+                    audioItems.add(editedItem)
+                }
+                if (audioItems.isNotEmpty()) {
+                    sequences.add(EditedMediaItemSequence.Builder(audioItems).build())
+                }
+            }
+
+            val composition = Composition.Builder(sequences)
                 .setEffects(effects)
                 .build()
 

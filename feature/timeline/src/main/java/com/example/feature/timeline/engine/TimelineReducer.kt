@@ -302,7 +302,7 @@ object TimelineReducer {
 
         val duplicateClip = clip.copy(
             id = UUID.randomUUID().toString(),
-            startTimeMs = clip.endTimeMs
+            startTimeMs = if (targetTrack.type == TrackType.OVERLAY) clip.startTimeMs else clip.endTimeMs
         )
 
         val updatedTracks = state.tracks.map { track ->

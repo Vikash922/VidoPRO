@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "versionName": "2.0.2",
+  "versionCode": 12,
+  "versionName": "2.0.3",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "Hotfix: Fixed drag gestures compilation errors."
+  "releaseNotes": "Release 2.0.3: Aspect ratio canvas, live text overlay, speed/volume controls, real-time GPU filters & adjustments, undo/redo, multi-track audio playback & export, interactive multi-overlay controls with drag/pinch-zoom/duplicate/remove."
 }

@@ -105,6 +105,9 @@ fun EditBottomSheet(
             if (clip.type == ClipType.AUDIO) {
                 items.add(BottomSheetItem("Beats", Icons.Default.GraphicEq, onBeats))
             }
+            if (clip.type == ClipType.TEXT) {
+                items.add(BottomSheetItem("Text", Icons.Default.Title, onText))
+            }
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(4),

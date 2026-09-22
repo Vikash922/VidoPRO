@@ -71,20 +71,26 @@ class UndoRedoManager(
     }
 
     /**
+     * Explicitly records a state change for operations outside the reducer (e.g. text clips).
+     */
+    fun recordStateChange(description: String, beforeState: TimelineEngineState, afterState: TimelineEngineState) {
+        val command = StateSnapshotCommand(description, TimelineAction.SelectClip(afterState.selectedClipId), beforeState)
+        if (undoStack.size >= maxHistorySize) {
+            undoStack.removeFirst()
+        }
+        undoStack.addLast(CommandEntry(command, beforeState, afterState))
+        redoStack.clear()
+        updateFlows()
+    }
+
+    /**
      * Undoes the most recent command, returning the previous [TimelineEngineState],
      * or null if no actions are available to undo.
      */
     fun undo(currentState: TimelineEngineState): TimelineEngineState? {
         if (undoStack.isEmpty()) return null
         val entry = undoStack.removeLast()
-        
-        // Execute the undo logic from the command itself to get the restored state.
-        // We use entry.beforeState as the baseline just in case the command undo fails structurally.
-        val restoredState = try {
-            entry.command.undo(entry.afterState)
-        } catch (e: Exception) {
-            entry.beforeState
-        }
+        val restoredState = entry.beforeState
 
         redoStack.addLast(CommandEntry(entry.command, restoredState, entry.afterState))
         updateFlows()
@@ -98,8 +104,6 @@ class UndoRedoManager(
     fun redo(currentState: TimelineEngineState): TimelineEngineState? {
         if (redoStack.isEmpty()) return null
         val entry = redoStack.removeLast()
-        
-        // Redo the logic from the saved restored state to the saved after state.
         val newState = entry.afterState
         
         undoStack.addLast(CommandEntry(entry.command, entry.beforeState, newState))

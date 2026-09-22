@@ -141,7 +141,9 @@ class MainActivity : ComponentActivity() {
                                     val selectedItems = mediaPickerUiState.selectedItems
                                     val targetTrack = editorUiState.project?.tracks?.firstOrNull { it.type == selectedTrackTypeForPicker }
                                     val trackId = targetTrack?.id ?: UUID.randomUUID().toString()
-                                    var currentStart = targetTrack?.clips?.maxOfOrNull { it.endTimeMs } ?: 0L
+                                    val isOverlay = selectedTrackTypeForPicker == com.example.core.model.TrackType.OVERLAY
+                                    val startPos = if (isOverlay) editorUiState.playheadPositionMs else (targetTrack?.clips?.maxOfOrNull { it.endTimeMs } ?: 0L)
+                                    var currentStart = startPos
 
                                     val assetsAndClips = selectedItems.map { mediaItem ->
                                         val effectiveItem = if (mediaItem.uri.scheme == "content") {
