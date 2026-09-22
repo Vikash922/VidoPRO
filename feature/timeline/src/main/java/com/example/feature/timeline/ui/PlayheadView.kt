@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -25,8 +26,9 @@ import androidx.compose.ui.unit.dp
 import com.example.core.ui.theme.EditorColors
 
 /**
- * Canvas-based Playhead indicator with playful scrubbing handle.
- * Bounces on scrub, emits haptics, and features a glowing trail!
+ * Canvas-based Playhead indicator with scrubbing handle.
+ * Tapping the white playhead toggles a beat marker (pink line) at the current timestamp.
+ * Dragging scrubs the timeline.
  */
 @Composable
 fun PlayheadView(
@@ -56,7 +58,7 @@ fun PlayheadView(
             .fillMaxHeight()
             .scale(scale)
             .pointerInput(Unit) {
-                androidx.compose.foundation.gestures.detectTapGestures {
+                detectTapGestures {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onTapPlayhead()
                 }
@@ -85,7 +87,6 @@ fun PlayheadView(
                 val handleCapWidth = 10.dp.toPx()
                 val lineWidth = 2.5.dp.toPx()
 
-                // Cache handle path geometry so it is not re-instantiated every frame
                 val handlePath = Path().apply {
                     moveTo(centerX - handleCapWidth, 0f)
                     lineTo(centerX + handleCapWidth, 0f)
@@ -96,16 +97,7 @@ fun PlayheadView(
                 }
 
                 onDrawBehind {
-                    // Draw glow behind the line
-                    drawLine(
-                        color = EditorColors.playhead.copy(alpha = 0.3f),
-                        start = Offset(centerX, handleHeight),
-                        end = Offset(centerX, height),
-                        strokeWidth = lineWidth * 3,
-                        blendMode = BlendMode.Lighten
-                    )
-
-                    // Draw vertical playhead line
+                    // Vertical playhead line
                     drawLine(
                         color = EditorColors.playhead,
                         start = Offset(centerX, handleHeight),
@@ -113,11 +105,7 @@ fun PlayheadView(
                         strokeWidth = lineWidth
                     )
                     
-                    // Draw handle head with shadow-like double draw
-                    drawPath(
-                        path = handlePath,
-                        color = EditorColors.playhead.copy(alpha = 0.4f),
-                    )
+                    // White handle head
                     drawPath(
                         path = handlePath,
                         color = EditorColors.playhead,
@@ -128,4 +116,3 @@ fun PlayheadView(
         // Drawing handled by drawWithCache
     }
 }
-
