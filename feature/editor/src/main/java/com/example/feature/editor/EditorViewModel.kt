@@ -425,9 +425,10 @@ class EditorViewModel(
             }
             is TimelineAction.SplitAtPlayhead -> {
                 val playhead = preActionState.playheadPositionMs
-                val clipId = if (action.clipId != null) {
-                    val c = preActionState.findClip(action.clipId)
-                    if (c != null && playhead >= c.startTimeMs && playhead <= c.endTimeMs) action.clipId
+                val targetClipId = action.clipId
+                val clipId = if (targetClipId != null) {
+                    val c = preActionState.findClip(targetClipId)
+                    if (c != null && playhead >= c.startTimeMs && playhead <= c.endTimeMs) targetClipId
                     else preActionState.tracks.flatMap { it.clips }.find { playhead >= it.startTimeMs && playhead < it.endTimeMs }?.id
                 } else {
                     val sel = preActionState.selectedClipId?.let { preActionState.findClip(it) }

@@ -1,6 +1,6 @@
 {
-  "versionCode": 14,
-  "versionName": "2.0.5",
+  "versionCode": 15,
+  "versionName": "2.0.6",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "Release 2.0.5: CapCut-style Fold/Unfold dedicated sub-timelines (Overlay, Audio, Text), 4K 60fps zero-copy SurfaceView hardware playback with decoder fallback, visible Text rendering on canvas & timeline, Keyframe button next to Undo/Redo, precision playhead splitting and ultra-thin 1dp line, smooth multi-overlay dragging and up to 10x scaling."
+  "releaseNotes": "Release 2.0.6: Fixed Kotlin smart-cast compilation, added Duplicate button across all timeline modes (Main, Overlay, Audio, Text) and directly on overlay canvas corners, CapCut-style dedicated fold/unfold sub-timelines, 4K 60fps SurfaceView hardware acceleration, canvas text rendering, playhead keyframe diamond button, and precision splitting."
 }

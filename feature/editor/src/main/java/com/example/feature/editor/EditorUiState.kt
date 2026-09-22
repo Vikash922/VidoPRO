@@ -19,6 +19,7 @@ enum class EditorTool(val label: String) {
     SPLIT("Split"),
     SPEED("Speed"),
     VOLUME("Volume"),
+    DUPLICATE("Duplicate"),
     ANIMATION("Animation"),
     DELETE("Delete"),
     MASK("Mask"),

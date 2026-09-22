@@ -840,6 +840,10 @@ fun EditorScreen(
                                     }
                                     Spacer(Modifier.width(18.dp))
                                 }
+                                EditorToolButton(EditorTool.DUPLICATE, Icons.Default.ContentCopy) {
+                                    onEvent(EditorEvent.DuplicateSelectedClip)
+                                }
+                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
                                     onEvent(EditorEvent.DeleteSelectedClip)
                                 }
@@ -885,6 +889,10 @@ fun EditorScreen(
                                     onEvent(EditorEvent.SetVolumeSheetVisible(true))
                                 }
                                 Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.DUPLICATE, Icons.Default.ContentCopy) {
+                                    onEvent(EditorEvent.DuplicateSelectedClip)
+                                }
+                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
                                     onEvent(EditorEvent.DeleteSelectedClip)
                                 }
@@ -917,6 +925,10 @@ fun EditorScreen(
                                     onEvent(EditorEvent.SetSpeedSheetVisible(true))
                                 }
                                 Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.DUPLICATE, Icons.Default.ContentCopy) {
+                                    onEvent(EditorEvent.DuplicateSelectedClip)
+                                }
+                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
                                     onEvent(EditorEvent.DeleteSelectedClip)
                                 }
@@ -943,6 +955,10 @@ fun EditorScreen(
                             if (uiState.selectedClipId != null) {
                                 EditorToolButton(EditorTool.TEXT, Icons.Default.Title) {
                                     onEvent(EditorEvent.SetTextSheetVisible(true))
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.DUPLICATE, Icons.Default.ContentCopy) {
+                                    onEvent(EditorEvent.DuplicateSelectedClip)
                                 }
                                 Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
