@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -27,29 +26,40 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.common.TimeUtils
+import com.example.core.model.AspectRatio
 import com.example.core.model.Project
 import com.example.core.ui.theme.AppSpacing
+import com.example.feature.home.components.DeleteProjectDialog
 import com.example.feature.home.components.NewProjectBottomSheet
+import com.example.feature.home.components.RenameProjectDialog
 
+/**
+ * HomeScreen — Clean solid dark theme matching MainActivity contract and reference designs.
+ * No gradients used.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     uiState: HomeUiState,
-    onProjectClick: (String) -> Unit,
-    onCreateProject: (String, com.example.core.model.AspectRatio) -> Unit,
-    onConfirmRename: (String) -> Unit,
+    onNewProjectClick: () -> Unit,
+    onDismissNewProjectSheet: () -> Unit,
+    onCreateProject: (name: String, aspectRatio: AspectRatio) -> Unit,
+    onProjectClick: (projectId: String) -> Unit,
+    onProjectRenameClick: (project: Project) -> Unit,
+    onConfirmRename: (newName: String) -> Unit,
     onDismissRename: () -> Unit,
+    onProjectDuplicateClick: (projectId: String) -> Unit,
+    onProjectDeleteClick: (project: Project) -> Unit,
     onConfirmDelete: () -> Unit,
     onDismissDelete: () -> Unit,
-    onOpenNewProjectSheet: () -> Unit,
-    onDismissNewProjectSheet: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    onSettingsClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onErrorDismiss: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
     val bgColor = Color(0xFF0F111A)
     val cardColor = Color(0xFF161925)
-    val accentColor = Color(0xFF7B61FF)
+    val accentColor = Color(0xFF6B4BFF)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -76,10 +86,7 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .size(28.dp)
-                            .background(
-                                brush = Brush.linearGradient(listOf(Color(0xFFB8A7FF), Color(0xFF7B61FF))),
-                                shape = RoundedCornerShape(8.dp)
-                            ),
+                            .background(accentColor, shape = RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text("V", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -90,22 +97,24 @@ fun HomeScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.WorkspacePremium, contentDescription = "Premium", tint = Color(0xFFFFD700), modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(16.dp))
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(24.dp).clickable { onNavigateToSettings() })
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp).clickable { onSettingsClick() }
+                    )
                 }
             }
 
-            // Banner Card
+            // Banner Card (Solid dark background, NO GRADIENT)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
                     .height(160.dp)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(Color(0xFF2B1F4F), Color(0xFF161925))
-                        )
-                    )
+                    .background(Color(0xFF1E2230))
+                    .border(1.dp, Color(0xFF2C3448), RoundedCornerShape(24.dp))
             ) {
                 Column(
                     modifier = Modifier.padding(24.dp).fillMaxHeight(),
@@ -130,11 +139,8 @@ fun HomeScreen(
                         .align(Alignment.BottomEnd)
                         .padding(16.dp)
                         .size(40.dp)
-                        .background(
-                            brush = Brush.linearGradient(listOf(Color(0xFFB8A7FF), Color(0xFF7B61FF))),
-                            shape = CircleShape
-                        )
-                        .clickable { onOpenNewProjectSheet() },
+                        .background(accentColor, shape = CircleShape)
+                        .clickable { onNewProjectClick() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Go", tint = Color.White)
@@ -148,24 +154,18 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // New Project Button — Solid Purple
                 Button(
-                    onClick = { onOpenNewProjectSheet() },
+                    onClick = { onNewProjectClick() },
                     modifier = Modifier.weight(1.5f).height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    colors = ButtonDefaults.buttonColors(containerColor = accentColor),
                     contentPadding = PaddingValues()
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Brush.horizontalGradient(listOf(Color(0xFF6B4BFF), Color(0xFF9E84FF)))),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Add, contentDescription = "New", tint = Color.White)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("New Project", color = Color.White, fontWeight = FontWeight.SemiBold)
-                        }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Add, contentDescription = "New", tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("New Project", color = Color.White, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -256,7 +256,7 @@ fun HomeScreen(
                         RecentProjectCard(
                             project = project,
                             onClick = { onProjectClick(project.id) },
-                            onMoreClick = { /* TODO */ }
+                            onMoreClick = { onProjectDeleteClick(project) }
                         )
                     }
                 }
@@ -272,6 +272,22 @@ fun HomeScreen(
         NewProjectBottomSheet(
             onDismissRequest = onDismissNewProjectSheet,
             onCreateProject = onCreateProject
+        )
+    }
+
+    if (uiState.projectToRename != null) {
+        RenameProjectDialog(
+            initialName = uiState.projectToRename.name,
+            onConfirm = onConfirmRename,
+            onDismiss = onDismissRename
+        )
+    }
+
+    if (uiState.projectToDelete != null) {
+        DeleteProjectDialog(
+            projectName = uiState.projectToDelete.name,
+            onConfirm = onConfirmDelete,
+            onDismiss = onDismissDelete
         )
     }
 }
@@ -307,7 +323,8 @@ fun RecentProjectCard(project: Project, onClick: () -> Unit, onMoreClick: () -> 
                 .fillMaxWidth()
                 .height(80.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Brush.horizontalGradient(listOf(Color(0xFF2C3248), Color(0xFF161925))))
+                .background(Color(0xFF1E2230))
+                .border(1.dp, Color(0xFF2C3448), RoundedCornerShape(16.dp))
         ) {
             Icon(
                 imageVector = Icons.Default.PlayCircle,
@@ -348,7 +365,7 @@ fun HomeBottomNavigationBar(selectedIndex: Int, onItemSelected: (Int) -> Unit) {
         )
         items.forEachIndexed { index, pair ->
             val isSelected = selectedIndex == index
-            val color = if (isSelected) Color(0xFF7B61FF) else Color.White.copy(alpha = 0.4f)
+            val color = if (isSelected) Color(0xFF6B4BFF) else Color.White.copy(alpha = 0.4f)
             NavigationBarItem(
                 icon = { Icon(pair.second, contentDescription = pair.first, tint = color, modifier = Modifier.size(22.dp)) },
                 label = { Text(pair.first, fontSize = 10.sp, color = color) },

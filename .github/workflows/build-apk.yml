@@ -29,7 +29,7 @@ jobs:
           gradle-version: '9.3.1'
 
       - name: Build Release APK
-        run: gradle assembleRelease
+        run: gradle assembleRelease --stacktrace
 
       - name: Get Version Name
         id: get_version
