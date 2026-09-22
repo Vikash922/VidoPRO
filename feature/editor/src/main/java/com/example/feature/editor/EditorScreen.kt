@@ -15,22 +15,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.common.TimeUtils
 import com.example.core.model.ClipType
 import com.example.core.ui.components.LoadingView
-import com.example.core.ui.theme.AppSpacing
-import com.example.core.ui.theme.EditorColors
-
-import com.example.feature.timeline.engine.TimelineEngineState
 import com.example.feature.timeline.engine.TimelineAction
-import com.example.feature.timeline.ui.TimelineContainer
 import com.example.core.model.TrackType
 import androidx.media3.common.Player
 
@@ -47,54 +42,48 @@ fun EditorScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val snackbarHostState = remember { SnackbarHostState() }
+    val bgColor = Color(0xFF0F111A)
+    val cardColor = Color(0xFF161925)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = bgColor,
         topBar = {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .background(MaterialTheme.colorScheme.background)
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurface)
-                }
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp).clickable { onNavigateBack() }
+                )
                 
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Resolution Dropdown
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("1080P", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
-                        }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("1080P", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                     }
                     
-                    // Export Button
-                    Button(
-                        onClick = { uiState.project?.id?.let { onNavigateExport(it) } },
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    Box(
+                        modifier = Modifier
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Brush.horizontalGradient(listOf(Color(0xFF6B4BFF), Color(0xFF9E84FF))))
+                            .clickable { uiState.project?.id?.let { onNavigateExport(it) } }
+                            .padding(horizontal = 16.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("Export", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("Export", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.background
+        }
     ) { innerPadding ->
         if (uiState.isLoading) {
             LoadingView(modifier = Modifier.fillMaxSize().padding(innerPadding))
@@ -107,15 +96,16 @@ fun EditorScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
-                // Placeholder for actual video preview player
                 Icon(
                     imageVector = Icons.Default.Image,
                     contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    modifier = Modifier.size(48.dp),
+                    tint = Color.White.copy(alpha = 0.2f)
                 )
             }
 
@@ -123,45 +113,58 @@ fun EditorScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(EditorColors.timelineBackground)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = "${TimeUtils.formatDuration(uiState.playheadPositionMs)} / ${TimeUtils.formatDuration(uiState.durationMs)}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 12.sp,
+                    modifier = Modifier.weight(1f)
                 )
                 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = { if (uiState.isPlaying) onEvent(EditorEvent.PlayPauseClicked) else onEvent(EditorEvent.PlayPauseClicked) }
-                    ) {
-                        Icon(
-                            if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = "Play/Pause",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    IconButton(onClick = { onEvent(EditorEvent.UndoClicked) }, enabled = uiState.canUndo) {
-                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo", tint = if(uiState.canUndo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    IconButton(onClick = { onEvent(EditorEvent.RedoClicked) }, enabled = uiState.canRedo) {
-                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo", tint = if(uiState.canRedo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    IconButton(onClick = { /* Fullscreen */ }) {
-                        Icon(Icons.Default.Fullscreen, contentDescription = "Fullscreen", tint = MaterialTheme.colorScheme.onSurface)
-                    }
+                Icon(
+                    imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = "Play/Pause",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp).clickable { onEvent(EditorEvent.PlayPauseClicked) }
+                )
+                
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Undo,
+                        contentDescription = "Undo",
+                        tint = if(uiState.canUndo) Color.White else Color.White.copy(alpha=0.3f),
+                        modifier = Modifier.size(20.dp).clickable(enabled = uiState.canUndo) { onEvent(EditorEvent.UndoClicked) }
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Icon(
+                        Icons.AutoMirrored.Filled.Redo,
+                        contentDescription = "Redo",
+                        tint = if(uiState.canRedo) Color.White else Color.White.copy(alpha=0.3f),
+                        modifier = Modifier.size(20.dp).clickable(enabled = uiState.canRedo) { onEvent(EditorEvent.RedoClicked) }
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Icon(
+                        Icons.Default.Fullscreen,
+                        contentDescription = "Fullscreen",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
 
-            // Timeline
+            // Timeline Area
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .background(EditorColors.timelineBackground)
+                    .height(240.dp)
+                    .background(Color(0xFF0F111A))
             ) {
                 if (uiState.project != null) {
                     val timelineEngineState = androidx.compose.runtime.remember(uiState.project, uiState.playheadPositionMs, uiState.selectedClipId, uiState.durationMs) {
@@ -188,51 +191,43 @@ fun EditorScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
+                    .background(bgColor)
                     .padding(vertical = 12.dp)
             ) {
                 val scrollState = rememberScrollState()
                 
                 Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState).padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp)
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState).padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(28.dp)
                 ) {
                     if (uiState.selectedClipId == null) {
-                        // Main Tools
                         EditorToolButton(EditorTool.EDIT, Icons.Default.ContentCut) { onEvent(EditorEvent.ToolClicked(EditorTool.EDIT)) }
                         EditorToolButton(EditorTool.AUDIO, Icons.Default.Audiotrack) { onEvent(EditorEvent.ToolClicked(EditorTool.AUDIO)) }
                         EditorToolButton(EditorTool.TEXT, Icons.Default.Title) { onEvent(EditorEvent.ToolClicked(EditorTool.TEXT)) }
                         EditorToolButton(EditorTool.OVERLAY, Icons.Default.Layers) { onEvent(EditorEvent.ToolClicked(EditorTool.OVERLAY)) }
                         EditorToolButton(EditorTool.EFFECTS, Icons.Default.AutoFixHigh) { onEvent(EditorEvent.ToolClicked(EditorTool.EFFECTS)) }
-                        EditorToolButton(EditorTool.FILTERS, Icons.Default.Brush) { onEvent(EditorEvent.ToolClicked(EditorTool.FILTERS)) }
-                        EditorToolButton(EditorTool.ADJUST, Icons.Default.Settings) { onEvent(EditorEvent.ToolClicked(EditorTool.ADJUST)) }
-                        EditorToolButton(EditorTool.HSL, Icons.Default.Edit) { onEvent(EditorEvent.ToolClicked(EditorTool.HSL)) }
-                        EditorToolButton(EditorTool.AI, Icons.Default.Star) { onEvent(EditorEvent.ToolClicked(EditorTool.AI)) }
+                        EditorToolButton(EditorTool.FILTERS, Icons.Default.CameraFilter) { onEvent(EditorEvent.ToolClicked(EditorTool.FILTERS)) }
                     } else {
-                        // Clip Specific Tools
                         val clip = uiState.selectedClip
                         EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) { onEvent(EditorEvent.ToolClicked(EditorTool.SPLIT)) }
                         if (clip?.type == ClipType.VIDEO) {
-                            EditorToolButton(EditorTool.SPEED, Icons.Default.PlayArrow) { onEvent(EditorEvent.ToolClicked(EditorTool.SPEED)) }
+                            EditorToolButton(EditorTool.SPEED, Icons.Default.Speed) { onEvent(EditorEvent.ToolClicked(EditorTool.SPEED)) }
                         }
                         if (clip?.type == ClipType.VIDEO || clip?.type == ClipType.AUDIO) {
                             EditorToolButton(EditorTool.VOLUME, Icons.Default.VolumeUp) { onEvent(EditorEvent.ToolClicked(EditorTool.VOLUME)) }
                         }
-                        EditorToolButton(EditorTool.ANIMATION, Icons.Default.Build) { onEvent(EditorEvent.ToolClicked(EditorTool.ANIMATION)) }
                         EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) { onEvent(EditorEvent.ToolClicked(EditorTool.DELETE)) }
-                        
                         EditorToolButton(EditorTool.MASK, Icons.Default.Layers) { onEvent(EditorEvent.ToolClicked(EditorTool.MASK)) }
                         EditorToolButton(EditorTool.BLEND, Icons.Default.ViewHeadline) { onEvent(EditorEvent.ToolClicked(EditorTool.BLEND)) }
                         EditorToolButton(EditorTool.TRANSFORM, Icons.Default.Refresh) { onEvent(EditorEvent.ToolClicked(EditorTool.TRANSFORM)) }
                         EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) { onEvent(EditorEvent.ToolClicked(EditorTool.KEYFRAME)) }
-                        EditorToolButton(EditorTool.BEATS, Icons.Default.Share) { onEvent(EditorEvent.ToolClicked(EditorTool.BEATS)) }
+                        EditorToolButton(EditorTool.BEATS, Icons.Default.GraphicEq) { onEvent(EditorEvent.ToolClicked(EditorTool.BEATS)) }
                     }
                 }
             }
         }
 
-        // Bottom Sheets (Omitted for brevity, but they will be mapped here)
-                if (uiState.isEditSheetVisible && uiState.selectedClip != null) { 
+        if (uiState.isEditSheetVisible && uiState.selectedClip != null) { 
             EditBottomSheet(
                 clip = uiState.selectedClip!!,
                 playheadPositionMs = uiState.playheadPositionMs,
@@ -267,8 +262,8 @@ fun EditorToolButton(tool: EditorTool, icon: ImageVector, onClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.clickable(onClick = onClick)
     ) {
-        Icon(imageVector = icon, contentDescription = tool.label, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+        Icon(imageVector = icon, contentDescription = tool.label, tint = Color.White, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.height(6.dp))
-        Text(text = tool.label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text = tool.label, fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f))
     }
 }
