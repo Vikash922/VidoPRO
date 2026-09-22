@@ -52,6 +52,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import coil.decode.VideoFrameDecoder
+import coil.decode.videoFrameMillis
 import coil.request.ImageRequest
 import com.example.core.model.Asset
 import com.example.core.model.Clip
