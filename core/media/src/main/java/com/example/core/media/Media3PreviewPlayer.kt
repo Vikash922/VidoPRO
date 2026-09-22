@@ -41,7 +41,8 @@ class Media3PreviewPlayer(
         )
         .build()
 
-    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context.applicationContext, renderersFactory)
+    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context.applicationContext)
+        .setRenderersFactory(renderersFactory)
         .setLoadControl(loadControl)
         .build()
     private val audioPlayer: ExoPlayer = ExoPlayer.Builder(context.applicationContext).build()

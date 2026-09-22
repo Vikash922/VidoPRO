@@ -71,7 +71,15 @@ class ProjectRepositoryImpl(
     }
 
     override suspend fun getProjectById(projectId: String): Project? = withContext(dispatchers.io) {
-        projectDao.getProjectWithTracks(projectId)?.toDomain()
+        val projectWithTracks = projectDao.getProjectWithTracks(projectId) ?: return@withContext null
+        val tracks = projectWithTracks.tracks.map { trackWithClips ->
+            val detailedClips = trackWithClips.clips.map { clipEntity ->
+                val clipWithDetails = clipDao.getClipWithDetails(clipEntity.id)
+                clipWithDetails?.toDomain() ?: clipEntity.toDomain()
+            }
+            trackWithClips.track.toDomain(clips = detailedClips)
+        }
+        projectWithTracks.project.toDomain(tracks = tracks)
     }
 
     override fun observeProjects(): Flow<List<Project>> {
@@ -82,7 +90,19 @@ class ProjectRepositoryImpl(
 
     override fun observeProjectById(projectId: String): Flow<Project?> {
         return projectDao.observeProjectWithTracks(projectId)
-            .map { it?.toDomain() }
+            .map { projectWithTracks ->
+                if (projectWithTracks == null) null
+                else {
+                    val tracks = projectWithTracks.tracks.map { trackWithClips ->
+                        val detailedClips = trackWithClips.clips.map { clipEntity ->
+                            val clipWithDetails = clipDao.getClipWithDetails(clipEntity.id)
+                            clipWithDetails?.toDomain() ?: clipEntity.toDomain()
+                        }
+                        trackWithClips.track.toDomain(clips = detailedClips)
+                    }
+                    projectWithTracks.project.toDomain(tracks = tracks)
+                }
+            }
             .flowOn(dispatchers.io)
     }
 

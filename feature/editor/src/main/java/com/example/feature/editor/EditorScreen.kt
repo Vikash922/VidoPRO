@@ -858,13 +858,13 @@ fun EditorScreen(
                                 }
                             }
                         } else if (timelineMode == TimelineMode.OVERLAY) {
-                            EditorToolButton(EditorTool.EDIT, Icons.AutoMirrored.Filled.ArrowBack) {
+                            EditorToolButton("Back", Icons.AutoMirrored.Filled.ArrowBack) {
                                 timelineMode = TimelineMode.MAIN
                                 onEvent(EditorEvent.SelectClip(null))
                                 onTimelineAction(TimelineAction.SelectClip(null))
                             }
                             Spacer(Modifier.width(18.dp))
-                            EditorToolButton(EditorTool.OVERLAY, Icons.Default.Add) {
+                            EditorToolButton("Add", Icons.Default.Add) {
                                 onNavigateMediaPicker(TrackType.OVERLAY)
                             }
                             Spacer(Modifier.width(18.dp))
@@ -894,13 +894,13 @@ fun EditorScreen(
                                 }
                             }
                         } else if (timelineMode == TimelineMode.AUDIO) {
-                            EditorToolButton(EditorTool.EDIT, Icons.AutoMirrored.Filled.ArrowBack) {
+                            EditorToolButton("Back", Icons.AutoMirrored.Filled.ArrowBack) {
                                 timelineMode = TimelineMode.MAIN
                                 onEvent(EditorEvent.SelectClip(null))
                                 onTimelineAction(TimelineAction.SelectClip(null))
                             }
                             Spacer(Modifier.width(18.dp))
-                            EditorToolButton(EditorTool.AUDIO, Icons.Default.Add) {
+                            EditorToolButton("Add", Icons.Default.Add) {
                                 onNavigateMediaPicker(TrackType.AUDIO)
                             }
                             Spacer(Modifier.width(18.dp))
@@ -926,13 +926,13 @@ fun EditorScreen(
                                 }
                             }
                         } else if (timelineMode == TimelineMode.TEXT) {
-                            EditorToolButton(EditorTool.EDIT, Icons.AutoMirrored.Filled.ArrowBack) {
+                            EditorToolButton("Back", Icons.AutoMirrored.Filled.ArrowBack) {
                                 timelineMode = TimelineMode.MAIN
                                 onEvent(EditorEvent.SelectClip(null))
                                 onTimelineAction(TimelineAction.SelectClip(null))
                             }
                             Spacer(Modifier.width(18.dp))
-                            EditorToolButton(EditorTool.TEXT, Icons.Default.Add) {
+                            EditorToolButton("Add", Icons.Default.Add) {
                                 onEvent(EditorEvent.SetTextSheetVisible(true))
                             }
                             Spacer(Modifier.width(18.dp))
@@ -1068,7 +1068,7 @@ fun EditorScreen(
 }
 
 @Composable
-fun EditorToolButton(tool: EditorTool, icon: ImageVector, onClick: () -> Unit) {
+fun EditorToolButton(label: String, icon: ImageVector, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -1077,15 +1077,20 @@ fun EditorToolButton(tool: EditorTool, icon: ImageVector, onClick: () -> Unit) {
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = tool.label,
+            contentDescription = label,
             tint = Color.White,
             modifier = Modifier.size(24.dp)
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = tool.label,
+            text = label,
             fontSize = 11.sp,
             color = Color.White.copy(alpha = 0.7f)
         )
     }
+}
+
+@Composable
+fun EditorToolButton(tool: EditorTool, icon: ImageVector, onClick: () -> Unit) {
+    EditorToolButton(label = tool.label, icon = icon, onClick = onClick)
 }
