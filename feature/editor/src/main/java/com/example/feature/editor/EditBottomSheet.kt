@@ -8,15 +8,30 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Filter
+import androidx.compose.material.icons.filled.CropRotate
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,19 +42,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.core.common.TimeUtils
 import com.example.core.model.Clip
 import com.example.core.ui.theme.AppRadius
 import com.example.core.ui.theme.AppSpacing
 
 /**
- * Bottom Sheet containing Split, Delete, and Duplicate actions for selected clip.
+ * Bottom Sheet containing all clip editing actions when a clip is tapped.
+ * Includes: Split, Speed, Volume, Audio, Text, Overlay, Effects/Filters, Transform, Canvas, Keyframe, Beats, Duplicate, Delete
  * Conforms to DEV-054 to DEV-057 and UI_DESIGN_SYSTEM.md.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,6 +68,16 @@ fun EditBottomSheet(
     onSplit: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
+    onSpeed: () -> Unit,
+    onVolume: () -> Unit,
+    onAudio: () -> Unit,
+    onText: () -> Unit,
+    onOverlay: () -> Unit,
+    onFilters: () -> Unit,
+    onTransform: () -> Unit,
+    onCanvas: () -> Unit,
+    onKeyframe: () -> Unit,
+    onBeats: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -130,14 +158,14 @@ fun EditBottomSheet(
 
             Spacer(modifier = Modifier.height(AppSpacing.lg))
 
-            // Action Buttons Row: Split, Duplicate, Delete
+            // Main Action Buttons Row 1: Split, Duplicate, Delete
             val canSplit = playheadPositionMs > clip.startTimeMs && playheadPositionMs < clip.endTimeMs
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
-                // Split Action Button (DEV-054)
+                // Split Action Button
                 EditActionButton(
                     icon = Icons.Default.ContentCut,
                     label = "Split",
@@ -148,7 +176,7 @@ fun EditBottomSheet(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Duplicate Action Button (DEV-056)
+                // Duplicate Action Button
                 EditActionButton(
                     icon = Icons.Default.ContentCopy,
                     label = "Duplicate",
@@ -159,7 +187,7 @@ fun EditBottomSheet(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Delete Action Button (DEV-055)
+                // Delete Action Button
                 EditActionButton(
                     icon = Icons.Default.Delete,
                     label = "Delete",
@@ -172,10 +200,103 @@ fun EditBottomSheet(
                 )
             }
 
+            Spacer(modifier = Modifier.height(AppSpacing.lg))
+
+            // Advanced Editing Tools Grid
+            Text(
+                text = "Editing Tools",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(AppSpacing.sm))
+
+            val editingTools = remember {
+                listOf(
+                    EditorToolItem("Speed", Icons.Default.Speed, "Adjust playback speed", onSpeed),
+                    EditorToolItem("Volume", Icons.Default.VolumeUp, "Adjust clip volume", onVolume),
+                    EditorToolItem("Audio", Icons.Default.MusicNote, "Add audio track", onAudio),
+                    EditorToolItem("Text", Icons.Default.TextFields, "Add text overlay", onText),
+                    EditorToolItem("Overlay", Icons.Default.Layers, "Add image/video overlay", onOverlay),
+                    EditorToolItem("Filters", Icons.Default.Filter, "Color filters & effects", onFilters),
+                    EditorToolItem("Transform", Icons.Default.CropRotate, "Position, scale, rotate", onTransform),
+                    EditorToolItem("Canvas", Icons.Default.AspectRatio, "Change aspect ratio", onCanvas),
+                    EditorToolItem("Keyframes", Icons.Default.Star, "Animate properties", onKeyframe),
+                    EditorToolItem("Beats", Icons.Default.Build, "Auto-cut to beats", onBeats),
+                )
+            }
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(editingTools) { tool ->
+                    EditorToolButton(
+                        tool = tool,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(AppSpacing.xl))
         }
     }
 }
+
+@Composable
+private fun EditorToolButton(
+    tool: EditorToolItem,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .defaultMinSize(minHeight = 64.dp)
+            .clip(RoundedCornerShape(AppRadius.medium))
+            .clickable(onClick = tool.onClick)
+            .testTag("tool_${tool.label.lowercase().replace(' ', '_')}_button"),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(AppRadius.medium)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(AppSpacing.md),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = tool.icon,
+                contentDescription = tool.label,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(AppSpacing.md))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = tool.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = tool.description,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+private data class EditorToolItem(
+    val label: String,
+    val icon: ImageVector,
+    val description: String,
+    val onClick: () -> Unit
+)
 
 @Composable
 private fun EditActionButton(

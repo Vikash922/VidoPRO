@@ -145,50 +145,70 @@ fun ClipCard(
             )
             .testTag("clip_card_${clip.id}")
     ) {
-        // Main clip body with Tap and Move gestures
+        // Main clip body with Tap and Move gestures - using combined pointerInput for proper gesture handling
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = if (isSelected) 16.dp else 4.dp)
-                .pointerInput(clip.id) {
-                    detectTapGestures(
-                        onPress = {
-                            isPressed = true
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            tryAwaitRelease()
-                            isPressed = false
-                        },
-                        onTap = {
+                .pointerInput(clip.id, pixelsPerMs) {
+                    // Use combined gesture detection for better tap/drag separation
+                    val touchSlop = 8f // pixels before considering it a drag
+                    var touchStartX = 0f
+                    var isDragging = false
+                    
+                    awaitPointerEventScope {
+                        awaitFirstDown()
+                        
+                        do {
+                            val event = awaitPointerEvent()
+                            val changes = event.changes
+                            val downChange = changes.find { it.pressed && it.positionChange().x != 0f }
+                            
+                            if (downChange != null) {
+                                touchStartX = downChange.position.x
+                                isPressed = true
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            
+                            // Check for drag
+                            if (!isDragging) {
+                                val totalDragX = changes
+                                    .filter { it.pressed }
+                                    .sumOf { (it.position.x - touchStartX).absoluteValue }
+                                
+                                if (totalDragX > touchSlop) {
+                                    isDragging = true
+                                    accumulatedMovePx = 0f
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                }
+                            }
+                            
+                            if (isDragging) {
+                                val dragAmount = changes
+                                    .filter { it.pressed }
+                                    .sumOf { it.positionChange().x }
+                                
+                                if (dragAmount != 0f) {
+                                    change.consumeAllChanges()
+                                    accumulatedMovePx += dragAmount
+                                    val deltaMs = (accumulatedMovePx / pixelsPerMs).toLong()
+                                    if (deltaMs != 0L) {
+                                        currentOnMoveDelta(deltaMs)
+                                        accumulatedMovePx -= deltaMs * pixelsPerMs
+                                    }
+                                }
+                            }
+                        } while (event.changes.any { it.pressed })
+                        
+                        // If not dragging, it was a tap
+                        if (!isDragging) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             currentOnSelect()
                         }
-                    )
-                }
-                .pointerInput(clip.id, pixelsPerMs) {
-                    detectDragGestures(
-                        onDragStart = { 
-                            isPressed = true
-                            accumulatedMovePx = 0f 
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        },
-                        onDragEnd = { 
-                            isPressed = false
-                            accumulatedMovePx = 0f 
-                        },
-                        onDragCancel = { 
-                            isPressed = false
-                            accumulatedMovePx = 0f 
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            accumulatedMovePx += dragAmount.x
-                            val deltaMs = (accumulatedMovePx / pixelsPerMs).toLong()
-                            if (deltaMs != 0L) {
-                                currentOnMoveDelta(deltaMs)
-                                accumulatedMovePx -= deltaMs * pixelsPerMs
-                            }
-                        }
-                    )
+                        
+                        isPressed = false
+                        accumulatedMovePx = 0f
+                    }
                 },
             contentAlignment = Alignment.CenterStart
         ) {

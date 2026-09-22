@@ -3,56 +3,49 @@ package com.example.core.ui.theme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
 
-/**
- * Base Dark Theme Color Scheme matching UI_DESIGN_SYSTEM.md Section 7.1
- */
 val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF7C5CFF),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFF9A7BFF),
-    onPrimaryContainer = Color(0xFFFFFFFF),
-    secondary = Color(0xFF22D3EE),
-    onSecondary = Color(0xFF04141A),
-    background = Color(0xFF0B0B0F),
-    onBackground = Color(0xFFF5F5F7),
-    surface = Color(0xFF121218),
-    onSurface = Color(0xFFF5F5F7),
-    surfaceVariant = Color(0xFF1A1A22),
-    onSurfaceVariant = Color(0xFFA0A0AB),
-    outline = Color(0xFF2A2A35),
-    outlineVariant = Color(0xFF3A3A48),
-    error = Color(0xFFFF4D4F),
-    onError = Color(0xFFFFFFFF)
+    primary = Color(0xFFB8A7FF), // Soft lavender
+    onPrimary = Color(0xFF0D0F12),
+    secondary = Color(0xFF7DE2D1), // Soft mint
+    onSecondary = Color(0xFF0D0F12),
+    tertiary = Color(0xFFFFB86B), // Warm accent
+    onTertiary = Color(0xFF0D0F12),
+    background = Color(0xFF0D0F12), // Primary background
+    onBackground = Color(0xFFF5F7FA), // Primary text
+    surface = Color(0xFF151920), // Surface
+    onSurface = Color(0xFFF5F7FA),
+    surfaceVariant = Color(0xFF1B2027), // Elevated surface
+    onSurfaceVariant = Color(0xFF9299A5), // Secondary text
+    outline = Color(0xFF272D35), // Border
+    error = Color(0xFFE57373),
+    onError = Color(0xFF0D0F12)
 )
 
-/**
- * Editor-specific Colors matching UI_DESIGN_SYSTEM.md Section 7.2
- */
 object EditorColors {
-    val timelineBackground = Color(0xFF0E0E13)
-    val timelineRuler = Color(0xFF6B6B76)
-    val playhead = Color(0xFFFF3B30)
-    val playheadGlow = Color(0x66FF3B30)
-    val clipVideo = Color(0xFF3B82F6)
-    val clipImage = Color(0xFF8B5CF6)
-    val clipAudio = Color(0xFF22C55E)
-    val clipText = Color(0xFFF59E0B)
-    val clipOverlay = Color(0xFF22D3EE)
-    val clipSelectedBorder = Color(0xFF7C5CFF)
-    val clipSelectedFill = Color(0x227C5CFF)
-    val snapLine = Color(0xFF22D3EE)
-    val transitionMarker = Color(0xFF9A7BFF)
+    val timelineBackground = Color(0xFF111419) // Secondary background
+    val timelineRuler = Color(0xFF626A76) // Muted text
+    val playhead = Color(0xFFF5F7FA) // Clear but not excessively bright
+    val playheadGlow = Color(0x33F5F7FA)
+    
+    // Muted clip colors based on instructions
+    val clipVideo = Color(0xFF4B6B99) // Muted blue
+    val clipImage = Color(0xFF7A64A3) // Muted violet
+    val clipAudio = Color(0xFF5B8A6E) // Muted green
+    val clipText = Color(0xFFB38959) // Muted amber
+    val clipOverlay = Color(0xFF4A8B99) // Muted cyan
+    
+    val clipSelectedBorder = Color(0xFFB8A7FF) // Accent
+    val clipSelectedFill = Color(0x33B8A7FF)
+    val snapLine = Color(0xFF7DE2D1) // Secondary accent
+    val transitionMarker = Color(0xFFB8A7FF)
+    
+    val mutedText = Color(0xFF626A76)
 }
 
-/**
- * State Colors matching UI_DESIGN_SYSTEM.md Section 7.3
- */
 object StateColors {
-    val pressed = Color(0x14FFFFFF)
+    val pressed = Color(0x1AFFFFFF)
     val hover = Color(0x0AFFFFFF)
-    val selected = Color(0x227C5CFF)
-    val disabled = Color(0x08FFFFFF)
-    val errorBackground = Color(0x1AFF4D4F)
-    val successBackground = Color(0x1A22C55E)
-    val warningBackground = Color(0x1AF59E0B)
+    val selected = Color(0x33B8A7FF)
+    val disabled = Color(0x0CFFFFFF)
+    val errorBackground = Color(0x1AE57373)
 }

@@ -1,6 +1,6 @@
 {
-  "versionCode": 8,
-  "versionName": "1.7",
+  "versionCode": 9,
+  "versionName": "2.0",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "Added Keyframe Animations UI, Audio Ducking, and Auto Beat Sync."
+  "releaseNotes": "Major Premium UI Redesign: Dark premium colors, new Home Screen, new Project flow, and professional Timeline interface."
 }

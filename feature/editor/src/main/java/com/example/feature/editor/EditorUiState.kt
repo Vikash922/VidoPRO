@@ -5,24 +5,31 @@ import com.example.core.model.Clip
 import com.example.core.model.Project
 
 enum class EditorTool(val label: String) {
-    SPLIT("Split"),
-    SPEED("Speed"),
-    VOLUME("Volume"),
+    EDIT("Edit"),
     AUDIO("Audio"),
     TEXT("Text"),
     OVERLAY("Overlay"),
     EFFECTS("Effects"),
-    FILTERS("Filters"),
+    FILTERS("Filter"),
+    ADJUST("Adjust"),
+    HSL("HSL"),
+    AI("AI"),
+    
+    // Secondary (Edit Panel)
+    SPLIT("Split"),
+    SPEED("Speed"),
+    VOLUME("Volume"),
+    ANIMATION("Animation"),
+    DELETE("Delete"),
+    MASK("Mask"),
+    BLEND("Blend"),
+    CHROMA("Chroma Key"),
     TRANSFORM("Transform"),
     CANVAS("Canvas"),
-    KEYFRAME("Keyframes"),
-    BEATS("Beats"),
-    DELETE("Delete")
+    KEYFRAME("Keyframe"),
+    BEATS("Beat Sync")
 }
 
-/**
- * UI State for the Video Editor screen matching UI_DESIGN_SYSTEM.md Section 15.2
- */
 @Immutable
 data class EditorUiState(
     val isLoading: Boolean = true,

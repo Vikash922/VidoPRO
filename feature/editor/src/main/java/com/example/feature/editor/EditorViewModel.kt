@@ -183,182 +183,26 @@ class EditorViewModel(
                 }
 
                 when (event.tool) {
-                    EditorTool.SPLIT -> {
-                        _uiState.update { it.copy(isEditSheetVisible = true) }
-                    }
-                    EditorTool.SPEED -> {
-                        _uiState.update { it.copy(isSpeedSheetVisible = true) }
-                    }
-                    EditorTool.VOLUME -> {
-                        _uiState.update { it.copy(isVolumeSheetVisible = true) }
-                    }
-                    EditorTool.CANVAS -> {
-                        _uiState.update { it.copy(isCanvasSheetVisible = true) }
-                    }
-                    EditorTool.KEYFRAME -> {
-                        _uiState.update { it.copy(isKeyframeSheetVisible = true) }
-                    }
-                    EditorTool.BEATS -> {
-                        _uiState.update { it.copy(isBeatsSheetVisible = true) }
-                    }
-                    EditorTool.TRANSFORM -> {
-                        _uiState.update { it.copy(isTransformSheetVisible = true) }
-                    }
-                    EditorTool.TEXT -> {
-                        _uiState.update { it.copy(isTextSheetVisible = true) }
-                    }
-                    EditorTool.FILTERS, EditorTool.EFFECTS -> {
-                        _uiState.update { it.copy(isFiltersSheetVisible = true) }
-                    }
+                    EditorTool.EDIT -> { _uiState.update { it.copy(isEditSheetVisible = true) } }
+                    EditorTool.AUDIO -> { _uiState.update { it.copy(isVolumeSheetVisible = true) } }
+                    EditorTool.TEXT -> { _uiState.update { it.copy(isTextSheetVisible = true) } }
+                    EditorTool.FILTERS -> { _uiState.update { it.copy(isFiltersSheetVisible = true) } }
+                    EditorTool.SPLIT -> { _uiState.update { it.copy(isEditSheetVisible = true) } }
+                    EditorTool.SPEED -> { _uiState.update { it.copy(isSpeedSheetVisible = true) } }
+                    EditorTool.VOLUME -> { _uiState.update { it.copy(isVolumeSheetVisible = true) } }
+                    EditorTool.CANVAS -> { _uiState.update { it.copy(isCanvasSheetVisible = true) } }
+                    EditorTool.KEYFRAME -> { _uiState.update { it.copy(isKeyframeSheetVisible = true) } }
+                    EditorTool.BEATS -> { _uiState.update { it.copy(isBeatsSheetVisible = true) } }
+                    EditorTool.TRANSFORM -> { _uiState.update { it.copy(isTransformSheetVisible = true) } }
                     EditorTool.DELETE -> {
                         currentClipId?.let { onTimelineAction(TimelineAction.DeleteClip(it)) }
                     }
                     else -> {
-                        _uiState.update { current ->
-                            val newTool = if (current.activeTool == event.tool) null else event.tool
-                            current.copy(activeTool = newTool)
-                        }
+                        // For newly added UI tools, just open edit sheet as placeholder
+                        _uiState.update { it.copy(isEditSheetVisible = true) }
                     }
                 }
             }
-
-            is EditorEvent.SetTextSheetVisible -> {
-                _uiState.update { it.copy(isTextSheetVisible = event.visible) }
-            }
-
-            is EditorEvent.SetFiltersSheetVisible -> {
-                _uiState.update { it.copy(isFiltersSheetVisible = event.visible) }
-            }
-
-            is EditorEvent.SetSpeedSheetVisible -> {
-                _uiState.update { it.copy(isSpeedSheetVisible = event.visible) }
-            }
-
-            is EditorEvent.SetVolumeSheetVisible -> {
-                _uiState.update { it.copy(isVolumeSheetVisible = event.visible) }
-            }
-
-            is EditorEvent.SetCanvasSheetVisible -> {
-                _uiState.update { it.copy(isCanvasSheetVisible = event.visible) }
-            }
-
-            is EditorEvent.SetKeyframeSheetVisible -> {
-                _uiState.update { it.copy(isKeyframeSheetVisible = event.visible) }
-            }
-            is EditorEvent.SetBeatsSheetVisible -> {
-                _uiState.update { it.copy(isBeatsSheetVisible = event.visible) }
-            }
-            is EditorEvent.SetTransformSheetVisible -> {
-                _uiState.update { it.copy(isTransformSheetVisible = event.visible) }
-            }
-
-            is EditorEvent.ChangeClipSpeed -> {
-                _uiState.value.selectedClipId?.let { clipId ->
-                    onTimelineAction(TimelineAction.UpdateClipSpeed(clipId, event.speed))
-                }
-            }
-
-            is EditorEvent.ChangeClipVolume -> {
-                _uiState.value.selectedClipId?.let { clipId ->
-                    onTimelineAction(TimelineAction.UpdateClipVolume(clipId, event.volume))
-                }
-            }
-
-            is EditorEvent.ChangeClipTransform -> {
-                _uiState.value.selectedClipId?.let { clipId ->
-                    onTimelineAction(TimelineAction.UpdateClipTransform(clipId, event.transform))
-                }
-            }
-
-            is EditorEvent.ChangeAspectRatio -> {
-                val currentProject = _uiState.value.project ?: return
-                val updated = currentProject.copy(
-                    aspectRatio = event.ratio,
-                    updatedAt = System.currentTimeMillis()
-                )
-                _uiState.update { it.copy(project = updated) }
-                scheduleAutosave(updated)
-            }
-
-            is EditorEvent.UpdateFilterSettings -> {
-                _uiState.update { it.copy(filterSettings = event.filterSettings) }
-            }
-
-            is EditorEvent.ResetFilterSettings -> {
-                _uiState.update { it.copy(filterSettings = com.example.feature.editor.filter.FilterSettings()) }
-            }
-
-            is EditorEvent.ApplyTextClip -> {
-                addTextClip(
-                    text = event.text,
-                    fontSize = event.fontSize,
-                    color = event.color,
-                    fontFamily = event.fontFamily,
-                    alignment = event.alignment
-                )
-                _uiState.update { it.copy(isTextSheetVisible = false) }
-            }
-
-            is EditorEvent.CloseToolPanel -> {
-                _uiState.update { it.copy(activeTool = null) }
-            }
-
-            is EditorEvent.UndoClicked -> {
-                val previous = undoRedoManager.undo(timelineEngineState)
-                if (previous != null) {
-                    timelineEngineState = previous
-                    val currentProj = _uiState.value.project ?: return
-                    val updatedProj = currentProj.copy(
-                        tracks = previous.tracks,
-                        durationMs = previous.durationMs,
-                        updatedAt = System.currentTimeMillis()
-                    )
-                    _uiState.update {
-                        it.copy(
-                            project = updatedProj,
-                            playheadPositionMs = previous.playheadPositionMs,
-                            selectedClipId = previous.selectedClipId
-                        )
-                    }
-                    scheduleAutosave(updatedProj)
-                    syncClipsToPlayer(updatedProj)
-                }
-            }
-
-            is EditorEvent.RedoClicked -> {
-                val next = undoRedoManager.redo(timelineEngineState)
-                if (next != null) {
-                    timelineEngineState = next
-                    val currentProj = _uiState.value.project ?: return
-                    val updatedProj = currentProj.copy(
-                        tracks = next.tracks,
-                        durationMs = next.durationMs,
-                        updatedAt = System.currentTimeMillis()
-                    )
-                    _uiState.update {
-                        it.copy(
-                            project = updatedProj,
-                            playheadPositionMs = next.playheadPositionMs,
-                            selectedClipId = next.selectedClipId
-                        )
-                    }
-                    scheduleAutosave(updatedProj)
-                    syncClipsToPlayer(updatedProj)
-                }
-            }
-
-            is EditorEvent.SplitSelectedClip -> {
-                onTimelineAction(TimelineAction.SplitAtPlayhead(_uiState.value.selectedClipId))
-            }
-
-            is EditorEvent.DeleteSelectedClip -> {
-                _uiState.value.selectedClipId?.let { onTimelineAction(TimelineAction.DeleteClip(it)) }
-            }
-
-            is EditorEvent.DuplicateSelectedClip -> {
-                _uiState.value.selectedClipId?.let { onTimelineAction(TimelineAction.DuplicateClip(it)) }
-            }
-
             is EditorEvent.SetEditSheetVisible -> {
                 _uiState.update { it.copy(isEditSheetVisible = event.visible) }
             }

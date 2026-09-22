@@ -299,6 +299,24 @@ fun TimelineContainer(
                         IntOffset(currentPlayheadPx - 12.dp.roundToPx(), 0)
                     }
                 )
+
+                // 4. Selected clip highlight overlay (visual feedback)
+                if (state.selectedClipId != null) {
+                    val selectedClip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
+                    if (selectedClip != null) {
+                        Box(
+                            modifier = Modifier
+                                .offset {
+                                    val clipStartPx = (selectedClip.startTimeMs * pixelsPerMs).roundToInt()
+                                    IntOffset(clipStartPx, 0)
+                                }
+                                .width((selectedClip.durationMs * pixelsPerMs).dp)
+                                .height(110.dp)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                        )
+                    }
+                }
             }
         }
     }

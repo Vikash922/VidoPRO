@@ -1,0 +1,2 @@
+sed -i 's/EditorTool.SPLIT -> {/EditorTool.SPLIT -> {\n                        _uiState.update { it.copy(isEditSheetVisible = true) }\n                    }/g' feature/editor/src/main/java/com/example/feature/editor/EditorViewModel.kt
+sed -i 's/EditorTool.TEXT -> {/EditorTool.TEXT -> {\n                        _uiState.update { it.copy(isTextSheetVisible = true) }\n                    }/g' feature/editor/src/main/java/com/example/feature/editor/EditorViewModel.kt

@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.common.TimeUtils
@@ -33,7 +34,6 @@ import com.example.core.model.AspectRatio
 import com.example.core.model.Project
 import com.example.core.ui.components.EmptyStateView
 import com.example.core.ui.components.LoadingView
-import com.example.core.ui.components.ProjectCard
 import com.example.core.ui.theme.AppSpacing
 import com.example.feature.home.components.DeleteProjectDialog
 import com.example.feature.home.components.NewProjectBottomSheet
@@ -86,102 +86,202 @@ fun HomeScreen(
                 .padding(innerPadding)
                 .verticalScroll(scrollState)
         ) {
-            // Header Gradient Section
-            Box(
+            // Top Bar
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(340.dp)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFF0F52BA), // Sapphire Blue
-                                Color(0xFF56CCF2), // Sky Blue
-                                MaterialTheme.colorScheme.background
-                            )
-                        )
-                    )
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    // Top Bar (Import & Search)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Videocam,
+                        contentDescription = "Logo",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "VixEdit",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = "Pro",
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    IconButton(
+                        onClick = onSettingsClick,
+                        modifier = Modifier.size(24.dp)
                     ) {
-                        Text(
-                            text = "VidoPRO",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        IconButton(
-                            onClick = onSettingsClick,
-                            modifier = Modifier.background(Color.Black.copy(alpha = 0.2f), CircleShape)
-                        ) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    Text("Video create", color = Color.White, fontSize = 14.sp)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Get started",
-                            color = Color.White,
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp).background(Color.White.copy(alpha=0.3f), CircleShape)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Primary Action Buttons
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        HomeActionCard(
-                            title = "New video",
-                            icon = Icons.Default.AddCircle,
-                            modifier = Modifier.weight(1f).height(100.dp),
-                            onClick = onNewProjectClick
-                        )
-                        HomeActionCard(
-                            title = "Edit photo",
-                            icon = Icons.Default.Image,
-                            modifier = Modifier.weight(1f).height(100.dp),
-                            onClick = { /* TODO */ }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-                    
-                    // Recent Projects Horizontal Scroll
-                    if (uiState.projects.isNotEmpty()) {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            items(uiState.projects) { project ->
-                                RecentProjectMiniCard(
-                                    project = project,
-                                    onClick = { onProjectClick(project.id) }
-                                )
-                            }
-                        }
-                    } else if (!uiState.isLoading) {
-                        Text("No recent projects", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
 
-            // Quick Tools Grid
-            QuickToolsGrid(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            // Hero Area
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .height(160.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color(0xFF2A2359),
+                                Color(0xFF1E1A3C)
+                            )
+                        )
+                    )
+                    .clickable { onNewProjectClick() }
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "Turn Your\nIdeas Into\nStunning Videos",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 28.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Edit • Create • Share",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 12.sp
+                    )
+                }
+                
+                // Floating Action Button in Hero
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(20.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.ArrowForward, contentDescription = "Start", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Quick Actions
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = onNewProjectClick,
+                    modifier = Modifier
+                        .weight(1.5f)
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("New Project", fontWeight = FontWeight.Bold)
+                }
+
+                QuickActionButton(
+                    title = "Templates",
+                    icon = Icons.Default.Dashboard,
+                    modifier = Modifier.weight(1f)
+                )
+
+                QuickActionButton(
+                    title = "AI Auto Edit",
+                    icon = Icons.Default.AutoAwesome,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Tools Section
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Tools",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { }) {
+                    Text(text = "See All", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                ToolIconItem("Effects", Icons.Default.AutoFixHigh)
+                ToolIconItem("Filters", Icons.Default.Brush)
+                ToolIconItem("Text", Icons.Default.Title)
+                ToolIconItem("Stickers", Icons.Default.Face)
+                ToolIconItem("Overlay", Icons.Default.Layers)
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Recent Projects
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "My Projects",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { }) {
+                    Text(text = "See All", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (uiState.projects.isNotEmpty()) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(uiState.projects) { project ->
+                        RecentProjectCard(
+                            project = project,
+                            onClick = { onProjectClick(project.id) },
+                            onMoreClick = { /* TODO show menu */ }
+                        )
+                    }
+                }
+            } else if (!uiState.isLoading) {
+                Text("No recent projects", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 20.dp))
+            }
             
             Spacer(modifier = Modifier.height(32.dp))
         }
@@ -203,9 +303,9 @@ fun HomeScreen(
 }
 
 @Composable
-fun HomeActionCard(title: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun QuickActionButton(title: String, icon: ImageVector, modifier: Modifier = Modifier) {
     Card(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.height(56.dp).clickable { },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
@@ -214,94 +314,81 @@ fun HomeActionCard(title: String, icon: ImageVector, modifier: Modifier = Modifi
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(imageVector = icon, contentDescription = title, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurface)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = title, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+            Icon(imageVector = icon, contentDescription = title, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = title, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
 
 @Composable
-fun RecentProjectMiniCard(project: Project, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(70.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onClick)
-    ) {
-        // Thumbnail or placeholder
-        Icon(
-            imageVector = Icons.Default.Movie,
-            contentDescription = null,
-            modifier = Modifier.align(Alignment.Center).size(30.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        // Duration overlay
+fun ToolIconItem(title: String, icon: ImageVector) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .background(Color.Black.copy(alpha = 0.6f))
-                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .size(48.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+                .clickable { },
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = TimeUtils.formatDuration(project.durationMs),
-                color = Color.White,
-                fontSize = 8.sp
-            )
+            Icon(imageVector = icon, contentDescription = title, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(24.dp))
         }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(text = title, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-fun QuickToolsGrid(modifier: Modifier = Modifier) {
-    val tools = listOf(
-        "AutoCut" to Icons.Default.ContentCut,
-        "Retouch" to Icons.Default.Face,
-        "AI generator" to Icons.Default.Star,
-        "Photo tools" to Icons.Default.Build,
-        "Frame capture" to Icons.Default.CameraAlt,
-        "Auto enhance" to Icons.Default.AutoFixHigh,
-        "Smart lighting" to Icons.Default.Lightbulb,
-        "Auto captions" to Icons.Default.ClosedCaption,
-        "AI poster" to Icons.Default.Image,
-        "Remove bg" to Icons.Default.PersonRemove,
-        "AI editor" to Icons.Default.Edit,
-        "Space" to Icons.Default.Cloud,
-        "Adjust speed" to Icons.Default.PlayArrow,
-        "Marketing" to Icons.Default.ShoppingCart,
-        "Audio tools" to Icons.Default.Headphones
-    )
-
-    Column(modifier = modifier) {
-        // Use a grid-like layout by chunking since we are inside a verticalScroll
-        tools.chunked(3).forEach { rowTools ->
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                for (tool in rowTools) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f).clickable { }
-                    ) {
-                        Icon(
-                            imageVector = tool.second,
-                            contentDescription = tool.first,
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = tool.first,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1
-                        )
-                    }
-                }
-                // Fill empty spaces if not multiple of 3
-                repeat(3 - rowTools.size) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+fun RecentProjectCard(project: Project, onClick: () -> Unit, onMoreClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(140.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Movie,
+                contentDescription = null,
+                modifier = Modifier.align(Alignment.Center).size(32.dp),
+                tint = MaterialTheme.colorScheme.outline
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = project.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${TimeUtils.formatDuration(project.durationMs)} • 1080p",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp
+                )
             }
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "More",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp).clickable(onClick = onMoreClick)
+            )
         }
     }
 }
@@ -309,23 +396,39 @@ fun QuickToolsGrid(modifier: Modifier = Modifier) {
 @Composable
 fun HomeBottomNavigationBar(selectedIndex: Int, onItemSelected: (Int) -> Unit) {
     NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface
+        containerColor = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
+        modifier = Modifier.border(width = 1.dp, color = MaterialTheme.colorScheme.outline)
     ) {
         val items = listOf(
-            "Edit" to Icons.Default.Edit,
-            "Templates" to Icons.Default.Dashboard,
-            "AI Lab" to Icons.Default.Star,
+            "Home" to Icons.Default.Home,
             "Projects" to Icons.Default.Folder,
-            "Inbox" to Icons.Default.Notifications,
-            "Me" to Icons.Default.Person
+            "Templates" to Icons.Default.Dashboard,
+            "Profile" to Icons.Default.Person
         )
         items.forEachIndexed { index, pair ->
+            val isSelected = selectedIndex == index
             NavigationBarItem(
-                icon = { Icon(pair.second, contentDescription = pair.first) },
-                label = { Text(pair.first, fontSize = 10.sp) },
-                selected = selectedIndex == index,
-                onClick = { onItemSelected(index) }
+                icon = { 
+                    Icon(
+                        pair.second, 
+                        contentDescription = pair.first,
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    ) 
+                },
+                label = { 
+                    Text(
+                        pair.first, 
+                        fontSize = 10.sp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    ) 
+                },
+                selected = isSelected,
+                onClick = { onItemSelected(index) },
+                colors = NavigationBarItemDefaults.colors(
+                    indicatorColor = Color.Transparent
+                )
             )
         }
     }
