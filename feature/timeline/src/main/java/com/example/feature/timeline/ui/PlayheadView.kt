@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -27,7 +28,7 @@ import com.example.core.ui.theme.EditorColors
 
 /**
  * Canvas-based Playhead indicator with scrubbing handle.
- * Tapping the white playhead toggles a beat marker (pink line) at the current timestamp.
+ * Features a sleek vibrant pink playhead line and indicator that jumps to tapped positions.
  * Dragging scrubs the timeline.
  */
 @Composable
@@ -40,6 +41,7 @@ fun PlayheadView(
 ) {
     val haptic = LocalHapticFeedback.current
     val handleWidth = 24.dp
+    val pinkColor = Color(0xFFFF2D75)
     
     var isDragging by remember { mutableStateOf(false) }
     
@@ -84,7 +86,7 @@ fun PlayheadView(
                 val centerX = size.width / 2f
                 val height = size.height
                 val handleHeight = 16.dp.toPx()
-                val handleCapWidth = 10.dp.toPx()
+                val handleCapWidth = 8.dp.toPx()
                 val lineWidth = 2.5.dp.toPx()
 
                 val handlePath = Path().apply {
@@ -97,18 +99,18 @@ fun PlayheadView(
                 }
 
                 onDrawBehind {
-                    // Vertical playhead line
+                    // Vertical playhead line (Vibrant Pink as requested)
                     drawLine(
-                        color = EditorColors.playhead,
+                        color = pinkColor,
                         start = Offset(centerX, handleHeight),
                         end = Offset(centerX, height),
                         strokeWidth = lineWidth
                     )
                     
-                    // White handle head
+                    // Pink handle head
                     drawPath(
                         path = handlePath,
-                        color = EditorColors.playhead,
+                        color = pinkColor,
                     )
                 }
             }

@@ -77,6 +77,7 @@ class Media3PreviewPlayer(
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            android.util.Log.e("Media3PreviewPlayer", "ExoPlayer Error: ${error.errorCodeName} (${error.errorCode}): ${error.message}", error)
             _isPlaying.value = false
             _isBuffering.value = false
             stopPositionTicker()
@@ -96,17 +97,29 @@ class Media3PreviewPlayer(
 
         val mediaItems = sorted.mapNotNull { clip ->
             val asset = assets[clip.assetId] ?: return@mapNotNull null
-            val clippingConfig = MediaItem.ClippingConfiguration.Builder()
-                .setStartPositionMs(clip.inPointMs)
-                .setEndPositionMs(clip.outPointMs)
-                .build()
 
             val isImage = asset.mimeType?.startsWith("image") == true || clip.type == com.example.core.model.ClipType.IMAGE
 
             val builder = MediaItem.Builder()
                 .setUri(Uri.parse(asset.uri))
                 .setMediaId(clip.id)
-                .setClippingConfiguration(clippingConfig)
+
+            // ONLY apply clipping configuration if the clip is actually trimmed.
+            // Avoid setting endPositionMs if not trimmed, preventing IllegalClippingException.
+            val isTrimmedStart = clip.inPointMs > 0L
+            val assetDuration = asset.durationMs ?: 0L
+            val isTrimmedEnd = clip.outPointMs > 0L && (assetDuration > 0L && clip.outPointMs < assetDuration)
+            if (isTrimmedStart || isTrimmedEnd) {
+                val clippingConfig = MediaItem.ClippingConfiguration.Builder().apply {
+                    if (isTrimmedStart) {
+                        setStartPositionMs(clip.inPointMs)
+                    }
+                    if (isTrimmedEnd) {
+                        setEndPositionMs(clip.outPointMs)
+                    }
+                }.build()
+                builder.setClippingConfiguration(clippingConfig)
+            }
 
             if (isImage) {
                 builder.setImageDurationMs(clip.durationMs)
@@ -123,6 +136,9 @@ class Media3PreviewPlayer(
     override fun play() {
         if (exoPlayer.playbackState == Player.STATE_ENDED) {
             seekTo(0L)
+        }
+        if (exoPlayer.playbackState == Player.STATE_IDLE) {
+            exoPlayer.prepare()
         }
         exoPlayer.play()
     }

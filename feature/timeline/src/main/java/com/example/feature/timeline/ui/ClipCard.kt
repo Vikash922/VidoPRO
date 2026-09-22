@@ -41,11 +41,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.core.model.Asset
 import com.example.core.model.Clip
 import com.example.core.model.ClipType
 import kotlin.math.absoluteValue
@@ -62,7 +65,9 @@ fun ClipCard(
     clip: Clip,
     isSelected: Boolean,
     pixelsPerMs: Float,
+    assets: Map<String, Asset> = emptyMap(),
     onSelect: () -> Unit,
+    onSeek: (Long) -> Unit = {},
     onMoveDelta: (Long) -> Unit,
     onTrimStartDelta: (Long) -> Unit,
     onTrimEndDelta: (Long) -> Unit,
@@ -108,6 +113,7 @@ fun ClipCard(
     )
 
     val currentOnSelect by rememberUpdatedState(onSelect)
+    val currentOnSeek by rememberUpdatedState(onSeek)
     val currentOnMoveDelta by rememberUpdatedState(onMoveDelta)
     val currentOnTrimStartDelta by rememberUpdatedState(onTrimStartDelta)
     val currentOnTrimEndDelta by rememberUpdatedState(onTrimEndDelta)
@@ -123,15 +129,18 @@ fun ClipCard(
             .background(bgColor)
             .border(if (isSelected) 2.dp else 1.dp, borderColor, cornerShape)
     ) {
-        // Main body: Tap to select, Drag / Tap & Hold to move left/right
+        // Main body: Tap to select and seek, Drag / Tap & Hold to move left/right
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = if (isSelected) 14.dp else 0.dp)
-                .pointerInput(clip.id) {
+                .pointerInput(clip.id, pixelsPerMs, clip.startTimeMs) {
                     detectTapGestures(
-                        onTap = {
+                        onTap = { offset ->
                             currentOnSelect()
+                            val tapOffsetMs = (offset.x / pixelsPerMs).toLong()
+                            val seekTimeMs = (clip.startTimeMs + tapOffsetMs).coerceIn(clip.startTimeMs, clip.endTimeMs)
+                            currentOnSeek(seekTimeMs)
                         }
                     )
                 }
@@ -221,23 +230,35 @@ fun ClipCard(
                 }
 
                 else -> {
-                    // Video/Image: solid segments simulating frames
+                    // Real video/image filmstrip thumbnails
+                    val asset = assets[clip.assetId]
+                    val thumbModel = asset?.thumbnailPath ?: asset?.uri
+                    val numThumbs = (clipWidthDp.value / 44f).toInt().coerceIn(1, 16)
+
                     Row(modifier = Modifier.fillMaxSize()) {
-                        val numThumbs = (clipWidthDp.value / 38f).toInt().coerceIn(1, 15)
                         for (i in 0 until numThumbs) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .weight(1f)
-                                    .padding(horizontal = 1.dp)
-                                    .background(Color(0xFF282D3F))
+                                    .padding(horizontal = 0.5.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(Color(0xFF1E2230)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                if (i == 0) {
+                                if (thumbModel != null) {
+                                    AsyncImage(
+                                        model = thumbModel,
+                                        contentDescription = "Video Thumbnail",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
                                     Icon(
                                         Icons.Default.Movie,
                                         contentDescription = null,
-                                        tint = Color.White.copy(alpha = 0.4f),
-                                        modifier = Modifier.align(Alignment.Center).size(14.dp)
+                                        tint = Color.White.copy(alpha = 0.35f),
+                                        modifier = Modifier.size(14.dp)
                                     )
                                 }
                             }

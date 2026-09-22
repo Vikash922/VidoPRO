@@ -9,9 +9,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import com.example.core.data.di.RepositoryModule
 import com.example.core.media.Media3PreviewPlayer
 import com.example.core.model.TrackType
@@ -35,8 +37,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        // Auto-updater check
-        AppUpdater.checkForUpdates(this)
+        // Auto-updater check (fail-safe for emulator environment)
+        try {
+            AppUpdater.checkForUpdates(this)
+        } catch (t: Throwable) {
+            android.util.Log.w("MainActivity", "AppUpdater skipped: ${t.message}")
+        }
         
         val projectRepository = RepositoryModule.provideProjectRepository(applicationContext)
         val assetRepository = RepositoryModule.provideAssetRepository(applicationContext)
@@ -48,6 +54,7 @@ class MainActivity : ComponentActivity() {
                 var showExportScreen by remember { mutableStateOf(false) }
                 var showSettingsScreen by remember { mutableStateOf(false) }
                 var selectedTrackTypeForPicker by remember { mutableStateOf(TrackType.VIDEO) }
+                val coroutineScope = rememberCoroutineScope()
 
                 if (showSettingsScreen) {
                     BackHandler {
@@ -130,20 +137,27 @@ class MainActivity : ComponentActivity() {
                             onFilterSelected = mediaPickerViewModel::setFilter,
                             onMediaItemClick = mediaPickerViewModel::toggleSelection,
                             onConfirmSelection = {
-                                val selectedItems = mediaPickerUiState.selectedItems
-                                val targetTrack = editorUiState.project?.tracks?.firstOrNull { it.type == selectedTrackTypeForPicker }
-                                val trackId = targetTrack?.id ?: UUID.randomUUID().toString()
-                                var currentStart = targetTrack?.clips?.maxOfOrNull { it.endTimeMs } ?: 0L
+                                coroutineScope.launch {
+                                    val selectedItems = mediaPickerUiState.selectedItems
+                                    val targetTrack = editorUiState.project?.tracks?.firstOrNull { it.type == selectedTrackTypeForPicker }
+                                    val trackId = targetTrack?.id ?: UUID.randomUUID().toString()
+                                    var currentStart = targetTrack?.clips?.maxOfOrNull { it.endTimeMs } ?: 0L
 
-                                val assetsAndClips = selectedItems.map { mediaItem ->
-                                    val pair = MediaConverter.toAssetAndClip(mediaItem, trackId, currentStart)
-                                    currentStart += pair.second.durationMs
-                                    pair
+                                    val assetsAndClips = selectedItems.map { mediaItem ->
+                                        val effectiveItem = if (mediaItem.uri.scheme == "content") {
+                                            mediaRepository.getMediaItemFromUri(mediaItem.uri) ?: mediaItem
+                                        } else {
+                                            mediaItem
+                                        }
+                                        val pair = MediaConverter.toAssetAndClip(effectiveItem, trackId, currentStart)
+                                        currentStart += pair.second.durationMs
+                                        pair
+                                    }
+
+                                    editorViewModel.addMedia(assetsAndClips)
+                                    mediaPickerViewModel.clearSelection()
+                                    showMediaPicker = false
                                 }
-
-                                editorViewModel.addMedia(assetsAndClips)
-                                mediaPickerViewModel.clearSelection()
-                                showMediaPicker = false
                             },
                             onNavigateBack = { showMediaPicker = false },
                             onUrisPicked = { uris ->

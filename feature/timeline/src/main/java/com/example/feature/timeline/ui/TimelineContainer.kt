@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,9 +39,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.core.model.Asset
 import com.example.core.model.Track
 import com.example.core.model.TrackType
 import com.example.core.ui.theme.AppSpacing
@@ -63,6 +66,7 @@ import kotlin.math.roundToInt
 fun TimelineContainer(
     state: TimelineEngineState,
     isPlaying: Boolean,
+    assets: Map<String, Asset> = emptyMap(),
     onAction: (TimelineAction) -> Unit,
     onPlayPause: () -> Unit,
     onAddMedia: () -> Unit,
@@ -199,7 +203,17 @@ fun TimelineContainer(
                     .fillMaxHeight()
                     .horizontalScroll(scrollState)
             ) {
-                Box(modifier = Modifier.width(timelineWidthDp).fillMaxHeight()) {
+                Box(
+                    modifier = Modifier
+                        .width(timelineWidthDp)
+                        .fillMaxHeight()
+                        .pointerInput(pixelsPerMs, totalTimelineDurationMs) {
+                            detectTapGestures { offset ->
+                                val tappedTime = (offset.x / pixelsPerMs).toLong().coerceIn(0L, totalTimelineDurationMs)
+                                onSeekAction(tappedTime)
+                            }
+                        }
+                ) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         // 1. Time Ruler
                         TimeRuler(
@@ -244,7 +258,9 @@ fun TimelineContainer(
                                     track = track,
                                     selectedClipId = state.selectedClipId,
                                     pixelsPerMs = pixelsPerMs,
+                                    assets = assets,
                                     onAction = onAction,
+                                    onSeek = onSeekAction,
                                     onAddMedia = onAddMedia
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -272,7 +288,7 @@ fun TimelineContainer(
                         )
                     }
 
-                    // 4. White Playhead Overlay — tap to toggle beat marker (pink line)!
+                    // 4. Pink Playhead Scrubber Line & Handle
                     PlayheadView(
                         playheadPositionMs = state.playheadPositionMs,
                         pixelsPerMs = pixelsPerMs,
@@ -281,7 +297,6 @@ fun TimelineContainer(
                             onAction(TimelineAction.Seek(newTime))
                         },
                         onTapPlayhead = {
-                            // Tapping white playhead adds/toggles pink beat line at this timestamp!
                             onAction(TimelineAction.ToggleBeatMarker(state.playheadPositionMs))
                         },
                         modifier = Modifier.offset {
@@ -300,7 +315,9 @@ private fun TrackLane(
     track: Track,
     selectedClipId: String?,
     pixelsPerMs: Float,
+    assets: Map<String, Asset>,
     onAction: (TimelineAction) -> Unit,
+    onSeek: (Long) -> Unit,
     onAddMedia: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -342,7 +359,9 @@ private fun TrackLane(
                 clip = clip,
                 isSelected = isSelected,
                 pixelsPerMs = pixelsPerMs,
+                assets = assets,
                 onSelect = onSelectClip,
+                onSeek = onSeek,
                 onMoveDelta = onMoveClipDelta,
                 onTrimStartDelta = onTrimStartClipDelta,
                 onTrimEndDelta = onTrimEndClipDelta,

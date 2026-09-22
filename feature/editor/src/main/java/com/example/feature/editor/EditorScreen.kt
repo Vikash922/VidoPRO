@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -199,19 +200,23 @@ fun EditorScreen(
             return@Scaffold
         }
 
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            val isCompactScreen = maxHeight < 640.dp
+            val timelineHeight = if (isCompactScreen) 160.dp else if (maxHeight < 800.dp) 190.dp else 220.dp
 
-            // VIDEO PREVIEW AREA — Real Live PlayerView (Media3 ExoPlayer)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(if (isFullscreen) 1f else 0.52f)
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black)
-                    .border(1.dp, Color(0xFF1F2432), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+
+                // VIDEO PREVIEW AREA — Real Live PlayerView (Media3 ExoPlayer)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Black)
+                        .border(1.dp, Color(0xFF1F2432), RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
                 if (player != null && hasClips) {
                     AndroidView(
                         factory = { ctx ->
@@ -330,11 +335,11 @@ fun EditorScreen(
                     }
                 }
 
-                // TIMELINE AREA (Height 210dp)
+                // TIMELINE AREA
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(210.dp)
+                        .height(timelineHeight)
                         .background(bgColor)
                 ) {
                     if (uiState.project != null) {
@@ -357,6 +362,7 @@ fun EditorScreen(
                         com.example.feature.timeline.ui.TimelineContainer(
                             state = timelineEngineState,
                             isPlaying = uiState.isPlaying,
+                            assets = uiState.assets,
                             onAction = onTimelineAction,
                             onPlayPause = { onEvent(EditorEvent.PlayPauseClicked) },
                             onAddMedia = { onNavigateMediaPicker(TrackType.VIDEO) },
@@ -455,8 +461,9 @@ fun EditorScreen(
                 }
             }
         }
+    }
 
-        // Bottom Sheets (only open when clicked by user)
+    // Bottom Sheets (only open when clicked by user)
         if (uiState.isEditSheetVisible && uiState.selectedClip != null) {
             EditBottomSheet(
                 clip = uiState.selectedClip!!,

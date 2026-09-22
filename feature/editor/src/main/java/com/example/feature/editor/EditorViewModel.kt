@@ -9,6 +9,7 @@ import com.example.core.data.repository.ProjectRepository
 import com.example.core.media.PreviewPlayerController
 import com.example.core.model.Asset
 import com.example.core.model.Clip
+import com.example.core.model.ClipType
 import com.example.core.model.Project
 import com.example.core.model.Track
 import com.example.core.model.TrackType
@@ -135,13 +136,15 @@ class EditorViewModel(
     private fun syncClipsToPlayer(project: com.example.core.model.Project) {
         viewModelScope.launch {
             val allClips = project.tracks.flatMap { it.clips }
-            val videoClips = project.tracks.filter { it.type == TrackType.VIDEO }.flatMap { it.clips }
-            val assetMap = mutableMapOf<String, Asset>()
+            val videoClips = allClips.filter { it.type == ClipType.VIDEO }
+            val assetMap = _uiState.value.assets.toMutableMap()
             assetRepository?.let { repo ->
                 allClips.forEach { clip ->
                     clip.assetId?.let { assetId ->
-                        repo.getAssetById(assetId)?.let { asset ->
-                            assetMap[asset.id] = asset
+                        if (!assetMap.containsKey(assetId)) {
+                            repo.getAssetById(assetId)?.let { asset ->
+                                assetMap[asset.id] = asset
+                            }
                         }
                     }
                 }
@@ -443,6 +446,23 @@ class EditorViewModel(
                     thumbnailPath = newThumbnail,
                     updatedAt = System.currentTimeMillis()
                 )
+
+                // Update in-memory state immediately so UI and Player are instantly responsive
+                val newAssetsMap = _uiState.value.assets + assetsAndClips.map { it.first.id to it.first }
+                _uiState.update {
+                    it.copy(
+                        project = updatedProject,
+                        assets = newAssetsMap
+                    )
+                }
+                timelineEngineState = timelineEngineState.copy(
+                    tracks = tracks,
+                    durationMs = newTotalDuration
+                )
+
+                val allClips = tracks.flatMap { it.clips }
+                val videoClips = allClips.filter { it.type == ClipType.VIDEO }
+                previewPlayer?.setClips(videoClips, newAssetsMap)
 
                 projectRepository.updateProject(updatedProject)
             } catch (e: Exception) {
