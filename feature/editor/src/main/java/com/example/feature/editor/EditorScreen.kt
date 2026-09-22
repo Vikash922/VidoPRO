@@ -51,11 +51,6 @@ fun EditorScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(uiState.error) {
-        uiState.error?.let { msg ->
-            snackbarHostState.showSnackbar(msg)
-            onEvent(EditorEvent.ClearError)
-        }
     }
 
         }
@@ -175,11 +170,24 @@ fun EditorScreen(
                     .background(EditorColors.timelineBackground)
             ) {
                 if (uiState.project != null) {
-                    TimelineView(
-                        project = uiState.project,
-                        selectedClipId = uiState.selectedClipId,
-                        playheadPositionMs = uiState.playheadPositionMs,
-                        onClipSelected = { onEvent(EditorEvent.SelectClip(it)) },
+                    val timelineEngineState = androidx.compose.runtime.remember(uiState.project, uiState.playheadPositionMs, uiState.selectedClipId, uiState.durationMs) {
+                        com.example.feature.timeline.engine.TimelineEngineState(
+                            tracks = uiState.project?.tracks ?: emptyList(),
+                            playheadPositionMs = uiState.playheadPositionMs,
+                            durationMs = uiState.durationMs,
+                            selectedClipId = uiState.selectedClipId
+                        )
+                    }
+
+                    com.example.feature.timeline.ui.TimelineContainer(
+                        state = timelineEngineState,
+                        isPlaying = uiState.isPlaying,
+                        onAction = onTimelineAction,
+                        onPlayPause = { onEvent(EditorEvent.PlayPauseClicked) },
+                        onAddMedia = { onNavigateMediaPicker(com.example.core.model.TrackType.VIDEO) },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                },
                         onPlayheadScrub = { onEvent(EditorEvent.SeekTo(it)) }
                     )
                 }
