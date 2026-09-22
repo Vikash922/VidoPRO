@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,19 +18,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CallSplit
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material.icons.filled.ZoomOut
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -39,16 +36,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.common.TimeUtils
 import com.example.core.model.Track
 import com.example.core.model.TrackType
-import com.example.core.ui.theme.AppRadius
 import com.example.core.ui.theme.AppSpacing
-import com.example.core.ui.theme.EditorColors
 import com.example.feature.timeline.engine.TimelineAction
 import com.example.feature.timeline.engine.TimelineEngineState
 import com.example.feature.timeline.engine.TimelineUtils
@@ -56,9 +49,9 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * Main Timeline Container containing TimeRuler, Track lanes, ClipCards, Playhead,
- * and quick editing controls for Split, Delete, Duplicate, and Add Media.
- * Optimized for 60fps scrolling and playhead movement (DEV-073, DEV-074).
+ * Main Timeline Container — matches the reference UI design exactly.
+ * Left side: track type labels (Cover, text icon, + for audio).
+ * Right side: scrollable timeline with TimeRuler, ClipCards, Playhead.
  */
 @Composable
 fun TimelineContainer(
@@ -75,7 +68,6 @@ fun TimelineContainer(
         TimelineUtils.calculatePixelsPerMs(state.zoomLevel)
     }
 
-    // Minimum timeline width calculated and cached with derivedStateOf
     val totalTimelineDurationMs by remember(state.durationMs) {
         derivedStateOf { max(state.durationMs + 5000L, 20000L) }
     }
@@ -84,237 +76,178 @@ fun TimelineContainer(
         derivedStateOf { (totalTimelineDurationMs * pixelsPerMs).dp }
     }
 
-    // Stable action callbacks
-    val onSplitClick = remember(state.selectedClipId, onAction) {
-        { onAction(TimelineAction.SplitAtPlayhead(state.selectedClipId)) }
-    }
-
-    val onDeleteClick = remember(state.selectedClipId, onAction) {
-        {
-            state.selectedClipId?.let { clipId ->
-                onAction(TimelineAction.DeleteClip(clipId))
-            }
-            Unit
-        }
-    }
-
-    val onDuplicateClick = remember(state.selectedClipId, onAction) {
-        {
-            state.selectedClipId?.let { clipId ->
-                onAction(TimelineAction.DuplicateClip(clipId))
-            }
-            Unit
-        }
-    }
-
-    val onZoomOutClick = remember(state.zoomLevel, onAction) {
-        { onAction(TimelineAction.SetZoom(state.zoomLevel * 0.8f)) }
-    }
-
-    val onZoomInClick = remember(state.zoomLevel, onAction) {
-        { onAction(TimelineAction.SetZoom(state.zoomLevel * 1.25f)) }
-    }
-
     val onSeekAction = remember(onAction) {
         { timeMs: Long -> onAction(TimelineAction.Seek(timeMs)) }
     }
 
+    val bgColor = Color(0xFF0A0D14)
+
     Column(
-        modifier = modifier
-            .background(EditorColors.timelineBackground)
-            .border(width = 1.dp, color = MaterialTheme.colorScheme.outline)
+        modifier = modifier.background(bgColor)
     ) {
-        // Controls Row: Timecode, Quick Actions (Split, Delete, Duplicate), Play/Pause
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = TimeUtils.formatTimecode(state.playheadPositionMs),
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = AppSpacing.xs)
-            )
+        // Main timeline area: Left track labels + Right scrollable tracks
+        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Split at Playhead button
-                IconButton(
-                    onClick = onSplitClick,
-                    modifier = Modifier.size(32.dp).testTag("timeline_split_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CallSplit,
-                        contentDescription = "Split",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+            // LEFT SIDE: Track type labels
+            Column(
+                modifier = Modifier
+                    .width(40.dp)
+                    .fillMaxHeight()
+                    .background(bgColor)
+                    .padding(top = 28.dp) // Offset for time ruler height
+            ) {
+                Spacer(modifier = Modifier.height(AppSpacing.xs))
 
-                // Delete selected clip button
-                if (state.selectedClipId != null) {
-                    IconButton(
-                        onClick = onDeleteClick,
-                        modifier = Modifier.size(32.dp).testTag("timeline_delete_button")
+                if (state.tracks.isEmpty()) {
+                    // Empty state — just show add button
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp, 56.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    // Duplicate selected clip button
-                    IconButton(
-                        onClick = onDuplicateClick,
-                        modifier = Modifier.size(32.dp).testTag("timeline_duplicate_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Duplicate",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
-                // Zoom Out
-                IconButton(
-                    onClick = onZoomOutClick,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ZoomOut,
-                        contentDescription = "Zoom Out",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                // Zoom In
-                IconButton(
-                    onClick = onZoomInClick,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ZoomIn,
-                        contentDescription = "Zoom In",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                // Add Media button
-                IconButton(
-                    onClick = onAddMedia,
-                    modifier = Modifier.size(32.dp).testTag("timeline_add_media_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add Media",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                // Play / Pause toggle
-                IconButton(
-                    onClick = onPlayPause,
-                    modifier = Modifier.size(32.dp).testTag("timeline_play_pause_button")
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-        }
-
-        // Scrollable Timeline Section
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .horizontalScroll(scrollState)
-        ) {
-            Box(modifier = Modifier.width(timelineWidthDp).fillMaxSize()) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // 1. Time Ruler Canvas
-                    TimeRuler(
-                        totalDurationMs = totalTimelineDurationMs,
-                        pixelsPerMs = pixelsPerMs,
-                        onSeek = onSeekAction
-                    )
-
-                    Spacer(modifier = Modifier.height(AppSpacing.xs))
-
-                    // 2. Track Lanes
-                    if (state.tracks.isEmpty()) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(80.dp)
-                                .padding(horizontal = 16.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF161925))
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF7B61FF))
                                 .clickable { onAddMedia() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF7B61FF))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Tap to add media", color = Color.White.copy(alpha = 0.7f))
-                            }
-                        }
-                    } else {
-                        state.tracks.forEach { track ->
-                            TrackLane(
-                                track = track,
-                                selectedClipId = state.selectedClipId,
-                                pixelsPerMs = pixelsPerMs,
-                                onAction = onAction,
-                                onAddMedia = onAddMedia
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "Add",
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
                         }
                     }
-                }
-
-                // 3. Playhead Overlay Line with fast lambda-based offset
-                PlayheadView(
-                    playheadPositionMs = state.playheadPositionMs,
-                    pixelsPerMs = pixelsPerMs,
-                    onSeekDelta = { deltaMs ->
-                        val newTime = (state.playheadPositionMs + deltaMs).coerceIn(0L, state.durationMs)
-                        onAction(TimelineAction.Seek(newTime))
-                    },
-                    modifier = Modifier.offset {
-                        val currentPlayheadPx = (state.playheadPositionMs * pixelsPerMs).roundToInt()
-                        IntOffset(currentPlayheadPx - 12.dp.roundToPx(), 0)
-                    }
-                )
-
-                // 4. Selected clip highlight overlay (visual feedback)
-                if (state.selectedClipId != null) {
-                    val selectedClip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
-                    if (selectedClip != null) {
+                } else {
+                    state.tracks.forEach { track ->
                         Box(
                             modifier = Modifier
-                                .offset {
-                                    val clipStartPx = (selectedClip.startTimeMs * pixelsPerMs).roundToInt()
-                                    IntOffset(clipStartPx, 0)
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when (track.type) {
+                                TrackType.VIDEO -> {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            Icons.Default.Image,
+                                            contentDescription = "Video",
+                                            tint = Color.White.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            "Cover",
+                                            color = Color.White.copy(alpha = 0.5f),
+                                            fontSize = 8.sp
+                                        )
+                                    }
                                 }
-                                .width((selectedClip.durationMs * pixelsPerMs).dp)
-                                .height(110.dp)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                        )
+                                TrackType.TEXT, TrackType.OVERLAY -> {
+                                    Icon(
+                                        Icons.Default.TextFields,
+                                        contentDescription = "Text",
+                                        tint = Color(0xFF4CAF50).copy(alpha = 0.7f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                TrackType.AUDIO -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF00B4D8).copy(alpha = 0.2f))
+                                            .clickable { onAddMedia() },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = "Add Audio",
+                                            tint = Color(0xFF00B4D8),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
+                }
+            }
+
+            // Thin separator line
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .fillMaxHeight()
+                    .background(Color.White.copy(alpha = 0.06f))
+            )
+
+            // RIGHT SIDE: Scrollable timeline
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .horizontalScroll(scrollState)
+            ) {
+                Box(modifier = Modifier.width(timelineWidthDp).fillMaxHeight()) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // 1. Time Ruler
+                        TimeRuler(
+                            totalDurationMs = totalTimelineDurationMs,
+                            pixelsPerMs = pixelsPerMs,
+                            onSeek = onSeekAction
+                        )
+
+                        Spacer(modifier = Modifier.height(AppSpacing.xs))
+
+                        // 2. Track Lanes
+                        if (state.tracks.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .padding(horizontal = 8.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF161925))
+                                    .clickable { onAddMedia() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF7B61FF), modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Tap to add media", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                                }
+                            }
+                        } else {
+                            state.tracks.forEach { track ->
+                                TrackLane(
+                                    track = track,
+                                    selectedClipId = state.selectedClipId,
+                                    pixelsPerMs = pixelsPerMs,
+                                    onAction = onAction,
+                                    onAddMedia = onAddMedia
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                        }
+                    }
+
+                    // 3. Playhead Overlay
+                    PlayheadView(
+                        playheadPositionMs = state.playheadPositionMs,
+                        pixelsPerMs = pixelsPerMs,
+                        onSeekDelta = { deltaMs ->
+                            val newTime = (state.playheadPositionMs + deltaMs).coerceIn(0L, state.durationMs)
+                            onAction(TimelineAction.Seek(newTime))
+                        },
+                        modifier = Modifier.offset {
+                            val currentPlayheadPx = (state.playheadPositionMs * pixelsPerMs).roundToInt()
+                            IntOffset(currentPlayheadPx - 12.dp.roundToPx(), 0)
+                        }
+                    )
                 }
             }
         }
@@ -331,26 +264,17 @@ private fun TrackLane(
     modifier: Modifier = Modifier
 ) {
     val laneHeight = 56.dp
-    val trackBg = remember(track.type) {
-        when (track.type) {
-            TrackType.VIDEO -> Color(0xFF0F111A)
-            TrackType.AUDIO -> Color(0xFF0F111A)
-            else -> Color(0xFF0F111A)
-        }
-    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(laneHeight)
-            .background(trackBg)
+            .background(Color(0xFF0A0D14))
             .padding(vertical = 2.dp)
     ) {
-        // Clips inside track
         track.clips.forEach { clip ->
             val isSelected = clip.id == selectedClipId
 
-            // Memoize callbacks per clip to avoid extra lambda allocations per frame
             val onSelectClip = remember(clip.id, onAction) {
                 { onAction(TimelineAction.SelectClip(clip.id)) }
             }
@@ -389,4 +313,3 @@ private fun TrackLane(
         }
     }
 }
-
