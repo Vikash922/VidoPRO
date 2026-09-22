@@ -31,7 +31,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import coil.decode.VideoFrameDecoder
-import coil.decode.videoFrameMillis
 import coil.request.ImageRequest
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -424,7 +423,6 @@ fun RecentProjectCard(
         if (thumbModel != null) {
             ImageRequest.Builder(context)
                 .data(thumbModel)
-                .videoFrameMillis(1000L)
                 .decoderFactory(VideoFrameDecoder.Factory())
                 .crossfade(true)
                 .build()
