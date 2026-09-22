@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.example.core.common.TimeUtils
 import com.example.core.model.Project
 import com.example.core.ui.theme.AppSpacing
+import com.example.feature.home.components.NewProjectBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -494,7 +494,7 @@ fun EditorScreen(
         if (uiState.isFiltersSheetVisible) {
             com.example.feature.editor.filter.FiltersBottomSheet(
                 filterSettings = uiState.filterSettings,
-                onSettingsChanged = { onEvent(EditorEvent.UpdateFilterSettings(it)) },
+                onFilterChange = { onEvent(EditorEvent.UpdateFilterSettings(it)) },
                 onReset = { onEvent(EditorEvent.ResetFilterSettings) },
                 onDismiss = { onEvent(EditorEvent.SetFiltersSheetVisible(false)) }
             )

@@ -152,9 +152,9 @@ fun ExportScreen(
 
                 if (uiState.isExporting) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Text("Exporting... ${(uiState.progress * 100).roundToInt()}%", color = Color.White)
+                        Text("Exporting... ${uiState.progressPercent}%", color = Color.White)
                         Spacer(Modifier.height(8.dp))
-                        LinearProgressIndicator(progress = { uiState.progress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), color = Color(0xFF7B61FF))
+                        LinearProgressIndicator(progress = { uiState.progressFraction }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), color = Color(0xFF7B61FF))
                         Spacer(Modifier.height(16.dp))
                         OutlinedButton(onClick = onCancelExport) {
                             Text("Cancel", color = Color.White)
