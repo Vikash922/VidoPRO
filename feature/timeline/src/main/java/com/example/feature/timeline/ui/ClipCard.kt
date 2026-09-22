@@ -3,20 +3,11 @@ package com.example.feature.timeline.ui
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Audiotrack
@@ -25,28 +16,23 @@ import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.ui.input.pointer.positionChange
-import kotlin.math.absoluteValue
-
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,12 +43,10 @@ import com.example.core.model.ClipType
 import com.example.core.ui.theme.AppRadius
 import com.example.core.ui.theme.AppSpacing
 import com.example.core.ui.theme.EditorColors
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
+import kotlin.random.Random
 
-/**
- * Interactive Clip Card with playful, fun gestures! 🚀
- * Includes bouncy scale animations, gradient accents, and haptic feedback 
- * for Selection, Move dragging, and Edge trimming.
- */
 @Composable
 fun ClipCard(
     clip: Clip,
@@ -75,46 +59,39 @@ fun ClipCard(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-
     val clipWidthDp = remember(clip.durationMs, pixelsPerMs) {
         maxOf(44.dp, (clip.durationMs * pixelsPerMs).dp)
     }
 
-    val baseColor = remember(clip.type) {
+    val (bgGradient, borderColor) = remember(clip.type, isSelected) {
         when (clip.type) {
-            ClipType.VIDEO -> EditorColors.clipVideo
-            ClipType.IMAGE -> EditorColors.clipImage
-            ClipType.AUDIO -> EditorColors.clipAudio
-            ClipType.TEXT -> EditorColors.clipText
-            ClipType.COLOR -> EditorColors.clipOverlay
-            ClipType.SHAPE -> EditorColors.clipOverlay
+            ClipType.TEXT -> 
+                Pair(
+                    listOf(Color(0xFFB8A7FF), Color(0xFF7B61FF)),
+                    if (isSelected) Color.White else Color(0xFF9E84FF)
+                )
+            ClipType.AUDIO ->
+                Pair(
+                    listOf(Color(0xFF00D2FF), Color(0xFF0096FF)),
+                    if (isSelected) Color.White else Color(0xFF33B5E5)
+                )
+            else ->
+                Pair(
+                    listOf(Color(0xFF2C3248), Color(0xFF161925)),
+                    if (isSelected) Color(0xFF7B61FF) else Color(0xFF2C3248)
+                )
         }
     }
 
-    val backgroundColor = remember(baseColor, isSelected) {
-        baseColor.copy(alpha = if (isSelected) 0.9f else 0.5f)
-    }
-
-    val borderColor = remember(baseColor, isSelected) {
-        if (isSelected) EditorColors.playhead else baseColor.copy(alpha = 0.8f)
-    }
-
-    val cornerShape = remember { RoundedCornerShape(AppRadius.clip) }
-    val formattedDuration = remember(clip.durationMs) { TimeUtils.formatDuration(clip.durationMs) }
-
+    val cornerShape = remember { RoundedCornerShape(8.dp) }
     var accumulatedMovePx by remember { mutableFloatStateOf(0f) }
     var accumulatedTrimStartPx by remember { mutableFloatStateOf(0f) }
     var accumulatedTrimEndPx by remember { mutableFloatStateOf(0f) }
-    
-    // Fun state for bouncy animations
     var isPressed by remember { mutableStateOf(false) }
     
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else if (isSelected) 1.02f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
+        targetValue = if (isPressed) 0.98f else if (isSelected) 1.02f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "clip_scale"
     )
 
@@ -128,70 +105,42 @@ fun ClipCard(
             .width(clipWidthDp)
             .height(52.dp)
             .scale(scale)
-            .shadow(
-                elevation = if (isSelected) 8.dp else 2.dp,
-                shape = cornerShape,
-                spotColor = baseColor
-            )
+            .shadow(if (isSelected) 4.dp else 0.dp, cornerShape, spotColor = borderColor)
             .clip(cornerShape)
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        backgroundColor.copy(alpha = backgroundColor.alpha + 0.1f),
-                        backgroundColor
-                    )
-                )
-            )
-            .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = borderColor,
-                shape = cornerShape
-            )
-            .testTag("clip_card_${clip.id}")
+            .background(Brush.horizontalGradient(bgGradient))
+            .border(if (isSelected) 2.dp else 1.dp, borderColor, cornerShape)
     ) {
-        // Main clip body with Tap and Move gestures - using combined pointerInput for proper gesture handling
+        // Main body for tap/move
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = if (isSelected) 16.dp else 4.dp)
+                .padding(horizontal = if (isSelected) 16.dp else 0.dp)
                 .pointerInput(clip.id, pixelsPerMs) {
-                    // Use combined gesture detection for better tap/drag separation
-                    val touchSlop = 8f // pixels before considering it a drag
+                    val touchSlop = 8f
                     var touchStartX = 0f
                     var isDragging = false
                     
                     awaitPointerEventScope {
-                        awaitFirstDown()
-                        
-                        do {
+                        while(true) {
                             val event = awaitPointerEvent()
                             val changes = event.changes
-                            val downChange = changes.find { it.pressed && it.positionChange().x != 0f }
+                            val downChange = changes.find { it.pressed }
                             
-                            if (downChange != null) {
+                            if (downChange != null && !isPressed) {
                                 touchStartX = downChange.position.x
                                 isPressed = true
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             }
                             
-                            // Check for drag
-                            if (!isDragging) {
-                                val totalDragX = changes
-                                    .filter { it.pressed }
-                                    .map { (it.position.x - touchStartX).absoluteValue }.sum()
-                                
+                            if (isPressed && !isDragging) {
+                                val totalDragX = changes.filter { it.pressed }.sumOf { (it.position.x - touchStartX).absoluteValue.toDouble() }.toFloat()
                                 if (totalDragX > touchSlop) {
                                     isDragging = true
                                     accumulatedMovePx = 0f
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 }
                             }
                             
                             if (isDragging) {
-                                val dragAmount = changes
-                                    .filter { it.pressed }
-                                    .map { it.positionChange().x }.sum()
-                                
+                                val dragAmount = changes.filter { it.pressed }.sumOf { it.positionChange().x.toDouble() }.toFloat()
                                 if (dragAmount != 0f) {
                                     changes.forEach { it.consume() }
                                     accumulatedMovePx += dragAmount
@@ -202,73 +151,85 @@ fun ClipCard(
                                     }
                                 }
                             }
-                        } while (event.changes.any { it.pressed })
-                        
-                        // If not dragging, it was a tap
-                        if (!isDragging) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            currentOnSelect()
+                            
+                            if (changes.all { !it.pressed }) {
+                                if (!isDragging) {
+                                    currentOnSelect()
+                                }
+                                isPressed = false
+                                isDragging = false
+                                accumulatedMovePx = 0f
+                            }
                         }
-                        
-                        isPressed = false
-                        accumulatedMovePx = 0f
                     }
                 },
             contentAlignment = Alignment.CenterStart
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = AppSpacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Start
-            ) {
-                val icon = when (clip.type) {
-                    ClipType.VIDEO, ClipType.IMAGE -> Icons.Default.Movie
-                    ClipType.AUDIO -> Icons.Default.Audiotrack
-                    ClipType.TEXT -> Icons.Default.TextFields
-                    ClipType.COLOR, ClipType.SHAPE -> Icons.Default.Movie
+            // Visual Content based on Clip Type
+            when (clip.type) {
+                ClipType.AUDIO -> {
+                    // Audio Waveform Visuals
+                    Canvas(modifier = Modifier.fillMaxSize().padding(vertical = 8.dp)) {
+                        val numBars = (size.width / 12f).toInt()
+                        val random = Random(clip.id.hashCode())
+                        for (i in 0 until numBars) {
+                            val heightRatio = 0.2f + random.nextFloat() * 0.8f
+                            val barHeight = size.height * heightRatio
+                            val x = i * 12f + 6f
+                            val y = (size.height - barHeight) / 2f
+                            drawLine(
+                                color = Color(0xFF00FFD1),
+                                start = Offset(x, y),
+                                end = Offset(x, y + barHeight),
+                                strokeWidth = 6f,
+                                cap = StrokeCap.Round
+                            )
+                        }
+                    }
                 }
-
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier.size(16.dp)
-                )
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                Text(
-                    text = formattedDuration,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 12.sp,
+                ClipType.TEXT -> {
+                    // Text Visuals
+                    Text(
+                        text = "Good Vibes",
+                        color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    ),
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                        modifier = Modifier.padding(start = 12.dp)
+                    )
+                }
+                else -> {
+                    // Video/Image Thumbnails Simulation
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        val numThumbs = (clipWidthDp.value / 40f).toInt().coerceAtLeast(1)
+                        for (i in 0 until numThumbs) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .weight(1f)
+                                    .padding(2.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Brush.linearGradient(listOf(Color(0xFF232533), Color(0xFF2C3248))))
+                            ) {
+                                if (i == 0) {
+                                    Icon(Icons.Default.Movie, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.align(Alignment.Center).size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // Left Trim Handle (visible when clip is selected)
+        // Left Trim
         if (isSelected) {
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .width(18.dp)
+                    .width(16.dp)
                     .fillMaxHeight()
-                    .background(EditorColors.playhead.copy(alpha = 0.95f))
+                    .background(Color.White)
                     .pointerInput(clip.id, pixelsPerMs) {
                         detectDragGestures(
-                            onDragStart = { 
-                                accumulatedTrimStartPx = 0f 
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            },
-                            onDragEnd = { accumulatedTrimStartPx = 0f },
-                            onDragCancel = { accumulatedTrimStartPx = 0f },
+                            onDragStart = { accumulatedTrimStartPx = 0f },
                             onDrag = { change, dragAmount ->
                                 change.consume()
                                 accumulatedTrimStartPx += dragAmount.x
@@ -282,33 +243,21 @@ fun ClipCard(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                // Playful Handle bar notch
-                Box(
-                    modifier = Modifier
-                        .width(3.dp)
-                        .height(20.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(Color.White)
-                )
+                Box(modifier = Modifier.width(2.dp).height(16.dp).background(Color.Black.copy(alpha = 0.5f)))
             }
         }
 
-        // Right Trim Handle (visible when clip is selected)
+        // Right Trim
         if (isSelected) {
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .width(18.dp)
+                    .width(16.dp)
                     .fillMaxHeight()
-                    .background(EditorColors.playhead.copy(alpha = 0.95f))
+                    .background(Color.White)
                     .pointerInput(clip.id, pixelsPerMs) {
                         detectDragGestures(
-                            onDragStart = { 
-                                accumulatedTrimEndPx = 0f 
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            },
-                            onDragEnd = { accumulatedTrimEndPx = 0f },
-                            onDragCancel = { accumulatedTrimEndPx = 0f },
+                            onDragStart = { accumulatedTrimEndPx = 0f },
                             onDrag = { change, dragAmount ->
                                 change.consume()
                                 accumulatedTrimEndPx += dragAmount.x
@@ -322,17 +271,8 @@ fun ClipCard(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                // Playful Handle bar notch
-                Box(
-                    modifier = Modifier
-                        .width(3.dp)
-                        .height(20.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(Color.White)
-                )
+                Box(modifier = Modifier.width(2.dp).height(16.dp).background(Color.Black.copy(alpha = 0.5f)))
             }
         }
     }
 }
-
-

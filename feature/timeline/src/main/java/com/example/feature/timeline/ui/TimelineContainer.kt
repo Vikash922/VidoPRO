@@ -255,22 +255,21 @@ fun TimelineContainer(
 
                     // 2. Track Lanes
                     if (state.tracks.isEmpty()) {
-                        // Empty timeline hint
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(80.dp)
-                                .padding(horizontal = AppSpacing.md)
-                                .clip(RoundedCornerShape(AppRadius.clip))
-                                .background(EditorColors.clipVideo.copy(alpha = 0.15f))
+                                .padding(horizontal = 16.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF161925))
                                 .clickable { onAddMedia() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "Tap + or here to add media",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = EditorColors.clipVideo
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF7B61FF))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Tap to add media", color = Color.White.copy(alpha = 0.7f))
+                            }
                         }
                     } else {
                         state.tracks.forEach { track ->
@@ -334,9 +333,9 @@ private fun TrackLane(
     val laneHeight = 56.dp
     val trackBg = remember(track.type) {
         when (track.type) {
-            TrackType.VIDEO -> Color(0xFF14141E)
-            TrackType.AUDIO -> Color(0xFF14191E)
-            else -> Color(0xFF1A161E)
+            TrackType.VIDEO -> Color(0xFF0F111A)
+            TrackType.AUDIO -> Color(0xFF0F111A)
+            else -> Color(0xFF0F111A)
         }
     }
 

@@ -2,77 +2,33 @@ package com.example.feature.export
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.HighQuality
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.core.common.TimeUtils
-import com.example.core.ui.components.AppPrimaryButton
-import com.example.core.ui.components.AppSecondaryButton
 import com.example.core.ui.components.LoadingView
-import com.example.core.ui.theme.AppRadius
-import com.example.core.ui.theme.AppSpacing
+import kotlin.math.roundToInt
 
-/**
- * Export screen enabling resolution, FPS, and quality configuration with real-time export progress (DEV-072).
- */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportScreen(
     uiState: ExportUiState,
@@ -90,554 +46,205 @@ fun ExportScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color(0xFF0F111A),
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Export Project",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        enabled = !uiState.isExporting,
-                        modifier = Modifier.testTag("export_back_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = if (uiState.isExporting) {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            }
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White,
+                    modifier = Modifier.clickable { onNavigateBack() }
                 )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
+                Spacer(Modifier.width(16.dp))
+                Text("Export Settings", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     ) { innerPadding ->
         if (uiState.isLoadingProject) {
-            LoadingView(
-                message = "Loading export options...",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            )
+            LoadingView(modifier = Modifier.fillMaxSize())
         } else {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
                     .verticalScroll(scrollState)
-                    .padding(AppSpacing.md),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)
+                    .padding(horizontal = 24.dp)
             ) {
-                // 1. Project Summary Card
-                ExportSummaryCard(uiState = uiState)
-
-                // 2. Settings Section (disabled while exporting)
-                if (!uiState.isExporting && uiState.status != ExportStatus.SUCCESS) {
-                    // Resolution selector
-                    ExportOptionGroup(
-                        title = "Resolution",
-                        icon = Icons.Default.Videocam
-                    ) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-                            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
-                        ) {
-                            ResolutionPreset.entries.forEach { preset ->
-                                val isSelected = uiState.selectedResolution == preset
-                                val (w, h) = preset.getDimensions(uiState.aspectRatio)
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = { onResolutionSelected(preset) },
-                                    label = {
-                                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                                            Text(
-                                                text = preset.label,
-                                                style = MaterialTheme.typography.labelLarge,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                            Text(
-                                                text = "${w}x${h}",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = if (isSelected) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                                }
-                                            )
-                                        }
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    ),
-                                    modifier = Modifier.testTag("export_resolution_${preset.shortLabel.lowercase()}")
-                                )
-                            }
-                        }
-                    }
-
-                    // Frame Rate selector
-                    ExportOptionGroup(
-                        title = "Frame Rate (FPS)",
-                        icon = Icons.Default.Speed
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
-                        ) {
-                            FpsPreset.entries.forEach { preset ->
-                                val isSelected = uiState.selectedFps == preset
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = { onFpsSelected(preset) },
-                                    label = {
-                                        Text(
-                                            text = preset.shortLabel,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("export_fps_${preset.fps}")
-                                )
-                            }
-                        }
-                    }
-
-                    // Quality / Bitrate selector
-                    ExportOptionGroup(
-                        title = "Bitrate Quality",
-                        icon = Icons.Default.HighQuality
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
-                        ) {
-                            QualityPreset.entries.forEach { preset ->
-                                val isSelected = uiState.selectedQuality == preset
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = { onQualitySelected(preset) },
-                                    label = {
-                                        Text(
-                                            text = preset.label,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("export_quality_${preset.name.lowercase()}")
-                                )
-                            }
-                        }
-                    }
+                // Preview Thumbnail Placeholder
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Brush.linearGradient(listOf(Color(0xFF2C3248), Color(0xFF161925)))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Image, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
                 }
 
-                // 3. Progress / Action Area
-                when (uiState.status) {
-                    ExportStatus.IDLE, ExportStatus.CANCELLED -> {
-                        if (uiState.status == ExportStatus.CANCELLED) {
-                            Surface(
-                                shape = RoundedCornerShape(AppRadius.medium),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(AppSpacing.md),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                    Spacer(modifier = Modifier.width(AppSpacing.sm))
-                                    Text(
-                                        text = "Export was cancelled.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                Spacer(Modifier.height(32.dp))
+
+                // Settings
+                ExportOptionRow(
+                    title = "Resolution",
+                    options = ResolutionPreset.entries,
+                    selected = uiState.selectedResolution,
+                    onSelect = onResolutionSelected,
+                    getLabel = { it.shortLabel }
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                ExportOptionRow(
+                    title = "Frame Rate",
+                    options = FpsPreset.entries,
+                    selected = uiState.selectedFps,
+                    onSelect = onFpsSelected,
+                    getLabel = { it.fps.toString() }
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                ExportOptionRow(
+                    title = "Quality",
+                    options = QualityPreset.entries,
+                    selected = uiState.selectedQuality,
+                    onSelect = onQualitySelected,
+                    getLabel = { it.name.lowercase().replaceFirstChar { c -> c.uppercase() } }
+                )
+
+                Spacer(Modifier.height(32.dp))
+
+                // Bitrate Slider
+                var bitrateValue by remember(uiState.selectedQuality) { mutableFloatStateOf(12f) }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Bitrate", color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Box(modifier = Modifier.background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                            Text("Recommended", color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+                        }
+                    }
+                    Text("${bitrateValue.roundToInt()} Mbps", color = Color.White, fontSize = 14.sp)
+                }
+                Slider(
+                    value = bitrateValue,
+                    onValueChange = { bitrateValue = it },
+                    valueRange = 2f..50f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = Color.White,
+                        activeTrackColor = Color(0xFF7B61FF),
+                        inactiveTrackColor = Color(0xFF2C3248)
+                    )
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Estimated File Size", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                    Text("~ ${uiState.estimatedSizeMb.roundToInt()} MB", color = Color.White, fontSize = 12.sp)
+                }
+
+                Spacer(Modifier.height(40.dp))
+
+                if (uiState.isExporting) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text("Exporting... ${(uiState.progress * 100).roundToInt()}%", color = Color.White)
+                        Spacer(Modifier.height(8.dp))
+                        LinearProgressIndicator(progress = { uiState.progress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), color = Color(0xFF7B61FF))
+                        Spacer(Modifier.height(16.dp))
+                        OutlinedButton(onClick = onCancelExport) {
+                            Text("Cancel", color = Color.White)
+                        }
+                    }
+                } else if (uiState.status == ExportStatus.SUCCESS) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF00FFD1), modifier = Modifier.size(48.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text("Export Successful!", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(16.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Button(onClick = onNavigateBack, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C3248))) {
+                                Text("Back to Editor")
+                            }
+                            Button(onClick = {
+                                uiState.outputUri?.let { uri ->
+                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                        setDataAndType(Uri.parse(uri), "video/mp4")
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(intent)
                                 }
+                            }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF))) {
+                                Text("Play Video")
                             }
                         }
-
-                        AppPrimaryButton(
-                            text = "Start Export",
-                            onClick = onStartExport,
+                    }
+                } else {
+                    Button(
+                        onClick = onStartExport,
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues()
+                    ) {
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .testTag("export_start_button")
-                        )
-                    }
-
-                    ExportStatus.PREPARING, ExportStatus.EXPORTING, ExportStatus.SAVING_TO_GALLERY -> {
-                        ExportProgressCard(
-                            uiState = uiState,
-                            onCancel = onCancelExport
-                        )
-                    }
-
-                    ExportStatus.SUCCESS -> {
-                        ExportSuccessCard(
-                            uiState = uiState,
-                            onOpenVideo = {
-                                uiState.outputUri?.let { uriStr ->
-                                    val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-                                        setDataAndType(Uri.parse(uriStr), "video/mp4")
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    try {
-                                        context.startActivity(viewIntent)
-                                    } catch (_: Exception) {}
-                                }
-                            },
-                            onShareVideo = {
-                                uiState.outputUri?.let { uriStr ->
-                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "video/mp4"
-                                        putExtra(Intent.EXTRA_STREAM, Uri.parse(uriStr))
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    try {
-                                        context.startActivity(Intent.createChooser(shareIntent, "Share Video"))
-                                    } catch (_: Exception) {}
-                                }
-                            },
-                            onDone = onNavigateBack
-                        )
-                    }
-
-                    ExportStatus.ERROR -> {
-                        ExportErrorCard(
-                            errorMessage = uiState.errorMessage ?: "Export encountered an unexpected error.",
-                            onRetry = onStartExport,
-                            onReset = onResetState
-                        )
+                                .fillMaxSize()
+                                .background(Brush.horizontalGradient(listOf(Color(0xFF6B4BFF), Color(0xFF9E84FF)))),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Upload, contentDescription = null, tint = Color.White)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Export", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
+                
+                Spacer(Modifier.height(32.dp))
             }
         }
     }
 }
 
 @Composable
-private fun ExportSummaryCard(uiState: ExportUiState) {
-    val project = uiState.project
-    val (w, h) = uiState.dimensions
-
-    Card(
-        shape = RoundedCornerShape(AppRadius.medium),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(AppSpacing.md)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = project?.name ?: "Untitled Project",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Format: MP4 (H.264 / AAC)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(AppRadius.small),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.padding(start = AppSpacing.sm)
+fun <T> ExportOptionRow(
+    title: String,
+    options: List<T>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    getLabel: (T) -> String
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(title, color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp)
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            options.forEach { option ->
+                val isSelected = option == selected
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isSelected) Color(0xFF7B61FF) else Color(0xFF161925))
+                        .clickable { onSelect(option) },
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = uiState.aspectRatio.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = AppSpacing.sm, vertical = 4.dp)
+                        text = getLabel(option),
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                     )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(AppSpacing.md))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        RoundedCornerShape(AppRadius.small)
-                    )
-                    .padding(AppSpacing.sm),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                SummaryItem(label = "Duration", value = TimeUtils.formatDuration(project?.durationMs ?: 0L))
-                SummaryItem(label = "Resolution", value = "${w}x${h}")
-                SummaryItem(label = "Est. Size", value = String.format("%.1f MB", uiState.estimatedSizeMb))
-            }
-        }
-    }
-}
-
-@Composable
-private fun SummaryItem(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
-private fun ExportOptionGroup(
-    title: String,
-    icon: ImageVector,
-    content: @Composable () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 2.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(AppSpacing.xs))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-        content()
-    }
-}
-
-@Composable
-private fun ExportProgressCard(
-    uiState: ExportUiState,
-    onCancel: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(AppRadius.medium),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("export_progress_card")
-    ) {
-        Column(
-            modifier = Modifier.padding(AppSpacing.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = uiState.statusMessage.ifBlank { "Exporting video..." },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "${uiState.progressPercent}%",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            LinearProgressIndicator(
-                progress = { uiState.progressFraction },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(AppRadius.button))
-                    .testTag("export_progress_indicator")
-            )
-
-            Spacer(modifier = Modifier.height(AppSpacing.xs))
-
-            AppSecondaryButton(
-                text = "Cancel Export",
-                onClick = onCancel,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("export_cancel_button")
-            )
-        }
-    }
-}
-
-@Composable
-private fun ExportSuccessCard(
-    uiState: ExportUiState,
-    onOpenVideo: () -> Unit,
-    onShareVideo: () -> Unit,
-    onDone: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(AppRadius.medium),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(AppSpacing.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF1B5E20).copy(alpha = 0.3f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Success",
-                    tint = Color(0xFF4CAF50),
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-
-            Text(
-                text = "Export Complete!",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Text(
-                text = "Video successfully rendered and saved to your device's Gallery under Movies / VideoEditor.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(AppSpacing.xs))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
-            ) {
-                AppSecondaryButton(
-                    text = "Share",
-                    onClick = onShareVideo,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("export_share_button")
-                )
-
-                AppPrimaryButton(
-                    text = "Done",
-                    onClick = onDone,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("export_done_button")
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExportErrorCard(
-    errorMessage: String,
-    onRetry: () -> Unit,
-    onReset: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(AppRadius.medium),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(AppSpacing.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
-        ) {
-            Icon(
-                imageVector = Icons.Default.ErrorOutline,
-                contentDescription = "Error",
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(48.dp)
-            )
-
-            Text(
-                text = "Export Failed",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-
-            Text(
-                text = errorMessage,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
-            ) {
-                AppSecondaryButton(
-                    text = "Change Settings",
-                    onClick = onReset,
-                    modifier = Modifier.weight(1f)
-                )
-
-                AppPrimaryButton(
-                    text = "Retry",
-                    onClick = onRetry,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("export_retry_button")
-                )
             }
         }
     }
