@@ -34,6 +34,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.positionChange
+import kotlin.math.absoluteValue
+
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -174,7 +178,7 @@ fun ClipCard(
                             if (!isDragging) {
                                 val totalDragX = changes
                                     .filter { it.pressed }
-                                    .sumOf { (it.position.x - touchStartX).absoluteValue }
+                                    .map { (it.position.x - touchStartX).absoluteValue }.sum()
                                 
                                 if (totalDragX > touchSlop) {
                                     isDragging = true
@@ -186,10 +190,10 @@ fun ClipCard(
                             if (isDragging) {
                                 val dragAmount = changes
                                     .filter { it.pressed }
-                                    .sumOf { it.positionChange().x }
+                                    .map { it.positionChange().x }.sum()
                                 
                                 if (dragAmount != 0f) {
-                                    change.consumeAllChanges()
+                                    changes.forEach { it.consume() }
                                     accumulatedMovePx += dragAmount
                                     val deltaMs = (accumulatedMovePx / pixelsPerMs).toLong()
                                     if (deltaMs != 0L) {
@@ -266,7 +270,7 @@ fun ClipCard(
                             onDragEnd = { accumulatedTrimStartPx = 0f },
                             onDragCancel = { accumulatedTrimStartPx = 0f },
                             onDrag = { change, dragAmount ->
-                                change.consume()
+                                changes.forEach { it.consume() }
                                 accumulatedTrimStartPx += dragAmount.x
                                 val deltaMs = (accumulatedTrimStartPx / pixelsPerMs).toLong()
                                 if (deltaMs != 0L) {
@@ -306,7 +310,7 @@ fun ClipCard(
                             onDragEnd = { accumulatedTrimEndPx = 0f },
                             onDragCancel = { accumulatedTrimEndPx = 0f },
                             onDrag = { change, dragAmount ->
-                                change.consume()
+                                changes.forEach { it.consume() }
                                 accumulatedTrimEndPx += dragAmount.x
                                 val deltaMs = (accumulatedTrimEndPx / pixelsPerMs).toLong()
                                 if (deltaMs != 0L) {

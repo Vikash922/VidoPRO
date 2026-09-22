@@ -1,6 +1,6 @@
 {
-  "versionCode": 9,
-  "versionName": "2.0",
+  "versionCode": 10,
+  "versionName": "2.0.1",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "Major Premium UI Redesign: Dark premium colors, new Home Screen, new Project flow, and professional Timeline interface."
+  "releaseNotes": "Hotfix: Fixed timeline compilation errors."
 }
