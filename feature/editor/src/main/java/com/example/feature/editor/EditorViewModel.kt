@@ -236,6 +236,7 @@ class EditorViewModel(
             is EditorEvent.AddMediaClicked -> {
                 // Handled via onNavigateMediaPicker
             }
+            else -> {}
 
             is EditorEvent.ExportClicked -> {
                 flushAutosave()

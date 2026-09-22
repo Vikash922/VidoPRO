@@ -28,8 +28,6 @@ import com.example.core.ui.components.LoadingView
 import com.example.core.ui.theme.AppSpacing
 import com.example.core.ui.theme.EditorColors
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 import com.example.feature.timeline.engine.TimelineEngineState
 import com.example.feature.timeline.engine.TimelineAction
 import com.example.feature.timeline.ui.TimelineContainer
@@ -50,10 +48,6 @@ fun EditorScreen(
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-
-    }
-
-        }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -186,9 +180,6 @@ fun EditorScreen(
                         onPlayPause = { onEvent(EditorEvent.PlayPauseClicked) },
                         onAddMedia = { onNavigateMediaPicker(com.example.core.model.TrackType.VIDEO) },
                         modifier = Modifier.fillMaxSize()
-                    )
-                },
-                        onPlayheadScrub = { onEvent(EditorEvent.SeekTo(it)) }
                     )
                 }
             }
