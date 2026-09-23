@@ -98,6 +98,10 @@ interface ClipDao {
     @Query("SELECT * FROM clips WHERE id = :clipId")
     suspend fun getClipWithDetails(clipId: String): ClipWithDetails?
 
+    @Query("SELECT * FROM clips WHERE groupId = :groupId ORDER BY startTimeMs ASC")
+    suspend fun getByGroupId(groupId: String): List<ClipEntity>
+
+
     @Query("DELETE FROM clips WHERE id = :clipId")
     suspend fun deleteById(clipId: String)
 

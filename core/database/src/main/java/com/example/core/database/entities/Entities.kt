@@ -101,9 +101,11 @@ data class ClipEntity(
     val volume: Float?,
     val isVisible: Boolean,
     val zIndex: Int,
+    val groupId: String? = null,
     val createdAt: Long,
     val updatedAt: Long
 )
+
 
 @Entity(
     tableName = "transforms",

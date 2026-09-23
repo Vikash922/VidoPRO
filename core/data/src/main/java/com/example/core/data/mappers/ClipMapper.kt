@@ -46,7 +46,8 @@ fun ClipEntity.toDomain(
         transform = transform ?: Transform.DEFAULT,
         effects = effects,
         keyframes = keyframes,
-        textData = textData
+        textData = textData,
+        groupId = groupId
     )
 }
 
@@ -73,6 +74,7 @@ fun Clip.toEntity(): ClipEntity {
         volume = volume,
         isVisible = isVisible,
         zIndex = zIndex,
+        groupId = groupId,
         createdAt = System.currentTimeMillis(),
         updatedAt = System.currentTimeMillis()
     )
