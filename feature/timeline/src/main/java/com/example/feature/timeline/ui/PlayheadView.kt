@@ -81,10 +81,12 @@ fun PlayheadView(
                         accumulatedDragPx += dragAmount.x
                         val deltaMs = (accumulatedDragPx / pixelsPerMs).toLong()
                         if (deltaMs != 0L) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onSeekDelta(deltaMs)
                             accumulatedDragPx -= deltaMs * pixelsPerMs
                         }
                     }
+
                 )
             }
             .drawWithCache {

@@ -1,8 +1,8 @@
 {
-  "versionCode": 19,
-  "versionName": "2.1.0",
+  "versionCode": 20,
+  "versionName": "2.1.1",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "v2.1.0: CapCut-style timeline (center playhead, 64dp clips, red scrubber), tap ruler to add/remove markers, markers survive split, permission auto-requested on launch, split clips stay on same track."
+  "releaseNotes": "v2.1.1: Verified all function connections, added physical haptic tick on scrubbing, full undo/redo for group/ungroup/keyframe drag, and fixed nativeCanvas text drawing."
 }
 
 

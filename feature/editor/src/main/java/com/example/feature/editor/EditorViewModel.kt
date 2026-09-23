@@ -518,6 +518,15 @@ class EditorViewModel(
             is TimelineAction.UpdateClipVolume -> {
                 StateSnapshotCommand("Change clip volume", action, preActionState)
             }
+            is TimelineAction.GroupSelectedClips -> {
+                StateSnapshotCommand("Group clips", action, preActionState)
+            }
+            is TimelineAction.UngroupClips -> {
+                StateSnapshotCommand("Ungroup clips", action, preActionState)
+            }
+            is TimelineAction.MoveKeyframe -> {
+                StateSnapshotCommand("Move keyframe", action, preActionState)
+            }
             is TimelineAction.UpdateClipTransform -> {
                 null
             }
@@ -550,6 +559,7 @@ class EditorViewModel(
             current.copy(
                 playheadPositionMs = timelineEngineState.playheadPositionMs,
                 selectedClipId = timelineEngineState.selectedClipId,
+                multiSelectedClipIds = timelineEngineState.multiSelectedClipIds,
                 beatMarkers = timelineEngineState.beatMarkers,
                 isEditSheetVisible = sheetVisible,
                 project = if (tracksChanged) current.project?.copy(
