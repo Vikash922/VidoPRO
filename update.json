@@ -1,8 +1,8 @@
 {
-  "versionCode": 20,
-  "versionName": "2.1.1",
+  "versionCode": 21,
+  "versionName": "2.1.2",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "v2.1.1: Verified all function connections, added physical haptic tick on scrubbing, full undo/redo for group/ungroup/keyframe drag, and fixed nativeCanvas text drawing."
+  "releaseNotes": "v2.1.2: Security & CI hardening — removed hardcoded signing credentials, eliminated high-risk package installer permission, added CI unit test verification."
 }
 
 

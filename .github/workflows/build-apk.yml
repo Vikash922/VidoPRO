@@ -37,16 +37,26 @@ jobs:
             echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           fi
 
+      - name: Run Unit Tests
+        run: gradle test --stacktrace
+
       - name: Build Release APK
+        env:
+          KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: gradle assembleRelease --stacktrace
 
-      - name: Upload build error report
+      - name: Upload Build and Test Reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: build-reports
           path: |
             **/build/reports/
+            **/build/test-results/
+
 
       - name: Get Version Name
         id: get_version

@@ -39,18 +39,33 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  val releaseKeystorePath = System.getenv("KEYSTORE_FILE")
+    ?: (project.findProperty("KEYSTORE_FILE") as? String)
+    ?: (project.findProperty("keystoreFile") as? String)
+  val releaseKeystorePassword = System.getenv("KEYSTORE_PASSWORD")
+    ?: (project.findProperty("KEYSTORE_PASSWORD") as? String)
+    ?: (project.findProperty("keystorePassword") as? String)
+  val releaseKeyAlias = System.getenv("KEY_ALIAS")
+    ?: (project.findProperty("KEY_ALIAS") as? String)
+    ?: (project.findProperty("keyAlias") as? String)
+  val releaseKeyPassword = System.getenv("KEY_PASSWORD")
+    ?: (project.findProperty("KEY_PASSWORD") as? String)
+    ?: (project.findProperty("keyPassword") as? String)
+
+  val releaseKeystoreFile = releaseKeystorePath?.let { file(it) } ?: file("release.keystore")
+  val isReleaseSigningConfigured = releaseKeystoreFile.exists() &&
+      !releaseKeystorePassword.isNullOrBlank() &&
+      !releaseKeyAlias.isNullOrBlank() &&
+      !releaseKeyPassword.isNullOrBlank()
+
   signingConfigs {
-    create("release") {
-      storeFile = file("release.keystore")
-      storePassword = "password"
-      keyAlias = "release"
-      keyPassword = "password"
-    }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+    if (isReleaseSigningConfigured) {
+      create("release") {
+        storeFile = releaseKeystoreFile
+        storePassword = releaseKeystorePassword
+        keyAlias = releaseKeyAlias
+        keyPassword = releaseKeyPassword
+      }
     }
   }
 
@@ -59,9 +74,16 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      if (isReleaseSigningConfigured) {
+        signingConfig = signingConfigs.getByName("release")
+      } else {
+        // Fallback to debug signing for local/CI builds when production signing secrets are not supplied
+        signingConfig = signingConfigs.getByName("debug")
+      }
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      signingConfig = signingConfigs.getByName("debug")
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
