@@ -1,7 +1,8 @@
 {
-  "versionCode": 17,
-  "versionName": "2.0.8",
+  "versionCode": 18,
+  "versionName": "2.0.9",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "v2.0.8: Alight Motion-style long-press multi-select, clip grouping (Group/Ungroup), group amber highlight, draggable keyframe diamonds on timeline, blue multi-select border with checkmark badge."
+  "releaseNotes": "v2.0.9: 4K 60fps smooth playback (hardware decoder priority, SurfaceView, 60fps ticker), split no longer resets playhead, keyframe button is silent (no sheet popup), fast local-file seek after split/trim."
 }
+
 

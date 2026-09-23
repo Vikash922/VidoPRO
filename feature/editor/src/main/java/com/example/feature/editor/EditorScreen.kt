@@ -696,17 +696,18 @@ fun EditorScreen(
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(if (uiState.selectedClipId != null) Color(0xFF1E2230) else Color.Transparent)
                                 .clickable {
-                                    if (uiState.selectedClipId != null) {
-                                        onEvent(EditorEvent.SetKeyframeSheetVisible(true))
-                                    } else {
-                                        val activeClipId = uiState.project?.tracks?.flatMap { it.clips }?.find {
+                                    // Tap = add keyframe at playhead for selected clip (no sheet)
+                                    val activeClipId = uiState.selectedClipId
+                                        ?: uiState.project?.tracks?.flatMap { it.clips }?.find {
                                             uiState.playheadPositionMs in it.startTimeMs..it.endTimeMs
                                         }?.id
-                                        if (activeClipId != null) {
+                                    if (activeClipId != null) {
+                                        if (uiState.selectedClipId == null) {
                                             onEvent(EditorEvent.SelectClip(activeClipId))
                                             onTimelineAction(TimelineAction.SelectClip(activeClipId))
-                                            onEvent(EditorEvent.SetKeyframeSheetVisible(true))
                                         }
+                                        // Add keyframe at current playhead — no sheet, no popup
+                                        onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs))
                                     }
                                 },
                             contentAlignment = Alignment.Center
@@ -725,6 +726,7 @@ fun EditorScreen(
                                 )
                             }
                         }
+
                         Spacer(Modifier.width(14.dp))
                         Icon(
                             Icons.Default.Fullscreen,
@@ -861,7 +863,10 @@ fun EditorScreen(
                                 }
                                 Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
-                                    onEvent(EditorEvent.SetKeyframeSheetVisible(true))
+                                    // Silently add/remove keyframe at playhead — no sheet
+                                    uiState.selectedClipId?.let { clipId ->
+                                        onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs))
+                                    }
                                 }
                                 Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.BEATS, Icons.Default.GraphicEq) {

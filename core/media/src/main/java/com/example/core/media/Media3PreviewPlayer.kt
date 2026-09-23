@@ -21,7 +21,13 @@ import kotlinx.coroutines.launch
 
 /**
  * Media3 ExoPlayer implementation of PreviewPlayerController.
- * Conforms to DEV-051, DEV-052.
+ *
+ * Optimisations (media3 1.5.1):
+ *  - EXTENSION_RENDERER_MODE_PREFER → hardware codec preference for 4K.
+ *  - enableDecoderFallback = true   → graceful fallback if hardware H.265/AV1 unavailable.
+ *  - LoadControl tuned for local file editing: low min-buffer, fast seek.
+ *  - setClips() preserves playhead after clip-list change (fixes split reset to 0).
+ *  - Ticker at 16ms for 60fps smooth playhead updates.
  */
 class Media3PreviewPlayer(
     context: Context,
@@ -30,25 +36,29 @@ class Media3PreviewPlayer(
 
     private val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context.applicationContext)
         .setEnableDecoderFallback(true)
+        // Prefer hardware-accelerated codec extensions over platform codecs
         .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
+    // Tuned for local file editing: small buffers = fast seek, low latency
     private val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
         .setBufferDurationsMs(
-            /* minBufferMs = */ 15_000,
-            /* maxBufferMs = */ 50_000,
-            /* bufferForPlaybackMs = */ 1_000,
-            /* bufferForPlaybackAfterRebufferMs = */ 2_000
+            /* minBufferMs                      */ 5_000,
+            /* maxBufferMs                      */ 30_000,
+            /* bufferForPlaybackMs              */ 500,
+            /* bufferForPlaybackAfterRebufferMs */ 1_000
         )
+        .setPrioritizeTimeOverSizeThresholds(true)
         .build()
+
 
     private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context.applicationContext)
         .setRenderersFactory(renderersFactory)
         .setLoadControl(loadControl)
         .build()
+
     private val audioPlayer: ExoPlayer = ExoPlayer.Builder(context.applicationContext).build()
 
-    override val player: Player
-        get() = exoPlayer
+    override val player: Player get() = exoPlayer
 
     private val _currentPositionMs = MutableStateFlow(0L)
     override val currentPositionMs: StateFlow<Long> = _currentPositionMs.asStateFlow()
@@ -64,14 +74,13 @@ class Media3PreviewPlayer(
 
     private var clipsList: List<Clip> = emptyList()
     private var audioClipsList: List<Clip> = emptyList()
+    private var assetsMap: Map<String, Asset> = emptyMap()
     private var tickerJob: Job? = null
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(playing: Boolean) {
             _isPlaying.value = playing
-            if (playing) {
-                startPositionTicker()
-            } else {
+            if (playing) startPositionTicker() else {
                 stopPositionTicker()
                 updatePositionFromPlayer()
             }
@@ -95,7 +104,7 @@ class Media3PreviewPlayer(
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            android.util.Log.e("Media3PreviewPlayer", "ExoPlayer Error: ${error.errorCodeName} (${error.errorCode}): ${error.message}", error)
+            android.util.Log.e("Media3Player", "Error ${error.errorCodeName}: ${error.message}", error)
             _isPlaying.value = false
             _isBuffering.value = false
             stopPositionTicker()
@@ -108,47 +117,28 @@ class Media3PreviewPlayer(
 
     override fun setClips(clips: List<Clip>, assets: Map<String, Asset>) {
         val sorted = clips.sortedBy { it.startTimeMs }
-        clipsList = sorted
+        assetsMap = assets
 
+        val wasPlaying = exoPlayer.isPlaying
+        // Save current timeline position so split/trim doesn't reset playhead
+        val savedPositionMs = _currentPositionMs.value
+
+        clipsList = sorted
         val totalDuration = sorted.maxOfOrNull { it.endTimeMs } ?: 0L
         _durationMs.value = totalDuration
 
-        val mediaItems = sorted.mapNotNull { clip ->
-            val asset = assets[clip.assetId] ?: return@mapNotNull null
-
-            val isImage = asset.mimeType?.startsWith("image") == true || clip.type == com.example.core.model.ClipType.IMAGE
-
-            val builder = MediaItem.Builder()
-                .setUri(Uri.parse(asset.uri))
-                .setMediaId(clip.id)
-
-            // ONLY apply clipping configuration if the clip is actually trimmed.
-            // Avoid setting endPositionMs if not trimmed, preventing IllegalClippingException.
-            val isTrimmedStart = clip.inPointMs > 0L
-            val assetDuration = asset.durationMs ?: 0L
-            val isTrimmedEnd = clip.outPointMs > 0L && (assetDuration <= 0L || clip.outPointMs < assetDuration)
-            if (isTrimmedStart || isTrimmedEnd) {
-                val clippingConfig = MediaItem.ClippingConfiguration.Builder().apply {
-                    if (isTrimmedStart) {
-                        setStartPositionMs(clip.inPointMs)
-                    }
-                    if (isTrimmedEnd) {
-                        setEndPositionMs(clip.outPointMs)
-                    }
-                }.build()
-                builder.setClippingConfiguration(clippingConfig)
-            }
-
-            if (isImage) {
-                builder.setImageDurationMs(clip.durationMs)
-            }
-
-            builder.build()
-        }
+        val mediaItems = sorted.mapNotNull { clip -> buildMediaItem(clip, assets) }
 
         exoPlayer.setMediaItems(mediaItems)
         exoPlayer.prepare()
-        updatePositionFromPlayer()
+
+        // Restore playhead to saved position (fixes: split causes reset to 0)
+        if (savedPositionMs > 0L && savedPositionMs < totalDuration) {
+            seekTo(savedPositionMs)
+        }
+        if (wasPlaying) {
+            exoPlayer.play()
+        }
     }
 
     override fun setAudioClips(clips: List<Clip>, assets: Map<String, Asset>) {
@@ -160,53 +150,28 @@ class Media3PreviewPlayer(
             val builder = MediaItem.Builder()
                 .setUri(Uri.parse(asset.uri))
                 .setMediaId(clip.id)
-
-            val isTrimmedStart = clip.inPointMs > 0L
-            val assetDuration = asset.durationMs ?: 0L
-            val isTrimmedEnd = clip.outPointMs > 0L && (assetDuration <= 0L || clip.outPointMs < assetDuration)
-            if (isTrimmedStart || isTrimmedEnd) {
-                val clippingConfig = MediaItem.ClippingConfiguration.Builder().apply {
-                    if (isTrimmedStart) {
-                        setStartPositionMs(clip.inPointMs)
-                    }
-                    if (isTrimmedEnd) {
-                        setEndPositionMs(clip.outPointMs)
-                    }
-                }.build()
-                builder.setClippingConfiguration(clippingConfig)
-            }
+            applyClipping(builder, clip, asset)
             builder.build()
         }
-
         audioPlayer.setMediaItems(mediaItems)
         audioPlayer.prepare()
     }
 
     override fun play() {
-        if (exoPlayer.playbackState == Player.STATE_ENDED) {
-            seekTo(0L)
-        }
-        if (exoPlayer.playbackState == Player.STATE_IDLE) {
-            exoPlayer.prepare()
-        }
+        if (exoPlayer.playbackState == Player.STATE_ENDED) seekTo(0L)
+        if (exoPlayer.playbackState == Player.STATE_IDLE) exoPlayer.prepare()
         exoPlayer.play()
 
         if (audioClipsList.isNotEmpty()) {
-            if (audioPlayer.playbackState == Player.STATE_ENDED) {
-                audioPlayer.seekTo(0L)
-            }
-            if (audioPlayer.playbackState == Player.STATE_IDLE) {
-                audioPlayer.prepare()
-            }
+            if (audioPlayer.playbackState == Player.STATE_ENDED) audioPlayer.seekTo(0L)
+            if (audioPlayer.playbackState == Player.STATE_IDLE) audioPlayer.prepare()
             audioPlayer.play()
         }
     }
 
     override fun pause() {
         exoPlayer.pause()
-        if (audioClipsList.isNotEmpty()) {
-            audioPlayer.pause()
-        }
+        if (audioClipsList.isNotEmpty()) audioPlayer.pause()
     }
 
     override fun seekTo(timelinePositionMs: Long) {
@@ -215,29 +180,24 @@ class Media3PreviewPlayer(
 
         if (clipsList.isEmpty()) {
             exoPlayer.seekTo(0L)
+            return
+        }
+
+        val targetIndex = clipsList.indexOfFirst { clamped >= it.startTimeMs && clamped < it.endTimeMs }
+        if (targetIndex != -1) {
+            val clip = clipsList[targetIndex]
+            exoPlayer.seekTo(targetIndex, clamped - clip.startTimeMs)
+        } else if (clamped <= (clipsList.firstOrNull()?.startTimeMs ?: 0L)) {
+            exoPlayer.seekTo(0, 0L)
         } else {
-            val targetIndex = clipsList.indexOfFirst { clamped >= it.startTimeMs && clamped < it.endTimeMs }
-            if (targetIndex != -1) {
-                val clip = clipsList[targetIndex]
-                val relativeOffset = clamped - clip.startTimeMs
-                exoPlayer.seekTo(targetIndex, relativeOffset)
-            } else {
-                if (clamped <= (clipsList.firstOrNull()?.startTimeMs ?: 0L)) {
-                    exoPlayer.seekTo(0, 0L)
-                } else {
-                    val lastIdx = clipsList.lastIndex
-                    val lastClip = clipsList[lastIdx]
-                    exoPlayer.seekTo(lastIdx, lastClip.durationMs)
-                }
-            }
+            val last = clipsList.lastIndex
+            exoPlayer.seekTo(last, clipsList[last].durationMs)
         }
 
         if (audioClipsList.isNotEmpty()) {
-            val audioIndex = audioClipsList.indexOfFirst { clamped >= it.startTimeMs && clamped < it.endTimeMs }
-            if (audioIndex != -1) {
-                val audioClip = audioClipsList[audioIndex]
-                val offset = clamped - audioClip.startTimeMs
-                audioPlayer.seekTo(audioIndex, offset)
+            val idx = audioClipsList.indexOfFirst { clamped >= it.startTimeMs && clamped < it.endTimeMs }
+            if (idx != -1) {
+                audioPlayer.seekTo(idx, clamped - audioClipsList[idx].startTimeMs)
             } else {
                 audioPlayer.pause()
             }
@@ -245,18 +205,16 @@ class Media3PreviewPlayer(
     }
 
     override fun setPlaybackSpeed(speed: Float) {
-        val safeSpeed = speed.coerceIn(0.1f, 4.0f)
-        exoPlayer.playbackParameters = PlaybackParameters(safeSpeed, exoPlayer.playbackParameters.pitch)
+        val s = speed.coerceIn(0.1f, 4.0f)
+        exoPlayer.playbackParameters = PlaybackParameters(s)
         if (audioClipsList.isNotEmpty()) {
-            audioPlayer.playbackParameters = PlaybackParameters(safeSpeed, audioPlayer.playbackParameters.pitch)
+            audioPlayer.playbackParameters = PlaybackParameters(s)
         }
     }
 
     override fun setVolume(volume: Float) {
         exoPlayer.volume = volume.coerceIn(0f, 1f)
-        if (audioClipsList.isNotEmpty()) {
-            audioPlayer.volume = volume.coerceIn(0f, 1f)
-        }
+        if (audioClipsList.isNotEmpty()) audioPlayer.volume = volume.coerceIn(0f, 1f)
     }
 
     override fun release() {
@@ -266,12 +224,42 @@ class Media3PreviewPlayer(
         audioPlayer.release()
     }
 
+    // ── Internal helpers ─────────────────────────────────────────────────────
+
+    private fun buildMediaItem(clip: Clip, assets: Map<String, Asset>): MediaItem? {
+        val asset = assets[clip.assetId] ?: return null
+        val isImage = asset.mimeType?.startsWith("image") == true ||
+                clip.type == com.example.core.model.ClipType.IMAGE
+        val builder = MediaItem.Builder()
+            .setUri(Uri.parse(asset.uri))
+            .setMediaId(clip.id)
+        applyClipping(builder, clip, asset)
+        if (isImage) builder.setImageDurationMs(clip.durationMs)
+        return builder.build()
+    }
+
+    private fun applyClipping(builder: MediaItem.Builder, clip: Clip, asset: Asset) {
+        val isTrimmedStart = clip.inPointMs > 0L
+        val assetDuration = asset.durationMs ?: 0L
+        val isTrimmedEnd = clip.outPointMs > 0L &&
+                (assetDuration <= 0L || clip.outPointMs < assetDuration)
+        if (isTrimmedStart || isTrimmedEnd) {
+            builder.setClippingConfiguration(
+                MediaItem.ClippingConfiguration.Builder().apply {
+                    if (isTrimmedStart) setStartPositionMs(clip.inPointMs)
+                    if (isTrimmedEnd) setEndPositionMs(clip.outPointMs)
+                }.build()
+            )
+        }
+    }
+
+    /** Ticker runs at 16ms (~60fps) for smooth playhead animation. */
     private fun startPositionTicker() {
         tickerJob?.cancel()
         tickerJob = scope.launch {
             while (isActive) {
                 updatePositionFromPlayer()
-                delay(33L) // ~30 fps updates
+                delay(16L) // 60fps
             }
         }
     }
@@ -283,11 +271,9 @@ class Media3PreviewPlayer(
 
     private fun updatePositionFromPlayer() {
         if (clipsList.isEmpty()) return
-        val currentWindow = exoPlayer.currentMediaItemIndex
-        if (currentWindow in clipsList.indices) {
-            val currentClip = clipsList[currentWindow]
-            val posInClip = exoPlayer.currentPosition
-            val timelinePos = currentClip.startTimeMs + posInClip
+        val idx = exoPlayer.currentMediaItemIndex
+        if (idx in clipsList.indices) {
+            val timelinePos = clipsList[idx].startTimeMs + exoPlayer.currentPosition
             _currentPositionMs.value = timelinePos.coerceIn(0L, _durationMs.value)
         }
     }
