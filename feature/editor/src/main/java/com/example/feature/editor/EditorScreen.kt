@@ -696,22 +696,14 @@ fun EditorScreen(
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(if (uiState.selectedClipId != null) Color(0xFF1E2230) else Color.Transparent)
                                 .clickable {
-                                    // Tap = add keyframe at playhead for selected clip (no sheet)
-                                    val activeClipId = uiState.selectedClipId
-                                        ?: uiState.project?.tracks?.flatMap { it.clips }?.find {
-                                            uiState.playheadPositionMs in it.startTimeMs..it.endTimeMs
-                                        }?.id
-                                    if (activeClipId != null) {
-                                        if (uiState.selectedClipId == null) {
-                                            onEvent(EditorEvent.SelectClip(activeClipId))
-                                            onTimelineAction(TimelineAction.SelectClip(activeClipId))
-                                        }
-                                        // Add keyframe at current playhead — no sheet, no popup
-                                        onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs))
-                                    }
+                                    onEvent(EditorEvent.ToggleKeyframeAtPlayhead)
                                 },
                             contentAlignment = Alignment.Center
                         ) {
+                            val activeClip = uiState.selectedClip
+                            val hasKeyframeAtPlayhead = activeClip != null && activeClip.keyframes.any {
+                                kotlin.math.abs(it.timeMs - uiState.playheadPositionMs) <= 50L
+                            }
                             Canvas(modifier = Modifier.size(14.dp)) {
                                 val path = Path().apply {
                                     moveTo(size.width / 2f, 0f)
@@ -720,9 +712,16 @@ fun EditorScreen(
                                     lineTo(0f, size.height / 2f)
                                     close()
                                 }
+                                val diamondColor = if (hasKeyframeAtPlayhead) {
+                                    Color(0xFFFFD600)
+                                } else if (uiState.selectedClipId != null) {
+                                    Color(0xFF00D2FF)
+                                } else {
+                                    Color.White.copy(alpha = 0.7f)
+                                }
                                 drawPath(
                                     path = path,
-                                    color = if (uiState.selectedClipId != null) Color(0xFF00D2FF) else Color.White.copy(alpha = 0.7f)
+                                    color = diamondColor
                                 )
                             }
                         }
@@ -863,10 +862,7 @@ fun EditorScreen(
                                 }
                                 Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
-                                    // Silently add/remove keyframe at playhead — no sheet
-                                    uiState.selectedClipId?.let { clipId ->
-                                        onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs))
-                                    }
+                                    onEvent(EditorEvent.SetKeyframeSheetVisible(true))
                                 }
                                 Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.BEATS, Icons.Default.GraphicEq) {
@@ -1046,7 +1042,25 @@ fun EditorScreen(
                 onBeats = { onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs)) }
             )
         }
-        if (uiState.isKeyframeSheetVisible) { KeyframeBottomSheet(onDismiss = { onEvent(EditorEvent.SetKeyframeSheetVisible(false)) }) }
+        if (uiState.isKeyframeSheetVisible) {
+            KeyframeBottomSheet(
+                clip = uiState.selectedClip,
+                playheadPositionMs = uiState.playheadPositionMs,
+                activeProperty = uiState.activeKeyframeProperty,
+                onSelectProperty = { onEvent(EditorEvent.SetActiveKeyframeProperty(it)) },
+                onAddKeyframe = { clipId, prop, timeMs, value, interp ->
+                    onEvent(EditorEvent.AddKeyframe(clipId, prop, timeMs, value, interp))
+                },
+                onUpdateKeyframe = { clipId, kfId, value, interp ->
+                    onEvent(EditorEvent.UpdateKeyframe(clipId, kfId, value, interp))
+                },
+                onDeleteKeyframe = { clipId, kfId ->
+                    onEvent(EditorEvent.DeleteKeyframe(clipId, kfId))
+                },
+                onSeek = { onEvent(EditorEvent.SeekTo(it)) },
+                onDismiss = { onEvent(EditorEvent.SetKeyframeSheetVisible(false)) }
+            )
+        }
         if (uiState.isBeatsSheetVisible) { BeatsBottomSheet(onDismiss = { onEvent(EditorEvent.SetBeatsSheetVisible(false)) }) }
         if (uiState.isSpeedSheetVisible) {
             SpeedBottomSheet(

@@ -49,5 +49,26 @@ sealed interface EditorEvent {
     data object UngroupSelectedClips : EditorEvent
     /** Drags a keyframe diamond to a new position on the timeline. */
     data class MoveKeyframe(val clipId: String, val keyframeId: String, val newTimeMs: Long) : EditorEvent
+    /** Adds a keyframe to a clip. */
+    data class AddKeyframe(
+        val clipId: String,
+        val property: String,
+        val timeMs: Long,
+        val value: Float,
+        val interpolation: com.example.core.model.InterpolationType = com.example.core.model.InterpolationType.LINEAR
+    ) : EditorEvent
+    /** Updates an existing keyframe. */
+    data class UpdateKeyframe(
+        val clipId: String,
+        val keyframeId: String,
+        val value: Float,
+        val interpolation: com.example.core.model.InterpolationType = com.example.core.model.InterpolationType.LINEAR
+    ) : EditorEvent
+    /** Deletes a keyframe. */
+    data class DeleteKeyframe(val clipId: String, val keyframeId: String) : EditorEvent
+    /** Changes the currently active animation property for keyframing. */
+    data class SetActiveKeyframeProperty(val property: String) : EditorEvent
+    /** Toggles (adds or removes) a keyframe at the current playhead position on the selected clip. */
+    data object ToggleKeyframeAtPlayhead : EditorEvent
 }
 

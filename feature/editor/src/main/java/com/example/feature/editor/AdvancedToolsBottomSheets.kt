@@ -15,9 +15,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import com.example.core.model.Clip
+import com.example.core.model.InterpolationType
+import com.example.core.model.Keyframe
+import com.example.core.model.KeyframeProperty
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import java.util.Locale
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KeyframeBottomSheet(
+    clip: Clip? = null,
+    playheadPositionMs: Long = 0L,
+    activeProperty: String = KeyframeProperty.POSITION_X,
+    onSelectProperty: (String) -> Unit = {},
+    onAddKeyframe: (clipId: String, property: String, timeMs: Long, value: Float, interpolation: InterpolationType) -> Unit = { _, _, _, _, _ -> },
+    onUpdateKeyframe: (clipId: String, keyframeId: String, value: Float, interpolation: InterpolationType) -> Unit = { _, _, _, _ -> },
+    onDeleteKeyframe: (clipId: String, keyframeId: String) -> Unit = { _, _ -> },
+    onSeek: (Long) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
@@ -29,110 +47,331 @@ fun KeyframeBottomSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    Spacer(Modifier.width(12.dp))
-                    Text("Keyframe", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Canvas(modifier = Modifier.size(16.dp)) {
+                        val path = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(size.width / 2f, 0f)
+                            lineTo(size.width, size.height / 2f)
+                            lineTo(size.width / 2f, size.height)
+                            lineTo(0f, size.height / 2f)
+                            close()
+                        }
+                        drawPath(path, color = Color(0xFFFFD600))
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text("Keyframe Editor", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White.copy(alpha = 0.7f))
+                }
+            }
+
+            if (clip == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No clip selected.\nSelect a clip on the timeline to edit keyframes.",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 14.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Property Selector Chips
+                Text("Animation Property", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(6.dp))
+
+                val properties = listOf(
+                    KeyframeProperty.POSITION_X to "Pos X",
+                    KeyframeProperty.POSITION_Y to "Pos Y",
+                    KeyframeProperty.SCALE_X to "Scale X",
+                    KeyframeProperty.SCALE_Y to "Scale Y",
+                    KeyframeProperty.ROTATION to "Rotation",
+                    KeyframeProperty.OPACITY to "Opacity",
+                    KeyframeProperty.VOLUME to "Volume"
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(properties) { (propKey, label) ->
+                        val isSelected = propKey == activeProperty
+                        val kfCountForProp = clip.keyframes.count { it.property == propKey }
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onSelectProperty(propKey) },
+                            label = {
+                                Text(
+                                    if (kfCountForProp > 0) "$label ($kfCountForProp)" else label,
+                                    fontSize = 12.sp
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF00D2FF),
+                                selectedLabelColor = Color(0xFF0A0D14),
+                                containerColor = Color(0xFF1E2230),
+                                labelColor = Color.White
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Active Property Controls at current Playhead
+                val existingKf = clip.keyframes.find {
+                    it.property == activeProperty && kotlin.math.abs(it.timeMs - playheadPositionMs) <= 50L
+                }
+
+                val clipDefaultValue = when (activeProperty) {
+                    KeyframeProperty.POSITION_X -> clip.transform.x
+                    KeyframeProperty.POSITION_Y -> clip.transform.y
+                    KeyframeProperty.SCALE_X -> clip.transform.scaleX
+                    KeyframeProperty.SCALE_Y -> clip.transform.scaleY
+                    KeyframeProperty.ROTATION -> clip.transform.rotation
+                    KeyframeProperty.OPACITY -> clip.transform.opacity
+                    KeyframeProperty.VOLUME -> clip.volume ?: 1.0f
+                    else -> 0f
+                }
+
+                val valueRange: ClosedFloatingPointRange<Float> = when (activeProperty) {
+                    KeyframeProperty.POSITION_X, KeyframeProperty.POSITION_Y -> -1000f..1000f
+                    KeyframeProperty.SCALE_X, KeyframeProperty.SCALE_Y -> 0.1f..5f
+                    KeyframeProperty.ROTATION -> -180f..180f
+                    KeyframeProperty.OPACITY -> 0f..1f
+                    KeyframeProperty.VOLUME -> 0f..2f
+                    else -> -100f..100f
+                }
+
+                val currentValue = existingKf?.value ?: clipDefaultValue
+                var sliderValue by remember(activeProperty, existingKf?.id, existingKf?.value) {
+                    mutableFloatStateOf(currentValue)
+                }
+
+                // Value Display & Slider
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161925)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Value: ${String.format(Locale.US, "%.2f", sliderValue)}",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            val relTimeSec = (playheadPositionMs - clip.startTimeMs).coerceAtLeast(0L) / 1000f
+                            Text(
+                                text = "At: ${String.format(Locale.US, "%.2f", relTimeSec)}s",
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 12.sp
+                            )
+                        }
+
+                        Slider(
+                            value = sliderValue.coerceIn(valueRange),
+                            onValueChange = { newValue ->
+                                sliderValue = newValue
+                                if (existingKf != null) {
+                                    onUpdateKeyframe(clip.id, existingKf.id, newValue, existingKf.interpolation)
+                                }
+                            },
+                            valueRange = valueRange,
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color(0xFFFFD600),
+                                activeTrackColor = Color(0xFF00D2FF),
+                                inactiveTrackColor = Color(0xFF2C3248)
+                            )
+                        )
+
+                        // Keyframe action buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (existingKf != null) {
+                                Text(
+                                    "◆ Keyframe Active",
+                                    color = Color(0xFFFFD600),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                OutlinedButton(
+                                    onClick = { onDeleteKeyframe(clip.id, existingKf.id) },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Delete Keyframe", fontSize = 12.sp)
+                                }
+                            } else {
+                                Text(
+                                    "No keyframe here",
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontSize = 12.sp
+                                )
+                                Button(
+                                    onClick = {
+                                        val clampedTime = playheadPositionMs.coerceIn(clip.startTimeMs, clip.endTimeMs)
+                                        onAddKeyframe(clip.id, activeProperty, clampedTime, sliderValue, InterpolationType.LINEAR)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00D2FF), contentColor = Color(0xFF0A0D14))
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Add Keyframe", fontSize = 12.sp)
+                                }
+                            }
+                        }
+
+                        // Interpolation picker (when keyframe exists)
+                        if (existingKf != null) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("Interpolation", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                            Spacer(Modifier.height(4.dp))
+                            val interpolations = listOf(
+                                InterpolationType.LINEAR to "Linear",
+                                InterpolationType.EASE_IN to "Ease In",
+                                InterpolationType.EASE_OUT to "Ease Out",
+                                InterpolationType.EASE_IN_OUT to "Ease In-Out"
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                interpolations.forEach { (interpType, interpLabel) ->
+                                    val isCurrent = existingKf.interpolation == interpType
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(if (isCurrent) Color(0xFF00D2FF) else Color(0xFF1E2230))
+                                            .clickable {
+                                                onUpdateKeyframe(clip.id, existingKf.id, existingKf.value, interpType)
+                                            }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            interpLabel,
+                                            color = if (isCurrent) Color(0xFF0A0D14) else Color.White,
+                                            fontSize = 10.sp,
+                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Keyframe List for this clip
+                val propKeyframes = clip.keyframes.sortedBy { it.timeMs }
+                Text(
+                    "All Clip Keyframes (${propKeyframes.size})",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                if (propKeyframes.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No keyframes created yet. Move playhead and tap Add Keyframe.",
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontSize = 12.sp
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 160.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(propKeyframes, key = { it.id }) { kf ->
+                            val isAtPlayhead = kotlin.math.abs(kf.timeMs - playheadPositionMs) <= 50L
+                            val relTimeSec = (kf.timeMs - clip.startTimeMs) / 1000f
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isAtPlayhead) Color(0xFF2C3248) else Color(0xFF161925))
+                                    .clickable { onSeek(kf.timeMs) }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Canvas(modifier = Modifier.size(10.dp)) {
+                                        val path = androidx.compose.ui.graphics.Path().apply {
+                                            moveTo(size.width / 2f, 0f)
+                                            lineTo(size.width, size.height / 2f)
+                                            lineTo(size.width / 2f, size.height)
+                                            lineTo(0f, size.height / 2f)
+                                            close()
+                                        }
+                                        drawPath(path, color = Color(0xFFFFD600))
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "${kf.property} @ ${String.format(Locale.US, "%.2f", relTimeSec)}s",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        "= ${String.format(Locale.US, "%.2f", kf.value)}",
+                                        color = Color(0xFF00D2FF),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { onDeleteKeyframe(clip.id, kf.id) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Delete",
+                                        tint = Color.White.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Fake Preview Box
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF161925)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Image, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Fake Timeline
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("00:00", color = Color.Gray, fontSize = 10.sp)
-                Text("00:10", color = Color.Gray, fontSize = 10.sp)
-                Text("00:20", color = Color.Gray, fontSize = 10.sp)
-                Text("00:30", color = Color.Gray, fontSize = 10.sp)
-            }
-            Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(Color(0xFF00D2FF)))
-            
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Properties
-            KeyframePropertyRow(title = "Position", value = "0.0, 0.0", icon = Icons.Default.OpenWith)
-            KeyframePropertyRow(title = "Scale", value = "100%", icon = Icons.Default.ZoomIn)
-            KeyframePropertyRow(title = "Rotation", value = "0°", icon = Icons.Default.RotateRight)
-            KeyframePropertyRow(title = "Opacity", value = "100%", icon = Icons.Default.Visibility)
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Bottom Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Reset")
-                }
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF0A0D14))
-                ) {
-                    Text("Apply")
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
         }
-    }
-}
-
-@Composable
-fun KeyframePropertyRow(title: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    var sliderValue by remember { mutableFloatStateOf(100f) }
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(title, color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp)
-            }
-            Text(value, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-        }
-        Slider(
-            value = sliderValue,
-            onValueChange = { sliderValue = it },
-            valueRange = 0f..100f,
-            colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = Color(0xFF00D2FF),
-                inactiveTrackColor = Color(0xFF2C3248)
-            )
-        )
     }
 }
 

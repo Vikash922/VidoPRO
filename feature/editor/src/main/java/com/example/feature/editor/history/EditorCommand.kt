@@ -125,7 +125,7 @@ class DeleteClipCommand(
  */
 class StateSnapshotCommand(
     override val description: String,
-    private val action: TimelineAction,
+    val action: TimelineAction,
     private val preActionState: TimelineEngineState
 ) : EditorCommand {
     override fun execute(state: TimelineEngineState): TimelineEngineState {

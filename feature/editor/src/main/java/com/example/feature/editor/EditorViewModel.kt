@@ -10,6 +10,7 @@ import com.example.core.media.PreviewPlayerController
 import com.example.core.model.Asset
 import com.example.core.model.Clip
 import com.example.core.model.ClipType
+import com.example.core.model.KeyframeProperty
 import com.example.core.model.Project
 import com.example.core.model.Track
 import com.example.core.model.TrackType
@@ -379,6 +380,21 @@ class EditorViewModel(
             is EditorEvent.MoveKeyframe -> {
                 onTimelineAction(TimelineAction.MoveKeyframe(event.clipId, event.keyframeId, event.newTimeMs))
             }
+            is EditorEvent.AddKeyframe -> {
+                onTimelineAction(TimelineAction.AddKeyframe(event.clipId, event.property, event.timeMs, event.value, event.interpolation))
+            }
+            is EditorEvent.UpdateKeyframe -> {
+                onTimelineAction(TimelineAction.UpdateKeyframe(event.clipId, event.keyframeId, event.value, event.interpolation))
+            }
+            is EditorEvent.DeleteKeyframe -> {
+                onTimelineAction(TimelineAction.DeleteKeyframe(event.clipId, event.keyframeId))
+            }
+            is EditorEvent.SetActiveKeyframeProperty -> {
+                _uiState.update { it.copy(activeKeyframeProperty = event.property) }
+            }
+            is EditorEvent.ToggleKeyframeAtPlayhead -> {
+                handleToggleKeyframeAtPlayhead()
+            }
             else -> {}
         }
     }
@@ -418,6 +434,55 @@ class EditorViewModel(
             ?.filter { it.groupId == groupId }
             ?.map { it.id }
             ?: emptyList()
+
+    private fun handleToggleKeyframeAtPlayhead() {
+        val state = _uiState.value
+        val clip = state.selectedClip ?: run {
+            val playhead = state.playheadPositionMs
+            val found = state.project?.tracks?.flatMap { it.clips }?.find {
+                playhead in it.startTimeMs..it.endTimeMs
+            }
+            if (found != null) {
+                onTimelineAction(TimelineAction.SelectClip(found.id))
+            }
+            found
+        } ?: return
+
+        val playhead = state.playheadPositionMs
+        val property = state.activeKeyframeProperty
+
+        // Check if there is an existing keyframe within 50ms tolerance at the playhead
+        // Prioritize keyframe matching activeProperty, otherwise any keyframe at playhead
+        val existingKf = clip.keyframes.find {
+            it.property == property && kotlin.math.abs(it.timeMs - playhead) <= 50L
+        } ?: clip.keyframes.find {
+            kotlin.math.abs(it.timeMs - playhead) <= 50L
+        }
+
+        if (existingKf != null) {
+            onTimelineAction(TimelineAction.DeleteKeyframe(clip.id, existingKf.id))
+        } else {
+            val currentValue = when (property) {
+                KeyframeProperty.POSITION_X -> clip.transform.x
+                KeyframeProperty.POSITION_Y -> clip.transform.y
+                KeyframeProperty.SCALE_X -> clip.transform.scaleX
+                KeyframeProperty.SCALE_Y -> clip.transform.scaleY
+                KeyframeProperty.ROTATION -> clip.transform.rotation
+                KeyframeProperty.OPACITY -> clip.transform.opacity
+                KeyframeProperty.VOLUME -> clip.volume ?: 1.0f
+                else -> 0f
+            }
+            val clampedTime = playhead.coerceIn(clip.startTimeMs, clip.endTimeMs)
+            onTimelineAction(
+                TimelineAction.AddKeyframe(
+                    clipId = clip.id,
+                    property = property,
+                    timeMs = clampedTime,
+                    value = currentValue
+                )
+            )
+        }
+    }
 
     /**
      * Schedules a debounced autosave of the project (DEV-060, DEV-061).
@@ -523,6 +588,15 @@ class EditorViewModel(
             }
             is TimelineAction.UngroupClips -> {
                 StateSnapshotCommand("Ungroup clips", action, preActionState)
+            }
+            is TimelineAction.AddKeyframe -> {
+                StateSnapshotCommand("Add keyframe", action, preActionState)
+            }
+            is TimelineAction.UpdateKeyframe -> {
+                StateSnapshotCommand("Update keyframe", action, preActionState)
+            }
+            is TimelineAction.DeleteKeyframe -> {
+                StateSnapshotCommand("Delete keyframe", action, preActionState)
             }
             is TimelineAction.MoveKeyframe -> {
                 StateSnapshotCommand("Move keyframe", action, preActionState)

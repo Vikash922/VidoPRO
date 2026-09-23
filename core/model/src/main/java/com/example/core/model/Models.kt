@@ -100,6 +100,18 @@ data class Keyframe(
     val bezierY2: Float? = null
 )
 
+object KeyframeProperty {
+    const val POSITION_X = "positionX"
+    const val POSITION_Y = "positionY"
+    const val SCALE_X = "scaleX"
+    const val SCALE_Y = "scaleY"
+    const val ROTATION = "rotation"
+    const val OPACITY = "opacity"
+    const val VOLUME = "volume"
+
+    val ALL = listOf(POSITION_X, POSITION_Y, SCALE_X, SCALE_Y, ROTATION, OPACITY, VOLUME)
+}
+
 data class TextClipData(
     val clipId: String,
     val text: String,

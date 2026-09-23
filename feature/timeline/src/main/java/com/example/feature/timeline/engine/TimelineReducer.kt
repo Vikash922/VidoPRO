@@ -1,6 +1,8 @@
 package com.example.feature.timeline.engine
 
 import com.example.core.model.Clip
+import com.example.core.model.InterpolationType
+import com.example.core.model.Keyframe
 import com.example.core.model.Track
 import com.example.core.model.TrackType
 import java.util.UUID
@@ -58,6 +60,9 @@ object TimelineReducer {
                 }
                 state.copy(beatMarkers = updated)
             }
+            is TimelineAction.AddKeyframe -> handleAddKeyframe(state, action.clipId, action.property, action.timeMs, action.value, action.interpolation)
+            is TimelineAction.UpdateKeyframe -> handleUpdateKeyframe(state, action.clipId, action.keyframeId, action.value, action.interpolation)
+            is TimelineAction.DeleteKeyframe -> handleDeleteKeyframe(state, action.clipId, action.keyframeId)
             is TimelineAction.MoveKeyframe -> handleMoveKeyframe(state, action.clipId, action.keyframeId, action.newTimeMs)
         }
     }
@@ -124,9 +129,14 @@ object TimelineReducer {
             when (track.id) {
                 targetTrackId -> {
                     val remainingClips = track.clips.filterNot { it.id == clipId }
+                    val deltaMs = safeStartTime - sourceClip.startTimeMs
+                    val shiftedKeyframes = if (deltaMs != 0L) {
+                        sourceClip.keyframes.map { it.copy(timeMs = it.timeMs + deltaMs) }
+                    } else sourceClip.keyframes
                     val movedClip = sourceClip.copy(
                         trackId = targetTrackId,
-                        startTimeMs = safeStartTime
+                        startTimeMs = safeStartTime,
+                        keyframes = shiftedKeyframes
                     )
                     val combined = remainingClips + movedClip
                     val resolved = if (track.type == TrackType.VIDEO) {
@@ -176,7 +186,8 @@ object TimelineReducer {
                         c.copy(
                             startTimeMs = clampedStartTime,
                             durationMs = newDuration,
-                            inPointMs = newInPoint
+                            inPointMs = newInPoint,
+                            keyframes = c.keyframes.filter { it.timeMs in clampedStartTime..originalEnd }
                         )
                     } else c
                 }
@@ -213,7 +224,8 @@ object TimelineReducer {
                     if (c.id == clipId) {
                         c.copy(
                             durationMs = newDuration,
-                            outPointMs = newOutPoint
+                            outPointMs = newOutPoint,
+                            keyframes = c.keyframes.filter { it.timeMs in c.startTimeMs..clampedEndTime }
                         )
                     } else c
                 }
@@ -265,15 +277,20 @@ object TimelineReducer {
 
         val firstClip = clip.copy(
             durationMs = firstDuration,
-            outPointMs = clip.inPointMs + firstDuration
+            outPointMs = clip.inPointMs + firstDuration,
+            keyframes = clip.keyframes.filter { it.timeMs <= clampedSplit }
         )
 
+        val secondClipId = UUID.randomUUID().toString()
         val secondClip = clip.copy(
-            id = UUID.randomUUID().toString(),
+            id = secondClipId,
             startTimeMs = clampedSplit,
             durationMs = secondDuration,
             inPointMs = clip.inPointMs + firstDuration,
-            outPointMs = clip.outPointMs
+            outPointMs = clip.outPointMs,
+            keyframes = clip.keyframes.filter { it.timeMs >= clampedSplit }.map {
+                it.copy(id = UUID.randomUUID().toString(), clipId = secondClipId)
+            }
         )
 
         val updatedTracks = state.tracks.map { track ->
@@ -454,7 +471,79 @@ object TimelineReducer {
         return state.copy(tracks = updatedTracks, multiSelectedClipIds = emptySet())
     }
 
-    /** Moves a keyframe diamond to a new timeMs on the timeline. */
+    /** Adds or updates a keyframe on a clip. Enforces clip boundary and uniqueness per (property, timeMs). */
+    private fun handleAddKeyframe(
+        state: TimelineEngineState,
+        clipId: String,
+        property: String,
+        timeMs: Long,
+        value: Float,
+        interpolation: InterpolationType
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val clampedTime = timeMs.coerceIn(clip.startTimeMs, clip.endTimeMs)
+        val existingIndex = clip.keyframes.indexOfFirst { it.property == property && it.timeMs == clampedTime }
+        val updatedKeyframes = if (existingIndex >= 0) {
+            clip.keyframes.mapIndexed { idx, kf ->
+                if (idx == existingIndex) kf.copy(value = value, interpolation = interpolation) else kf
+            }
+        } else {
+            val newKf = Keyframe(
+                id = UUID.randomUUID().toString(),
+                clipId = clipId,
+                property = property,
+                timeMs = clampedTime,
+                value = value,
+                interpolation = interpolation
+            )
+            clip.keyframes + newKf
+        }.sortedWith(compareBy({ it.timeMs }, { it.property }))
+
+        val updatedTracks = state.tracks.map { track ->
+            track.copy(clips = track.clips.map { c ->
+                if (c.id == clipId) c.copy(keyframes = updatedKeyframes) else c
+            })
+        }
+        return state.copy(tracks = updatedTracks)
+    }
+
+    /** Updates value and/or interpolation on an existing keyframe. */
+    private fun handleUpdateKeyframe(
+        state: TimelineEngineState,
+        clipId: String,
+        keyframeId: String,
+        value: Float,
+        interpolation: InterpolationType
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val updatedKeyframes = clip.keyframes.map { kf ->
+            if (kf.id == keyframeId) kf.copy(value = value, interpolation = interpolation) else kf
+        }
+        val updatedTracks = state.tracks.map { track ->
+            track.copy(clips = track.clips.map { c ->
+                if (c.id == clipId) c.copy(keyframes = updatedKeyframes) else c
+            })
+        }
+        return state.copy(tracks = updatedTracks)
+    }
+
+    /** Deletes a keyframe from a clip. */
+    private fun handleDeleteKeyframe(
+        state: TimelineEngineState,
+        clipId: String,
+        keyframeId: String
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val updatedKeyframes = clip.keyframes.filterNot { it.id == keyframeId }
+        val updatedTracks = state.tracks.map { track ->
+            track.copy(clips = track.clips.map { c ->
+                if (c.id == clipId) c.copy(keyframes = updatedKeyframes) else c
+            })
+        }
+        return state.copy(tracks = updatedTracks)
+    }
+
+    /** Moves a keyframe diamond to a new timeMs on the timeline, respecting clip boundaries. */
     private fun handleMoveKeyframe(
         state: TimelineEngineState,
         clipId: String,
@@ -463,9 +552,12 @@ object TimelineReducer {
     ): TimelineEngineState {
         val clip = state.findClip(clipId) ?: return state
         val clampedTime = newTimeMs.coerceIn(clip.startTimeMs, clip.endTimeMs)
+        val targetKf = clip.keyframes.find { it.id == keyframeId } ?: return state
         val updatedKeyframes = clip.keyframes.map { kf ->
             if (kf.id == keyframeId) kf.copy(timeMs = clampedTime) else kf
-        }
+        }.distinctBy { it.property to it.timeMs }
+         .sortedWith(compareBy({ it.timeMs }, { it.property }))
+
         val updatedTracks = state.tracks.map { track ->
             track.copy(clips = track.clips.map { c ->
                 if (c.id == clipId) c.copy(keyframes = updatedKeyframes) else c
