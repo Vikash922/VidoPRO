@@ -1,6 +1,7 @@
 {
-  "versionCode": 16,
-  "versionName": "2.0.7",
+  "versionCode": 17,
+  "versionName": "2.0.8",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "Release 2.0.7: High-performance C++ Native Engine (vidopro_native) with SIMD multi-threaded pixel processing, C++ real-time color grading & adjustment pipeline (Exposure, Contrast, HSL, 3D LUT, Curves, Sharpen, Blur, Vignette, Grain), C++ 13 blend modes overlay compositor, native audio FFT beat onset detection, and Newton-Raphson Bézier keyframe interpolation."
+  "releaseNotes": "v2.0.8: Alight Motion-style long-press multi-select, clip grouping (Group/Ungroup), group amber highlight, draggable keyframe diamonds on timeline, blue multi-select border with checkmark badge."
 }
+

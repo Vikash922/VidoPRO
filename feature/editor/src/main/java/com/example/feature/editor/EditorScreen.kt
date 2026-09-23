@@ -61,6 +61,8 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -747,6 +749,7 @@ fun EditorScreen(
                             uiState.project,
                             uiState.playheadPositionMs,
                             uiState.selectedClipId,
+                            uiState.multiSelectedClipIds,
                             uiState.durationMs,
                             uiState.beatMarkers
                         ) {
@@ -755,6 +758,7 @@ fun EditorScreen(
                                 playheadPositionMs = uiState.playheadPositionMs,
                                 durationMs = uiState.durationMs,
                                 selectedClipId = uiState.selectedClipId,
+                                multiSelectedClipIds = uiState.multiSelectedClipIds,
                                 beatMarkers = uiState.beatMarkers
                             )
                         }
@@ -764,6 +768,7 @@ fun EditorScreen(
                             isPlaying = uiState.isPlaying,
                             assets = uiState.assets,
                             timelineMode = timelineMode,
+                            multiSelectedClipIds = uiState.multiSelectedClipIds,
                             onBackToMain = {
                                 timelineMode = TimelineMode.MAIN
                                 onEvent(EditorEvent.SelectClip(null))
@@ -780,8 +785,11 @@ fun EditorScreen(
                             onAction = onTimelineAction,
                             onPlayPause = { onEvent(EditorEvent.PlayPauseClicked) },
                             onAddMedia = { onNavigateMediaPicker(TrackType.VIDEO) },
+                            onLongPressClip = { clipId -> onEvent(EditorEvent.LongPressClip(clipId)) },
+                            onMoveKeyframe = { clipId, kfId, newMs -> onEvent(EditorEvent.MoveKeyframe(clipId, kfId, newMs)) },
                             modifier = Modifier.fillMaxSize()
                         )
+
                     }
                 }
 
@@ -857,11 +865,25 @@ fun EditorScreen(
                                 }
                                 Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.BEATS, Icons.Default.GraphicEq) {
-                                    // Tapping BEATS toggles pink beat marker line at playhead!
                                     onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs))
                                 }
+                                // ── Multi-select group controls ──────────────
+                                if (uiState.isMultiSelectMode) {
+                                    Spacer(Modifier.width(18.dp))
+                                    EditorToolButton("Group", Icons.Default.Folder) {
+                                        onEvent(EditorEvent.GroupSelectedClips)
+                                    }
+                                }
+                                if (uiState.selectedGroupId != null) {
+                                    Spacer(Modifier.width(18.dp))
+                                    EditorToolButton("Ungroup", Icons.Default.FolderOff) {
+                                        onEvent(EditorEvent.UngroupSelectedClips)
+                                    }
+                                }
+
                             }
                         } else if (timelineMode == TimelineMode.OVERLAY) {
+
                             EditorToolButton("Back", Icons.AutoMirrored.Filled.ArrowBack) {
                                 timelineMode = TimelineMode.MAIN
                                 onEvent(EditorEvent.SelectClip(null))

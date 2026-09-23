@@ -77,11 +77,14 @@ fun TimelineContainer(
     isPlaying: Boolean,
     assets: Map<String, Asset> = emptyMap(),
     timelineMode: TimelineMode = TimelineMode.MAIN,
+    multiSelectedClipIds: Set<String> = emptySet(),
     onBackToMain: () -> Unit = {},
     onAddSubTrackMedia: () -> Unit = {},
     onAction: (TimelineAction) -> Unit,
     onPlayPause: () -> Unit,
     onAddMedia: () -> Unit,
+    onLongPressClip: (clipId: String) -> Unit = {},
+    onMoveKeyframe: (clipId: String, keyframeId: String, newTimeMs: Long) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -358,16 +361,20 @@ fun TimelineContainer(
                                 TrackLane(
                                     track = track,
                                     selectedClipId = state.selectedClipId,
+                                    multiSelectedClipIds = multiSelectedClipIds,
                                     pixelsPerMs = pixelsPerMs,
                                     assets = assets,
                                     onAction = onAction,
                                     onSeek = onSeekAction,
                                     onAddMedia = {
                                         if (timelineMode == TimelineMode.MAIN) onAddMedia() else onAddSubTrackMedia()
-                                    }
+                                    },
+                                    onLongPressClip = onLongPressClip,
+                                    onMoveKeyframe = onMoveKeyframe
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                             }
+
                         }
                     }
 
@@ -417,11 +424,14 @@ fun TimelineContainer(
 private fun TrackLane(
     track: Track,
     selectedClipId: String?,
+    multiSelectedClipIds: Set<String> = emptySet(),
     pixelsPerMs: Float,
     assets: Map<String, Asset>,
     onAction: (TimelineAction) -> Unit,
     onSeek: (Long) -> Unit,
     onAddMedia: () -> Unit,
+    onLongPressClip: (clipId: String) -> Unit = {},
+    onMoveKeyframe: (clipId: String, keyframeId: String, newTimeMs: Long) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val laneHeight = 56.dp
@@ -435,9 +445,13 @@ private fun TrackLane(
     ) {
         track.clips.forEach { clip ->
             val isSelected = clip.id == selectedClipId
+            val isMultiSelected = multiSelectedClipIds.contains(clip.id)
 
             val onSelectClip = remember(clip.id, onAction) {
                 { onAction(TimelineAction.SelectClip(clip.id)) }
+            }
+            val onLongPressClipCb = remember(clip.id, onLongPressClip) {
+                { onLongPressClip(clip.id) }
             }
             val onMoveClipDelta = remember(clip.id, clip.trackId, clip.startTimeMs, onAction) {
                 { deltaMs: Long ->
@@ -457,17 +471,23 @@ private fun TrackLane(
                     onAction(TimelineAction.TrimEnd(clip.id, newEndTime))
                 }
             }
+            val onMoveKf = remember(clip.id, onMoveKeyframe) {
+                { keyframeId: String, newTimeMs: Long -> onMoveKeyframe(clip.id, keyframeId, newTimeMs) }
+            }
 
             ClipCard(
                 clip = clip,
                 isSelected = isSelected,
+                isMultiSelected = isMultiSelected,
                 pixelsPerMs = pixelsPerMs,
                 assets = assets,
                 onSelect = onSelectClip,
+                onLongPress = onLongPressClipCb,
                 onSeek = onSeek,
                 onMoveDelta = onMoveClipDelta,
                 onTrimStartDelta = onTrimStartClipDelta,
                 onTrimEndDelta = onTrimEndClipDelta,
+                onMoveKeyframe = onMoveKf,
                 modifier = Modifier.offset {
                     val clipOffsetPx = (clip.startTimeMs * pixelsPerMs).roundToInt()
                     IntOffset(clipOffsetPx, 0)
@@ -476,3 +496,4 @@ private fun TrackLane(
         }
     }
 }
+

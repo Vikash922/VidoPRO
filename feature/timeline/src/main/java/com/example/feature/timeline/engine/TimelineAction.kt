@@ -13,6 +13,10 @@ sealed interface TimelineAction {
     data class Seek(val positionMs: Long) : TimelineAction
     data class SeekPlayhead(val positionMs: Long) : TimelineAction
     data class SelectClip(val clipId: String?) : TimelineAction
+    data class SelectMultipleClips(val clipIds: Set<String>) : TimelineAction
+    data class ToggleClipSelection(val clipId: String) : TimelineAction
+    data class GroupSelectedClips(val groupId: String) : TimelineAction
+    data class UngroupClips(val groupId: String) : TimelineAction
     data class AddClip(val trackId: String, val clip: Clip, val atTimeMs: Long? = null) : TimelineAction
     data class MoveClip(val clipId: String, val targetTrackId: String, val newStartTimeMs: Long) : TimelineAction
     data class TrimStart(val clipId: String, val newStartTimeMs: Long) : TimelineAction
@@ -31,4 +35,7 @@ sealed interface TimelineAction {
     data class SetSnapping(val enabled: Boolean) : TimelineAction
     data class SetScrollOffset(val offsetPx: Float) : TimelineAction
     data class ToggleBeatMarker(val positionMs: Long) : TimelineAction
+    /** Moves a keyframe diamond to a new time position (drag-on-timeline). */
+    data class MoveKeyframe(val clipId: String, val keyframeId: String, val newTimeMs: Long) : TimelineAction
 }
+

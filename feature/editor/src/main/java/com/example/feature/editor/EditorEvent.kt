@@ -41,4 +41,13 @@ sealed interface EditorEvent {
     data object ResetFilterSettings : EditorEvent
     data class AddMediaClicked(val trackType: TrackType) : EditorEvent
     data object SaveImmediately : EditorEvent
+    /** Alight Motion-style long-press toggles this clip into/out of multi-selection. */
+    data class LongPressClip(val clipId: String) : EditorEvent
+    /** Groups all currently multi-selected clips under a new shared groupId. */
+    data object GroupSelectedClips : EditorEvent
+    /** Ungroups clips that belong to the same group as the currently selected clip. */
+    data object UngroupSelectedClips : EditorEvent
+    /** Drags a keyframe diamond to a new position on the timeline. */
+    data class MoveKeyframe(val clipId: String, val keyframeId: String, val newTimeMs: Long) : EditorEvent
 }
+

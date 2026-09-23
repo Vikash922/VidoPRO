@@ -40,7 +40,10 @@ data class Clip(
     val transform: Transform = Transform.DEFAULT,
     val effects: List<Effect> = emptyList(),
     val keyframes: List<Keyframe> = emptyList(),
-    val textData: TextClipData? = null
+    val textData: TextClipData? = null,
+    /** Alight-Motion-style clip group. Clips sharing the same non-null groupId
+     *  receive bulk edits together (speed, volume, transform, delete, duplicate). */
+    val groupId: String? = null
 ) {
     val endTimeMs: Long
         get() = startTimeMs + durationMs

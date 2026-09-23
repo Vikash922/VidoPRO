@@ -17,7 +17,21 @@ object TimelineReducer {
             is TimelineAction.SetTracks -> handleLoadProject(state, action.tracks, null)
             is TimelineAction.Seek -> handleSeek(state, action.positionMs)
             is TimelineAction.SeekPlayhead -> handleSeek(state, action.positionMs)
-            is TimelineAction.SelectClip -> state.copy(selectedClipId = action.clipId)
+            is TimelineAction.SelectClip -> state.copy(selectedClipId = action.clipId, multiSelectedClipIds = emptySet())
+            is TimelineAction.SelectMultipleClips -> state.copy(
+                multiSelectedClipIds = action.clipIds,
+                selectedClipId = action.clipIds.firstOrNull()
+            )
+            is TimelineAction.ToggleClipSelection -> {
+                val updated = if (state.multiSelectedClipIds.contains(action.clipId)) {
+                    state.multiSelectedClipIds - action.clipId
+                } else {
+                    state.multiSelectedClipIds + action.clipId
+                }
+                state.copy(multiSelectedClipIds = updated, selectedClipId = updated.firstOrNull() ?: state.selectedClipId)
+            }
+            is TimelineAction.GroupSelectedClips -> handleGroupClips(state, action.groupId)
+            is TimelineAction.UngroupClips -> handleUngroupClips(state, action.groupId)
             is TimelineAction.AddClip -> handleAddClip(state, action.trackId, action.clip, action.atTimeMs)
             is TimelineAction.MoveClip -> handleMoveClip(state, action.clipId, action.targetTrackId, action.newStartTimeMs)
             is TimelineAction.TrimStart -> handleTrimStart(state, action.clipId, action.newStartTimeMs)
@@ -44,8 +58,10 @@ object TimelineReducer {
                 }
                 state.copy(beatMarkers = updated)
             }
+            is TimelineAction.MoveKeyframe -> handleMoveKeyframe(state, action.clipId, action.keyframeId, action.newTimeMs)
         }
     }
+
 
     private fun handleLoadProject(state: TimelineEngineState, tracks: List<Track>, explicitDuration: Long?): TimelineEngineState {
         val totalDuration = explicitDuration ?: TimelineUtils.recalculateProjectDuration(tracks)
@@ -414,4 +430,48 @@ object TimelineReducer {
         return state.tracks.flatMap { it.clips }
             .find { playhead >= it.startTimeMs && playhead < it.endTimeMs }?.id
     }
+
+    /** Tags all multiSelectedClips with the given groupId. */
+    private fun handleGroupClips(state: TimelineEngineState, groupId: String): TimelineEngineState {
+        val ids = if (state.multiSelectedClipIds.isNotEmpty()) state.multiSelectedClipIds
+                  else setOfNotNull(state.selectedClipId)
+        if (ids.size < 2) return state
+        val updatedTracks = state.tracks.map { track ->
+            track.copy(clips = track.clips.map { clip ->
+                if (ids.contains(clip.id)) clip.copy(groupId = groupId) else clip
+            })
+        }
+        return state.copy(tracks = updatedTracks)
+    }
+
+    /** Clears the groupId from all clips in the given group. */
+    private fun handleUngroupClips(state: TimelineEngineState, groupId: String): TimelineEngineState {
+        val updatedTracks = state.tracks.map { track ->
+            track.copy(clips = track.clips.map { clip ->
+                if (clip.groupId == groupId) clip.copy(groupId = null) else clip
+            })
+        }
+        return state.copy(tracks = updatedTracks, multiSelectedClipIds = emptySet())
+    }
+
+    /** Moves a keyframe diamond to a new timeMs on the timeline. */
+    private fun handleMoveKeyframe(
+        state: TimelineEngineState,
+        clipId: String,
+        keyframeId: String,
+        newTimeMs: Long
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val clampedTime = newTimeMs.coerceIn(clip.startTimeMs, clip.endTimeMs)
+        val updatedKeyframes = clip.keyframes.map { kf ->
+            if (kf.id == keyframeId) kf.copy(timeMs = clampedTime) else kf
+        }
+        val updatedTracks = state.tracks.map { track ->
+            track.copy(clips = track.clips.map { c ->
+                if (c.id == clipId) c.copy(keyframes = updatedKeyframes) else c
+            })
+        }
+        return state.copy(tracks = updatedTracks)
+    }
 }
+

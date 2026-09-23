@@ -332,9 +332,28 @@ class EditorViewModel(
             is EditorEvent.ExportClicked -> {
                 flushAutosave()
             }
+            is EditorEvent.LongPressClip -> {
+                // Alight Motion-style: long-press toggles the clip into/out of multi-selection
+                onTimelineAction(TimelineAction.ToggleClipSelection(event.clipId))
+                _uiState.update { it.copy(multiSelectedClipIds = timelineEngineState.multiSelectedClipIds) }
+            }
+            is EditorEvent.GroupSelectedClips -> {
+                val groupId = UUID.randomUUID().toString()
+                onTimelineAction(TimelineAction.GroupSelectedClips(groupId))
+                _uiState.update { it.copy(multiSelectedClipIds = emptySet()) }
+            }
+            is EditorEvent.UngroupSelectedClips -> {
+                val gid = _uiState.value.selectedGroupId ?: return
+                onTimelineAction(TimelineAction.UngroupClips(gid))
+                _uiState.update { it.copy(multiSelectedClipIds = emptySet()) }
+            }
+            is EditorEvent.MoveKeyframe -> {
+                onTimelineAction(TimelineAction.MoveKeyframe(event.clipId, event.keyframeId, event.newTimeMs))
+            }
             else -> {}
         }
     }
+
 
     private fun applyEngineState(newState: TimelineEngineState) {
         timelineEngineState = newState
@@ -350,6 +369,7 @@ class EditorViewModel(
             current.copy(
                 playheadPositionMs = newState.playheadPositionMs,
                 selectedClipId = newState.selectedClipId,
+                multiSelectedClipIds = newState.multiSelectedClipIds,
                 beatMarkers = newState.beatMarkers,
                 project = updatedProject
             )
@@ -358,6 +378,7 @@ class EditorViewModel(
         syncClipsToPlayer(updatedProject)
         previewPlayer?.seekTo(newState.playheadPositionMs)
     }
+
 
     /**
      * Schedules a debounced autosave of the project (DEV-060, DEV-061).

@@ -36,6 +36,7 @@ data class EditorUiState(
     val isLoading: Boolean = true,
     val project: Project? = null,
     val selectedClipId: String? = null,
+    val multiSelectedClipIds: Set<String> = emptySet(),
     val playheadPositionMs: Long = 0L,
     val isPlaying: Boolean = false,
     val canUndo: Boolean = false,
@@ -60,4 +61,13 @@ data class EditorUiState(
 
     val durationMs: Long
         get() = project?.durationMs ?: 0L
+
+    /** True when 2+ clips are selected for grouping. */
+    val isMultiSelectMode: Boolean
+        get() = multiSelectedClipIds.size >= 2
+
+    /** Returns the groupId of the currently selected clip (if it belongs to a group). */
+    val selectedGroupId: String?
+        get() = selectedClip?.groupId
 }
+
