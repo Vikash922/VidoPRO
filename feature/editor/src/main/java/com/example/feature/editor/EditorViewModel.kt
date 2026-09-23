@@ -241,8 +241,26 @@ class EditorViewModel(
             }
             
             is EditorEvent.SplitSelectedClip -> onTimelineAction(TimelineAction.SplitAtPlayhead(_uiState.value.selectedClipId))
-            is EditorEvent.DeleteSelectedClip -> _uiState.value.selectedClipId?.let { onTimelineAction(TimelineAction.DeleteClip(it)) }
-            is EditorEvent.DuplicateSelectedClip -> _uiState.value.selectedClipId?.let { onTimelineAction(TimelineAction.DuplicateClip(it)) }
+            is EditorEvent.DeleteSelectedClip -> {
+                val clipId = _uiState.value.selectedClipId ?: return
+                val groupId = _uiState.value.selectedClip?.groupId
+                if (groupId != null) {
+                    // Delete all clips in the same group
+                    groupedClipIds(groupId).forEach { onTimelineAction(TimelineAction.DeleteClip(it)) }
+                } else {
+                    onTimelineAction(TimelineAction.DeleteClip(clipId))
+                }
+            }
+            is EditorEvent.DuplicateSelectedClip -> {
+                val clipId = _uiState.value.selectedClipId ?: return
+                val groupId = _uiState.value.selectedClip?.groupId
+                if (groupId != null) {
+                    groupedClipIds(groupId).forEach { onTimelineAction(TimelineAction.DuplicateClip(it)) }
+                } else {
+                    onTimelineAction(TimelineAction.DuplicateClip(clipId))
+                }
+            }
+
             is EditorEvent.ApplyTextClip -> {
                 val currentSelected = _uiState.value.selectedClip
                 if (currentSelected?.type == ClipType.TEXT && currentSelected.textData != null) {
@@ -285,25 +303,36 @@ class EditorViewModel(
                 }
             }
             is EditorEvent.ChangeClipSpeed -> {
-                val clipId = _uiState.value.selectedClipId
-                if (clipId != null) {
+                val clipId = _uiState.value.selectedClipId ?: return
+                val groupId = _uiState.value.selectedClip?.groupId
+                if (groupId != null) {
+                    groupedClipIds(groupId).forEach { onTimelineAction(TimelineAction.UpdateClipSpeed(it, event.speed)) }
+                } else {
                     onTimelineAction(TimelineAction.UpdateClipSpeed(clipId, event.speed))
-                    previewPlayer?.setPlaybackSpeed(event.speed)
                 }
+                previewPlayer?.setPlaybackSpeed(event.speed)
             }
             is EditorEvent.ChangeClipTransform -> {
-                val clipId = event.clipId ?: _uiState.value.selectedClipId
-                if (clipId != null) {
+                val clipId = event.clipId ?: _uiState.value.selectedClipId ?: return
+                val groupId = _uiState.value.selectedClip?.groupId
+                if (groupId != null && event.clipId == null) {
+                    // Propagate transform (position/scale/rotation/opacity) to all group members
+                    groupedClipIds(groupId).forEach { onTimelineAction(TimelineAction.UpdateClipTransform(it, event.transform)) }
+                } else {
                     onTimelineAction(TimelineAction.UpdateClipTransform(clipId, event.transform))
                 }
             }
             is EditorEvent.ChangeClipVolume -> {
-                val clipId = _uiState.value.selectedClipId
-                if (clipId != null) {
+                val clipId = _uiState.value.selectedClipId ?: return
+                val groupId = _uiState.value.selectedClip?.groupId
+                if (groupId != null) {
+                    groupedClipIds(groupId).forEach { onTimelineAction(TimelineAction.UpdateClipVolume(it, event.volume)) }
+                } else {
                     onTimelineAction(TimelineAction.UpdateClipVolume(clipId, event.volume))
-                    previewPlayer?.setVolume(event.volume)
                 }
+                previewPlayer?.setVolume(event.volume)
             }
+
             is EditorEvent.UndoClicked -> {
                 val restored = undoRedoManager.undo(timelineEngineState)
                 if (restored != null) {
@@ -379,11 +408,22 @@ class EditorViewModel(
         previewPlayer?.seekTo(newState.playheadPositionMs)
     }
 
+    /**
+     * Returns all clip IDs that share the given groupId across all project tracks.
+     * Used to propagate edits (speed, volume, transform, delete, duplicate) to grouped clips.
+     */
+    private fun groupedClipIds(groupId: String): List<String> =
+        _uiState.value.project?.tracks
+            ?.flatMap { it.clips }
+            ?.filter { it.groupId == groupId }
+            ?.map { it.id }
+            ?: emptyList()
 
     /**
      * Schedules a debounced autosave of the project (DEV-060, DEV-061).
      * Waits 1500ms after the last edit before persisting to Room via ProjectRepository.
      */
+
     private fun scheduleAutosave(project: Project) {
         pendingProjectSave = project
         autosaveJob?.cancel()
