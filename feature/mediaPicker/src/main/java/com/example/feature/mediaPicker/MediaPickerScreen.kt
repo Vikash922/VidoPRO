@@ -97,9 +97,13 @@ fun MediaPickerScreen(
         }
     }
 
+    // Auto-request permission on first composition — no more silent loading
     LaunchedEffect(Unit) {
         if (PermissionHandler.hasMediaPermission(context)) {
             onPermissionGranted()
+        } else {
+            // Immediately launch permission dialog — don't make user hunt for button
+            permissionLauncher.launch(PermissionHandler.getRequiredMediaPermissions())
         }
     }
 

@@ -1,8 +1,9 @@
 {
-  "versionCode": 18,
-  "versionName": "2.0.9",
+  "versionCode": 19,
+  "versionName": "2.1.0",
   "apkUrl": "https://github.com/Vikash922/VidoPRO/releases/latest/download/app-release.apk",
-  "releaseNotes": "v2.0.9: 4K 60fps smooth playback (hardware decoder priority, SurfaceView, 60fps ticker), split no longer resets playhead, keyframe button is silent (no sheet popup), fast local-file seek after split/trim."
+  "releaseNotes": "v2.1.0: CapCut-style timeline (center playhead, 64dp clips, red scrubber), tap ruler to add/remove markers, markers survive split, permission auto-requested on launch, split clips stay on same track."
 }
+
 
 
