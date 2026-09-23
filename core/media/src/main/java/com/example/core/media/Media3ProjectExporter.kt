@@ -41,6 +41,7 @@ class Media3ProjectExporter(
 
     private var activeTransformer: Transformer? = null
     private var progressJob: Job? = null
+    private var activeTextOverlay: TextOverlayGenerator? = null
 
     override suspend fun export(
         project: Project,
@@ -118,6 +119,7 @@ class Media3ProjectExporter(
             if (textClips.isNotEmpty()) {
                 try {
                     val textOverlay = TextOverlayGenerator(textClips, settings.width, settings.height)
+                    activeTextOverlay = textOverlay
                     val overlayEffect = androidx.media3.effect.OverlayEffect(com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(textOverlay))
                     videoEffects.add(overlayEffect)
                 } catch (e: Exception) {
@@ -231,6 +233,8 @@ class Media3ProjectExporter(
         } finally {
             stopProgressTicker()
             activeTransformer = null
+            activeTextOverlay?.release()
+            activeTextOverlay = null
         }
     }
 
@@ -242,6 +246,8 @@ class Media3ProjectExporter(
             // Ignore cancel exceptions
         }
         activeTransformer = null
+        activeTextOverlay?.release()
+        activeTextOverlay = null
     }
 
     private fun startProgressTicker(
