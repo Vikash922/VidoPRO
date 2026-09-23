@@ -228,4 +228,49 @@ object ColorFilterHelper {
         }
         return result
     }
+
+    /**
+     * Applies filter and color grading adjustments to a bitmap using multi-threaded C++ (SIMD accelerated).
+     */
+    fun applyNativeAdjustments(bitmap: android.graphics.Bitmap, settings: FilterSettings): Boolean {
+        if (!com.example.core.media.nativeengine.NativeVideoEngine.isAvailable) return false
+        val eff = if (settings.selectedPreset != FilterPreset.NONE && settings.isDefault) {
+            settings.selectedPreset.toFilterSettings()
+        } else {
+            settings
+        }
+        val params = floatArrayOf(
+            eff.brightness,
+            eff.contrast,
+            eff.exposure,
+            eff.highlights,
+            eff.shadows,
+            eff.whites,
+            eff.blacks,
+            eff.saturation,
+            eff.vibrance,
+            eff.temperature,
+            eff.tint,
+            eff.hue,
+            eff.redBalance,
+            eff.greenBalance,
+            eff.blueBalance,
+            eff.gamma,
+            eff.midtones,
+            eff.vignette,
+            eff.fade,
+            eff.opacity / 100f
+        )
+        val success = com.example.core.media.nativeengine.NativeVideoEngine.applyAdjustments(bitmap, params)
+        if (eff.blur > 0.1f) {
+            com.example.core.media.nativeengine.NativeVideoEngine.applyBlur(bitmap, eff.blur.toInt())
+        }
+        if (eff.sharpness > 0.1f) {
+            com.example.core.media.nativeengine.NativeVideoEngine.applySharpen(bitmap, eff.sharpness)
+        }
+        if (eff.grain > 0.1f) {
+            com.example.core.media.nativeengine.NativeVideoEngine.applyGrain(bitmap, eff.grain)
+        }
+        return success
+    }
 }

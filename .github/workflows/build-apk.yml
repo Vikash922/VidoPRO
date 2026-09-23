@@ -28,6 +28,15 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
+      - name: Setup Android NDK
+        run: |
+          if [ -d "$ANDROID_HOME/ndk" ]; then
+            NDK_PATH=$(ls -d $ANDROID_HOME/ndk/* 2>/dev/null | sort -V | tail -n 1)
+            echo "Found preinstalled NDK at: $NDK_PATH"
+            echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+            echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
+          fi
+
       - name: Build Release APK
         run: gradle assembleRelease --stacktrace
 
