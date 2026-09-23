@@ -64,6 +64,7 @@ object TimelineReducer {
             is TimelineAction.UpdateKeyframe -> handleUpdateKeyframe(state, action.clipId, action.keyframeId, action.value, action.interpolation)
             is TimelineAction.DeleteKeyframe -> handleDeleteKeyframe(state, action.clipId, action.keyframeId)
             is TimelineAction.MoveKeyframe -> handleMoveKeyframe(state, action.clipId, action.keyframeId, action.newTimeMs)
+            is TimelineAction.UpdateClipEffects -> handleUpdateClipEffects(state, action.clipId, action.effects)
         }
     }
 
@@ -409,6 +410,28 @@ object TimelineReducer {
             track.copy(clips = updated)
         }
         return state.copy(tracks = updatedTracks)
+    }
+
+    private fun handleUpdateClipEffects(
+        state: TimelineEngineState,
+        clipId: String,
+        effects: List<com.example.core.model.Effect>
+    ): TimelineEngineState {
+        val updatedTracks = state.tracks.map { track ->
+            val updated = track.clips.map { c ->
+                if (c.id == clipId) c.copy(effects = effects) else c
+            }
+            track.copy(clips = updated)
+        }
+        val updatedSelected = if (state.selectedClip?.id == clipId) {
+            state.selectedClip.copy(effects = effects)
+        } else {
+            state.selectedClip
+        }
+        return state.copy(
+            tracks = updatedTracks,
+            selectedClip = updatedSelected
+        )
     }
 
     /**

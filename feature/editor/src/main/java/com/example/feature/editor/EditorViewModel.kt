@@ -192,7 +192,14 @@ class EditorViewModel(
                     EditorTool.EDIT -> { _uiState.update { it.copy(isEditSheetVisible = true) } }
                     EditorTool.AUDIO -> { _uiState.update { it.copy(isVolumeSheetVisible = true) } }
                     EditorTool.TEXT -> { _uiState.update { it.copy(isTextSheetVisible = true) } }
-                    EditorTool.FILTERS -> { _uiState.update { it.copy(isFiltersSheetVisible = true) } }
+                    EditorTool.FILTERS -> {
+                        val targetClip = currentClipId?.let { id ->
+                            _uiState.value.project?.tracks?.flatMap { it.clips }?.find { it.id == id }
+                        }
+                        val settings = targetClip?.let { com.example.feature.editor.filter.FilterSettingsMapper.fromEffects(it.effects) }
+                            ?: com.example.feature.editor.filter.FilterSettings()
+                        _uiState.update { it.copy(isFiltersSheetVisible = true, filterSettings = settings) }
+                    }
                     EditorTool.SPLIT -> {
                         onTimelineAction(TimelineAction.SplitAtPlayhead(currentClipId))
                     }
@@ -223,7 +230,21 @@ class EditorViewModel(
                 _uiState.update { it.copy(isTextSheetVisible = event.visible) }
             }
             is EditorEvent.SetFiltersSheetVisible -> {
-                _uiState.update { it.copy(isFiltersSheetVisible = event.visible) }
+                if (event.visible) {
+                    val targetClip = _uiState.value.selectedClipId?.let { id ->
+                        _uiState.value.project?.tracks?.flatMap { it.clips }?.find { it.id == id }
+                    } ?: run {
+                        val playhead = _uiState.value.playheadPositionMs
+                        _uiState.value.project?.tracks?.flatMap { it.clips }?.find {
+                            playhead >= it.startTimeMs && playhead <= it.endTimeMs
+                        }
+                    }
+                    val settings = targetClip?.let { com.example.feature.editor.filter.FilterSettingsMapper.fromEffects(it.effects) }
+                        ?: com.example.feature.editor.filter.FilterSettings()
+                    _uiState.update { it.copy(isFiltersSheetVisible = true, filterSettings = settings) }
+                } else {
+                    _uiState.update { it.copy(isFiltersSheetVisible = false) }
+                }
             }
             is EditorEvent.SetSpeedSheetVisible -> {
                 _uiState.update { it.copy(isSpeedSheetVisible = event.visible) }
@@ -349,9 +370,29 @@ class EditorViewModel(
             is EditorEvent.CloseToolPanel -> {}
             is EditorEvent.UpdateFilterSettings -> {
                 _uiState.update { it.copy(filterSettings = event.filterSettings) }
+                val targetClipId = _uiState.value.selectedClipId ?: run {
+                    val playhead = _uiState.value.playheadPositionMs
+                    _uiState.value.project?.tracks?.flatMap { it.clips }?.find {
+                        playhead >= it.startTimeMs && playhead <= it.endTimeMs
+                    }?.id
+                }
+                if (targetClipId != null) {
+                    val effects = com.example.feature.editor.filter.FilterSettingsMapper.toEffects(event.filterSettings, targetClipId)
+                    onTimelineAction(TimelineAction.UpdateClipEffects(targetClipId, effects))
+                }
             }
             is EditorEvent.ResetFilterSettings -> {
-                _uiState.update { it.copy(filterSettings = com.example.feature.editor.filter.FilterSettings()) }
+                val defaultSettings = com.example.feature.editor.filter.FilterSettings()
+                _uiState.update { it.copy(filterSettings = defaultSettings) }
+                val targetClipId = _uiState.value.selectedClipId ?: run {
+                    val playhead = _uiState.value.playheadPositionMs
+                    _uiState.value.project?.tracks?.flatMap { it.clips }?.find {
+                        playhead >= it.startTimeMs && playhead <= it.endTimeMs
+                    }?.id
+                }
+                if (targetClipId != null) {
+                    onTimelineAction(TimelineAction.UpdateClipEffects(targetClipId, emptyList()))
+                }
             }
             is EditorEvent.SaveImmediately -> {
                 flushAutosave()
@@ -410,13 +451,22 @@ class EditorViewModel(
             durationMs = updatedDuration,
             updatedAt = System.currentTimeMillis()
         )
+        val activeEffects = newState.selectedClipId?.let { id ->
+            updatedTracks.flatMap { it.clips }.find { it.id == id }?.effects
+        }
+        val restoredFilterSettings = if (activeEffects != null && activeEffects.isNotEmpty()) {
+            com.example.feature.editor.filter.FilterSettingsMapper.fromEffects(activeEffects)
+        } else {
+            com.example.feature.editor.filter.FilterSettings()
+        }
         _uiState.update { current ->
             current.copy(
                 playheadPositionMs = newState.playheadPositionMs,
                 selectedClipId = newState.selectedClipId,
                 multiSelectedClipIds = newState.multiSelectedClipIds,
                 beatMarkers = newState.beatMarkers,
-                project = updatedProject
+                project = updatedProject,
+                filterSettings = restoredFilterSettings
             )
         }
         scheduleAutosave(updatedProject)
@@ -630,12 +680,25 @@ class EditorViewModel(
                 is TimelineAction.SplitAtPlayhead, is TimelineAction.SplitClip, is TimelineAction.DuplicateClip -> false
                 else -> current.isEditSheetVisible && timelineEngineState.selectedClipId != null
             }
+            val selectedClipEffects = timelineEngineState.selectedClipId?.let { id ->
+                updatedTracks.flatMap { it.clips }.find { it.id == id }?.effects
+            }
+            val syncedFilterSettings = if (action is TimelineAction.SelectClip) {
+                if (selectedClipEffects != null && selectedClipEffects.isNotEmpty()) {
+                    com.example.feature.editor.filter.FilterSettingsMapper.fromEffects(selectedClipEffects)
+                } else {
+                    com.example.feature.editor.filter.FilterSettings()
+                }
+            } else {
+                current.filterSettings
+            }
             current.copy(
                 playheadPositionMs = timelineEngineState.playheadPositionMs,
                 selectedClipId = timelineEngineState.selectedClipId,
                 multiSelectedClipIds = timelineEngineState.multiSelectedClipIds,
                 beatMarkers = timelineEngineState.beatMarkers,
                 isEditSheetVisible = sheetVisible,
+                filterSettings = syncedFilterSettings,
                 project = if (tracksChanged) current.project?.copy(
                     tracks = updatedTracks,
                     durationMs = updatedDuration,

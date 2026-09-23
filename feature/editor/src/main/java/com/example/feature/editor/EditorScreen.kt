@@ -268,6 +268,29 @@ fun EditorScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         if (player != null && hasClips) {
+                            val currentFilterSettings = remember(
+                                uiState.filterSettings,
+                                uiState.selectedClipId,
+                                uiState.playheadPositionMs,
+                                uiState.project,
+                                uiState.isFiltersSheetVisible
+                            ) {
+                                if (uiState.isFiltersSheetVisible) {
+                                    uiState.filterSettings
+                                } else {
+                                    val allClips = uiState.project?.tracks?.flatMap { it.clips } ?: emptyList()
+                                    val activeClip = uiState.selectedClipId?.let { selId -> allClips.find { it.id == selId } }
+                                        ?: allClips.find { uiState.playheadPositionMs in it.startTimeMs..it.endTimeMs }
+                                    if (activeClip != null && activeClip.effects.isNotEmpty()) {
+                                        com.example.feature.editor.filter.FilterSettingsMapper.fromEffects(activeClip.effects)
+                                    } else if (uiState.selectedClipId == null && !uiState.filterSettings.isDefault) {
+                                        uiState.filterSettings
+                                    } else {
+                                        com.example.feature.editor.filter.FilterSettings()
+                                    }
+                                }
+                            }
+
                             AndroidView(
                                 factory = { ctx ->
                                     (android.view.LayoutInflater.from(ctx).inflate(R.layout.texture_player_view, null) as PlayerView).apply {
@@ -283,7 +306,7 @@ fun EditorScreen(
                                     if (view.player != player) {
                                         view.player = player
                                     }
-                                    if (uiState.filterSettings.isDefault) {
+                                    if (currentFilterSettings.isDefault) {
                                         view.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                                         view.videoSurfaceView?.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
@@ -291,10 +314,10 @@ fun EditorScreen(
                                             view.videoSurfaceView?.setRenderEffect(null)
                                         }
                                     } else {
-                                        val colorArray = com.example.feature.editor.filter.ColorFilterHelper.createColorMatrixArray(uiState.filterSettings)
+                                        val colorArray = com.example.feature.editor.filter.ColorFilterHelper.createColorMatrixArray(currentFilterSettings)
                                         val paint = android.graphics.Paint().apply {
                                             colorFilter = android.graphics.ColorMatrixColorFilter(colorArray)
-                                            alpha = (uiState.filterSettings.opacity.coerceIn(0f, 100f) / 100f * 255).toInt()
+                                            alpha = (currentFilterSettings.opacity.coerceIn(0f, 100f) / 100f * 255).toInt()
                                         }
                                         view.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, paint)
                                         view.videoSurfaceView?.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, paint)
@@ -321,8 +344,8 @@ fun EditorScreen(
                             )
 
                             // Real-time Optical Overlays (Vignette, Fade, Bloom/Glow)
-                            if (uiState.filterSettings.vignette > 0f) {
-                                val vignetteAlpha = (uiState.filterSettings.vignette / 100f * 0.9f).coerceIn(0f, 0.95f)
+                            if (currentFilterSettings.vignette > 0f) {
+                                val vignetteAlpha = (currentFilterSettings.vignette / 100f * 0.9f).coerceIn(0f, 0.95f)
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -337,8 +360,8 @@ fun EditorScreen(
                                 )
                             }
 
-                            if (uiState.filterSettings.fade > 0f) {
-                                val fadeAlpha = (uiState.filterSettings.fade / 100f * 0.45f).coerceIn(0f, 0.8f)
+                            if (currentFilterSettings.fade > 0f) {
+                                val fadeAlpha = (currentFilterSettings.fade / 100f * 0.45f).coerceIn(0f, 0.8f)
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -346,8 +369,8 @@ fun EditorScreen(
                                 )
                             }
 
-                            if (uiState.filterSettings.glow > 0f) {
-                                val glowAlpha = (uiState.filterSettings.glow / 100f * 0.25f).coerceIn(0f, 0.5f)
+                            if (currentFilterSettings.glow > 0f) {
+                                val glowAlpha = (currentFilterSettings.glow / 100f * 0.25f).coerceIn(0f, 0.5f)
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()

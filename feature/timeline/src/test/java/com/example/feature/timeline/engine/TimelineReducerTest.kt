@@ -231,4 +231,40 @@ class TimelineReducerTest {
         assertEquals("Remaining clip should be clip_a", "clip_a", updatedTrack.clips[0].id)
         assertEquals("Project duration should be recalculated to 2000ms", 2000L, stateAfterDelete.durationMs)
     }
+
+    @Test
+    fun testUpdateClipEffects() {
+        val trackId = "track_1"
+        val clip = createTestClip(
+            id = "clip_eff",
+            trackId = trackId,
+            startTimeMs = 0L,
+            durationMs = 2000L
+        )
+        val track = Track(id = trackId, projectId = "proj_1", type = TrackType.VIDEO, order = 0, clips = listOf(clip))
+        val initialState = createInitialState(listOf(track)).copy(
+            selectedClip = clip,
+            selectedClipId = clip.id
+        )
+
+        val newEffects = listOf(
+            com.example.core.model.Effect(
+                id = "eff_1",
+                clipId = "clip_eff",
+                type = com.example.core.model.EffectType.CONTRAST,
+                parameters = mapOf("value" to 1.4f)
+            )
+        )
+
+        val stateAfter = TimelineReducer.reduce(
+            initialState,
+            TimelineAction.UpdateClipEffects("clip_eff", newEffects)
+        )
+
+        val updatedClip = stateAfter.tracks.first().clips.first()
+        assertEquals(1, updatedClip.effects.size)
+        assertEquals(com.example.core.model.EffectType.CONTRAST, updatedClip.effects[0].type)
+        assertEquals(1.4f, updatedClip.effects[0].parameters["value"]!!, 0.001f)
+        assertEquals(1, stateAfter.selectedClip?.effects?.size)
+    }
 }

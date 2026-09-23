@@ -88,6 +88,12 @@ class Media3ProjectExporter(
                     editedItemBuilder.setDurationUs(clip.durationMs * 1000L)
                     editedItemBuilder.setFrameRate(settings.fps)
                 }
+
+                // Apply per-clip video effects (brightness, contrast, saturation, exposure, filters)
+                val clipVideoEffects = Media3EffectHelper.createMedia3Effects(clip.effects)
+                if (clipVideoEffects.isNotEmpty()) {
+                    editedItemBuilder.setEffects(Effects(emptyList(), clipVideoEffects))
+                }
                 
                 val editedItem = editedItemBuilder.build()
                 editedMediaItems.add(editedItem)

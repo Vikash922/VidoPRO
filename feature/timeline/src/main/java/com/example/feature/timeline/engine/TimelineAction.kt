@@ -1,6 +1,7 @@
 package com.example.feature.timeline.engine
 
 import com.example.core.model.Clip
+import com.example.core.model.Effect
 import com.example.core.model.InterpolationType
 import com.example.core.model.Track
 import com.example.core.model.Transform
@@ -55,5 +56,7 @@ sealed interface TimelineAction {
     data class DeleteKeyframe(val clipId: String, val keyframeId: String) : TimelineAction
     /** Moves a keyframe diamond to a new time position (drag-on-timeline). */
     data class MoveKeyframe(val clipId: String, val keyframeId: String, val newTimeMs: Long) : TimelineAction
+    /** Updates the effects applied to a clip. */
+    data class UpdateClipEffects(val clipId: String, val effects: List<Effect>) : TimelineAction
 }
 
