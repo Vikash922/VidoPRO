@@ -22,6 +22,7 @@ import com.example.feature.editor.history.StateSnapshotCommand
 import com.example.feature.editor.history.TrimEndCommand
 import com.example.feature.editor.history.TrimStartCommand
 import com.example.feature.editor.history.UndoRedoManager
+import com.example.feature.editor.history.UpdateClipTransformCommand
 import com.example.feature.timeline.engine.TimelineAction
 import com.example.feature.timeline.engine.TimelineEngineState
 import com.example.feature.timeline.engine.TimelineReducer
@@ -653,7 +654,7 @@ class EditorViewModel(
                 StateSnapshotCommand("Move keyframe", action, preActionState)
             }
             is TimelineAction.UpdateClipTransform -> {
-                null
+                UpdateClipTransformCommand(action.clipId, action.transform, preActionState)
             }
             else -> null
         }

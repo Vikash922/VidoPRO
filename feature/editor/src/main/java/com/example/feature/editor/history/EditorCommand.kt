@@ -136,3 +136,23 @@ class StateSnapshotCommand(
         return preActionState
     }
 }
+
+/**
+ * Command to update a clip's transform (position, scale, rotation, opacity).
+ * Supports undo/redo with command coalescing during continuous drag/slider gestures.
+ */
+class UpdateClipTransformCommand(
+    val clipId: String,
+    val transform: com.example.core.model.Transform,
+    val preActionState: TimelineEngineState
+) : EditorCommand {
+    override val description: String = "Update transform"
+
+    override fun execute(state: TimelineEngineState): TimelineEngineState {
+        return TimelineReducer.reduce(state, TimelineAction.UpdateClipTransform(clipId, transform))
+    }
+
+    override fun undo(state: TimelineEngineState): TimelineEngineState {
+        return preActionState
+    }
+}

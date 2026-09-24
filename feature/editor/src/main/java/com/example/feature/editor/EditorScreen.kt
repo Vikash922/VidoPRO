@@ -80,6 +80,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -87,6 +88,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
 import com.example.core.common.TimeUtils
+import com.example.core.media.CanvasCoordinateHelper
+import com.example.core.media.KeyframeEvaluator
 import com.example.core.model.ClipType
 import com.example.core.model.TrackType
 import com.example.core.ui.components.LoadingView
@@ -268,6 +271,38 @@ fun EditorScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         if (player != null && hasClips) {
+                            val density = LocalDensity.current
+                            val canvasWidthPx = with(density) { canvasWidth.toPx() }
+                            val canvasHeightPx = with(density) { canvasHeight.toPx() }
+                            val projectWidth = uiState.project?.width ?: 1080
+                            val projectHeight = uiState.project?.height ?: 1920
+
+                            val mainTrack = uiState.project?.tracks?.find { it.type == TrackType.VIDEO }
+                            val mainClips = mainTrack?.clips ?: emptyList()
+                            val activeMainClip = uiState.selectedClip?.takeIf { it.type == ClipType.VIDEO }
+                                ?: mainClips.find { uiState.playheadPositionMs in it.startTimeMs..it.endTimeMs }
+                                ?: mainClips.firstOrNull()
+
+                            val currentTransform = remember(activeMainClip, uiState.playheadPositionMs) {
+                                if (activeMainClip != null) {
+                                    KeyframeEvaluator.evaluateTransform(activeMainClip, uiState.playheadPositionMs)
+                                } else {
+                                    com.example.core.model.Transform.DEFAULT
+                                }
+                            }
+
+                            val previewTransform = remember(currentTransform, canvasWidthPx, canvasHeightPx, projectWidth, projectHeight) {
+                                CanvasCoordinateHelper.toPreviewCoordinates(
+                                    currentTransform,
+                                    canvasWidthPx = canvasWidthPx,
+                                    canvasHeightPx = canvasHeightPx,
+                                    projectWidth = projectWidth,
+                                    projectHeight = projectHeight
+                                )
+                            }
+
+                            val isMainVideoSelected = uiState.selectedClipId != null && uiState.selectedClipId == activeMainClip?.id
+
                             val currentFilterSettings = remember(
                                 uiState.filterSettings,
                                 uiState.selectedClipId,
@@ -291,57 +326,111 @@ fun EditorScreen(
                                 }
                             }
 
-                            AndroidView(
-                                factory = { ctx ->
-                                    (android.view.LayoutInflater.from(ctx).inflate(R.layout.texture_player_view, null) as PlayerView).apply {
-                                        this.player = player
-                                        useController = false
-                                        layoutParams = ViewGroup.LayoutParams(
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                            ViewGroup.LayoutParams.MATCH_PARENT
-                                        )
-                                    }
-                                },
-                                update = { view ->
-                                    if (view.player != player) {
-                                        view.player = player
-                                    }
-                                    if (currentFilterSettings.isDefault) {
-                                        view.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
-                                        view.videoSurfaceView?.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
-                                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                            view.setRenderEffect(null)
-                                            view.videoSurfaceView?.setRenderEffect(null)
-                                        }
-                                    } else {
-                                        val colorArray = com.example.feature.editor.filter.ColorFilterHelper.createColorMatrixArray(currentFilterSettings)
-                                        val paint = android.graphics.Paint().apply {
-                                            colorFilter = android.graphics.ColorMatrixColorFilter(colorArray)
-                                            alpha = (currentFilterSettings.opacity.coerceIn(0f, 100f) / 100f * 255).toInt()
-                                        }
-                                        view.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, paint)
-                                        view.videoSurfaceView?.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, paint)
-                                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                            val cm = android.graphics.ColorMatrix(colorArray)
-                                            val cf = android.graphics.ColorMatrixColorFilter(cm)
-                                            val effect = android.graphics.RenderEffect.createColorFilterEffect(cf)
-                                            view.setRenderEffect(effect)
-                                        }
-                                    }
-                                },
+                            Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .pointerInput(uiState.selectedClipId) {
-                                        detectTapGestures {
-                                            if (uiState.selectedClipId != null) {
-                                                onEvent(EditorEvent.SelectClip(null))
-                                                onTimelineAction(TimelineAction.SelectClip(null))
-                                            } else {
-                                                onEvent(EditorEvent.PlayPauseClicked)
+                                    .graphicsLayer {
+                                        translationX = previewTransform.x
+                                        translationY = previewTransform.y
+                                        scaleX = previewTransform.scaleX
+                                        scaleY = previewTransform.scaleY
+                                        rotationZ = previewTransform.rotation
+                                        alpha = previewTransform.opacity
+                                    }
+                                    .pointerInput(activeMainClip?.id, isMainVideoSelected) {
+                                        if (activeMainClip != null && isMainVideoSelected) {
+                                            detectTransformGestures { _, pan, zoom, rotation ->
+                                                val currentT = activeMainClip.transform
+                                                val (deltaX, deltaY) = CanvasCoordinateHelper.fromPreviewPan(
+                                                    panX = pan.x,
+                                                    panY = pan.y,
+                                                    canvasWidthPx = canvasWidthPx,
+                                                    canvasHeightPx = canvasHeightPx,
+                                                    projectWidth = projectWidth,
+                                                    projectHeight = projectHeight
+                                                )
+                                                val newX = currentT.x + deltaX
+                                                val newY = currentT.y + deltaY
+                                                val newScale = (currentT.scaleX * zoom).coerceIn(0.1f, 10.0f)
+                                                val rawRot = (currentT.rotation + rotation) % 360f
+                                                val newRot = if (rawRot < 0f) rawRot + 360f else rawRot
+
+                                                onEvent(
+                                                    EditorEvent.ChangeClipTransform(
+                                                        currentT.copy(
+                                                            x = newX,
+                                                            y = newY,
+                                                            scaleX = newScale,
+                                                            scaleY = newScale,
+                                                            rotation = newRot
+                                                        ),
+                                                        clipId = activeMainClip.id
+                                                    )
+                                                )
                                             }
                                         }
                                     }
-                            )
+                            ) {
+                                AndroidView(
+                                    factory = { ctx ->
+                                        (android.view.LayoutInflater.from(ctx).inflate(R.layout.texture_player_view, null) as PlayerView).apply {
+                                            this.player = player
+                                            useController = false
+                                            layoutParams = ViewGroup.LayoutParams(
+                                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                                ViewGroup.LayoutParams.MATCH_PARENT
+                                            )
+                                        }
+                                    },
+                                    update = { view ->
+                                        if (view.player != player) {
+                                            view.player = player
+                                        }
+                                        if (currentFilterSettings.isDefault) {
+                                            view.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+                                            view.videoSurfaceView?.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+                                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                                view.setRenderEffect(null)
+                                                view.videoSurfaceView?.setRenderEffect(null)
+                                            }
+                                        } else {
+                                            val colorArray = com.example.feature.editor.filter.ColorFilterHelper.createColorMatrixArray(currentFilterSettings)
+                                            val paint = android.graphics.Paint().apply {
+                                                colorFilter = android.graphics.ColorMatrixColorFilter(colorArray)
+                                                alpha = (currentFilterSettings.opacity.coerceIn(0f, 100f) / 100f * 255).toInt()
+                                            }
+                                            view.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, paint)
+                                            view.videoSurfaceView?.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, paint)
+                                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                                val cm = android.graphics.ColorMatrix(colorArray)
+                                                val cf = android.graphics.ColorMatrixColorFilter(cm)
+                                                val effect = android.graphics.RenderEffect.createColorFilterEffect(cf)
+                                                view.setRenderEffect(effect)
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .pointerInput(uiState.selectedClipId) {
+                                            detectTapGestures {
+                                                if (uiState.selectedClipId != null) {
+                                                    onEvent(EditorEvent.SelectClip(null))
+                                                    onTimelineAction(TimelineAction.SelectClip(null))
+                                                } else {
+                                                    onEvent(EditorEvent.PlayPauseClicked)
+                                                }
+                                            }
+                                        }
+                                )
+
+                                if (isMainVideoSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .border(1.5.dp, Color(0xFF6B4BFF).copy(alpha = 0.8f), RoundedCornerShape(2.dp))
+                                    )
+                                }
+                            }
 
                             // Real-time Optical Overlays (Vignette, Fade, Bloom/Glow)
                             if (currentFilterSettings.vignette > 0f) {

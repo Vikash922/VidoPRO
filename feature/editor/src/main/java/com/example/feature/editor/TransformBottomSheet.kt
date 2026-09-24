@@ -7,14 +7,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CropRotate
-import androidx.compose.material.icons.filled.Flip
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,8 +53,26 @@ fun TransformBottomSheet(
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var rotationDegrees by remember(currentTransform) { mutableIntStateOf(currentTransform.rotation.toInt()) }
+    var posX by remember(currentTransform) { mutableFloatStateOf(currentTransform.x) }
+    var posY by remember(currentTransform) { mutableFloatStateOf(currentTransform.y) }
     var scale by remember(currentTransform) { mutableFloatStateOf(currentTransform.scaleX) }
+    var rotationDegrees by remember(currentTransform) { mutableIntStateOf(currentTransform.rotation.toInt()) }
+
+    fun emitChange(x: Float = posX, y: Float = posY, s: Float = scale, r: Int = rotationDegrees) {
+        posX = x
+        posY = y
+        scale = s
+        rotationDegrees = r
+        onTransformChanged(
+            currentTransform.copy(
+                x = x,
+                y = y,
+                scaleX = s,
+                scaleY = s,
+                rotation = r.toFloat()
+            )
+        )
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -63,7 +86,9 @@ fun TransformBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = AppSpacing.lg, vertical = AppSpacing.sm)
+                .verticalScroll(rememberScrollState())
         ) {
+            // Header: Title + Reset + Close
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -82,13 +107,21 @@ fun TransformBottomSheet(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-                IconButton(onClick = onDismiss) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = {
+                        emitChange(x = 0f, y = 0f, s = 1.0f, r = 0)
+                    }) {
+                        Icon(imageVector = Icons.Default.RestartAlt, contentDescription = "Reset Transform")
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(AppSpacing.md))
 
+            // 1. SCALE CONTROLS
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -99,62 +132,176 @@ fun TransformBottomSheet(
                         .fillMaxWidth()
                         .padding(AppSpacing.md)
                 ) {
-                    Text(
-                        text = "Scale / Zoom: ${String.format("%.2fx", scale)}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Scale / Zoom",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${String.format("%.2f", scale)}x",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     Spacer(modifier = Modifier.height(AppSpacing.xs))
                     Slider(
                         value = scale,
-                        onValueChange = { scale = it },
+                        onValueChange = { emitChange(s = it) },
                         valueRange = 0.5f..3.0f,
                         steps = 25,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(0.5f, 1.0f, 1.5f, 2.0f).forEach { preset ->
+                            FilterChip(
+                                selected = (scale - preset).let { kotlin.math.abs(it) < 0.05f },
+                                onClick = { emitChange(s = preset) },
+                                label = { Text("${preset}x") },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            )
+                        }
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(AppSpacing.md))
 
-            Row(
+            // 2. ROTATION CONTROLS
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(AppRadius.medium)
             ) {
-                OutlinedButton(
-                    onClick = { rotationDegrees = (rotationDegrees + 90) % 360 },
-                    modifier = Modifier.weight(1f)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppSpacing.md)
                 ) {
-                    Icon(imageVector = Icons.Default.RotateRight, contentDescription = null)
-                    Spacer(modifier = Modifier.padding(start = 4.dp))
-                    Text("Rotate ($rotationDegrees°)")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Rotation",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "$rotationDegrees°",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(AppSpacing.xs))
+                    Slider(
+                        value = rotationDegrees.toFloat(),
+                        onValueChange = { emitChange(r = it.toInt()) },
+                        valueRange = 0f..360f,
+                        steps = 35,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(0, 90, 180, 270).forEach { deg ->
+                            FilterChip(
+                                selected = (rotationDegrees % 360) == deg,
+                                onClick = { emitChange(r = deg) },
+                                label = { Text("$deg°") },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { emitChange(r = (rotationDegrees + 90) % 360) },
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.RotateRight, contentDescription = null)
+                            Spacer(Modifier.padding(start = 2.dp))
+                            Text("+90°")
+                        }
+                    }
                 }
+            }
 
-                OutlinedButton(
-                    onClick = {
-                        rotationDegrees = 0
-                        scale = 1.0f
-                    },
-                    modifier = Modifier.weight(1f)
+            Spacer(modifier = Modifier.height(AppSpacing.md))
+
+            // 3. POSITION (X / Y) CONTROLS
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(AppRadius.medium)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppSpacing.md)
                 ) {
-                    Text("Reset")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Position (X: ${posX.toInt()}, Y: ${posY.toInt()})",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedButton(
+                            onClick = { emitChange(x = 0f, y = 0f) }
+                        ) {
+                            Icon(imageVector = Icons.Default.CenterFocusStrong, contentDescription = null)
+                            Spacer(Modifier.padding(start = 2.dp))
+                            Text("Center")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(AppSpacing.xs))
+                    Text(
+                        text = "Horizontal (X)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Slider(
+                        value = posX,
+                        onValueChange = { emitChange(x = it) },
+                        valueRange = -500f..500f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text(
+                        text = "Vertical (Y)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Slider(
+                        value = posY,
+                        onValueChange = { emitChange(y = it) },
+                        valueRange = -500f..500f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(AppSpacing.lg))
 
             AppPrimaryButton(
-                text = "Apply Transform",
-                onClick = {
-                    onTransformChanged(
-                        currentTransform.copy(
-                            rotation = rotationDegrees.toFloat(),
-                            scaleX = scale,
-                            scaleY = scale
-                        )
-                    )
-                    onDismiss()
-                },
+                text = "Done",
+                onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             )
 

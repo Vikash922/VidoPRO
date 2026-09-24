@@ -92,7 +92,23 @@ class Media3ProjectExporter(
                 }
 
                 // Apply per-clip video effects (brightness, contrast, saturation, exposure, filters)
-                val clipVideoEffects = Media3EffectHelper.createMedia3Effects(clip.effects)
+                val clipVideoEffects = mutableListOf<androidx.media3.common.Effect>()
+                clipVideoEffects.addAll(Media3EffectHelper.createMedia3Effects(clip.effects))
+
+                // Apply per-clip transform effect (position, scale, rotation, keyframes)
+                val transformEffect = Media3EffectHelper.createTransformEffect(clip, settings.width, settings.height)
+                if (transformEffect != null) {
+                    clipVideoEffects.add(transformEffect)
+                }
+
+                // Apply per-clip opacity effect (dimming toward background canvas)
+                if (clip.transform.opacity < 1.0f) {
+                    val opacityEffect = Media3EffectHelper.createOpacityEffect(clip.transform.opacity)
+                    if (opacityEffect != null) {
+                        clipVideoEffects.add(opacityEffect)
+                    }
+                }
+
                 if (clipVideoEffects.isNotEmpty()) {
                     editedItemBuilder.setEffects(Effects(emptyList(), clipVideoEffects))
                 }

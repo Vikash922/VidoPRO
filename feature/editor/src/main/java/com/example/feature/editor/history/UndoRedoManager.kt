@@ -67,6 +67,9 @@ class UndoRedoManager(
             lastCmd is TrimEndCommand && newCmd is TrimEndCommand -> {
                 lastCmd.clipId == newCmd.clipId
             }
+            lastCmd is UpdateClipTransformCommand && newCmd is UpdateClipTransformCommand -> {
+                lastCmd.clipId == newCmd.clipId
+            }
             lastCmd is StateSnapshotCommand && newCmd is StateSnapshotCommand -> {
                 val lastAction = lastCmd.action
                 val newAction = newCmd.action

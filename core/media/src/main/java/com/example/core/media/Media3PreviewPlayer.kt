@@ -160,6 +160,23 @@ class Media3PreviewPlayer(
         val totalDuration = sorted.maxOfOrNull { it.endTimeMs } ?: 0L
         _durationMs.value = totalDuration
 
+        // Check if underlying media sources actually changed (URIs, clip boundaries, speed, duration).
+        // If only visual properties (transform, effects, keyframes) changed, avoid re-preparing ExoPlayer.
+        val sourcesUnchanged = clipsList.size == sorted.size && clipsList.zip(sorted).all { (old, new) ->
+            old.id == new.id &&
+            old.assetId == new.assetId &&
+            old.inPointMs == new.inPointMs &&
+            old.outPointMs == new.outPointMs &&
+            old.speed == new.speed &&
+            old.startTimeMs == new.startTimeMs &&
+            old.durationMs == new.durationMs
+        } && assets == assetsMap
+
+        if (sourcesUnchanged && exoPlayer.mediaItemCount == sorted.size) {
+            clipsList = sorted
+            return
+        }
+
         val mediaItems = sorted.mapNotNull { clip -> buildMediaItem(clip, assets) }
 
         exoPlayer.setMediaItems(mediaItems)

@@ -1,11 +1,16 @@
 package com.example.core.media
 
+import android.graphics.Matrix
 import androidx.media3.common.Effect
 import androidx.media3.effect.Contrast
 import androidx.media3.effect.HslAdjustment
+import androidx.media3.effect.MatrixTransformation
 import androidx.media3.effect.RgbAdjustment
 import androidx.media3.effect.RgbFilter
+import com.example.core.model.Clip
 import com.example.core.model.EffectType
+import com.example.core.model.KeyframeProperty
+import com.example.core.model.Transform
 import kotlin.math.pow
 
 /**
@@ -115,5 +120,59 @@ object Media3EffectHelper {
         }
 
         return result
+    }
+
+    /**
+     * Creates an [Effect] representing a clip's 2D transform (position, scale, rotation),
+     * dynamically evaluated from keyframes or static transform.
+     *
+     * Returns null if the clip has default transform and no keyframes.
+     */
+    fun createTransformEffect(
+        clip: Clip,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ): Effect? {
+        val hasKeyframes = clip.keyframes.any { it.property in KeyframeProperty.ALL }
+        val baseTransform = clip.transform
+        if (!hasKeyframes && baseTransform == Transform.DEFAULT) {
+            return null
+        }
+
+        return MatrixTransformation { presentationTimeUs ->
+            val timeMs = clip.startTimeMs + (presentationTimeUs / 1000L)
+            val currentT = if (hasKeyframes) {
+                KeyframeEvaluator.evaluateTransform(clip, timeMs)
+            } else {
+                baseTransform
+            }
+
+            val matrix = Matrix()
+            // 1. Scale around center (0, 0)
+            matrix.postScale(currentT.scaleX, currentT.scaleY)
+            // 2. Rotate around center (0, 0)
+            // Screen clockwise rotation -> NDC counter-clockwise (-rotation)
+            matrix.postRotate(-currentT.rotation)
+            // 3. Translate in NDC coordinates
+            val (ndcDx, ndcDy) = CanvasCoordinateHelper.toNdcCoordinates(currentT, canvasWidth, canvasHeight)
+            matrix.postTranslate(ndcDx, ndcDy)
+
+            matrix
+        }
+    }
+
+    /**
+     * Creates an [Effect] to adjust clip opacity by scaling RGB values toward the background.
+     * Returns null if opacity is 1.0f (fully opaque).
+     */
+    fun createOpacityEffect(opacity: Float): Effect? {
+        val clamped = opacity.coerceIn(0f, 1f)
+        if (clamped >= 1f) return null
+
+        return RgbAdjustment.Builder()
+            .setRedScale(clamped)
+            .setGreenScale(clamped)
+            .setBlueScale(clamped)
+            .build()
     }
 }
