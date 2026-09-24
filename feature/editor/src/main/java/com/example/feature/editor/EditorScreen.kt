@@ -279,17 +279,18 @@ fun EditorScreen(
                             .background(Color.Black),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (player != null && hasClips) {
-                            val density = LocalDensity.current
-                            val canvasWidthPx = with(density) { canvasWidth.toPx() }
-                            val canvasHeightPx = with(density) { canvasHeight.toPx() }
-                            val projectWidth = uiState.project?.width ?: 1080
-                            val projectHeight = uiState.project?.height ?: 1920
+                        val density = LocalDensity.current
+                        val canvasWidthPx = with(density) { canvasWidth.toPx() }
+                        val canvasHeightPx = with(density) { canvasHeight.toPx() }
+                        val projectWidth = uiState.project?.width ?: 1080
+                        val projectHeight = uiState.project?.height ?: 1920
 
-                            val renderScene = remember(uiState.project, uiState.assets) {
-                                uiState.project?.let { RenderSceneBuilder.buildScene(it, uiState.assets) }
-                            }
-                            val canvasConfig = renderScene?.canvasConfig ?: CanvasConfig(projectWidth, projectHeight, currentAspectRatio)
+                        val renderScene = remember(uiState.project, uiState.assets) {
+                            uiState.project?.let { RenderSceneBuilder.buildScene(it, uiState.assets) }
+                        }
+                        val canvasConfig = renderScene?.canvasConfig ?: CanvasConfig(projectWidth, projectHeight, currentAspectRatio)
+
+                        if (player != null && hasClips) {
 
                             val mainTrack = uiState.project?.tracks?.find { it.type == TrackType.VIDEO }
                             val mainClips = mainTrack?.clips ?: emptyList()
@@ -306,7 +307,7 @@ fun EditorScreen(
                                 val activeTransition = renderScene?.activeTransitionAt(uiState.playheadPositionMs)
                                 if (activeTransition != null && activeTransition.type != com.example.core.model.TransitionType.NONE) {
                                     val progress = activeTransition.progressAt(uiState.playheadPositionMs)
-                                    val isOutgoing = uiState.playheadPositionMs < activeTransition.cutTimeMs
+                                    val isOutgoing = uiState.playheadPositionMs < activeTransition.boundaryTimeMs
                                     if (isOutgoing) {
                                         com.example.core.media.transition.TransitionEvaluator.evaluateOutgoingTransform(
                                             transition = activeTransition,
@@ -392,9 +393,6 @@ fun EditorScreen(
                                         scaleY = previewTransform.scaleY
                                         rotationZ = previewTransform.rotation
                                         alpha = previewTransform.opacity
-                                        if (activeMainClip != null && activeMainClip.blendMode != com.example.core.model.BlendMode.NORMAL) {
-                                            blendMode = com.example.core.media.blend.BlendModeHelper.toComposeBlendMode(activeMainClip.blendMode)
-                                        }
                                     }
                                     .then(if (mainMaskShape != null) Modifier.clip(mainMaskShape) else Modifier)
                                     .pointerInput(activeMainClip?.id, isMainVideoSelected) {
@@ -619,7 +617,6 @@ fun EditorScreen(
                                         scaleY = previewTransform.scaleY
                                         rotationZ = previewTransform.rotation
                                         alpha = previewTransform.opacity
-                                        blendMode = com.example.core.media.blend.BlendModeHelper.toComposeBlendMode(overlayClip.blendMode)
                                     }
                                     .size(baseWidth, baseHeight)
                                     .pointerInput(overlayClip.id) {
