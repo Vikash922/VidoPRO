@@ -170,6 +170,8 @@ class ProjectRepositoryImpl(
         }
     }
 
+    override suspend fun saveProject(project: Project) = updateProject(project)
+
     override suspend fun deleteProject(projectId: String) = withContext(dispatchers.io) {
         projectDao.deleteById(projectId)
     }

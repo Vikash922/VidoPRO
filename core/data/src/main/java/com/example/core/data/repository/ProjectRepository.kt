@@ -10,6 +10,7 @@ interface ProjectRepository {
     fun observeProjects(): Flow<List<Project>>
     fun observeProjectById(projectId: String): Flow<Project?>
     suspend fun updateProject(project: Project)
+    suspend fun saveProject(project: Project) = updateProject(project)
     suspend fun deleteProject(projectId: String)
     suspend fun duplicateProject(projectId: String): Project?
 }
