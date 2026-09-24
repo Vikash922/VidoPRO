@@ -58,5 +58,11 @@ sealed interface TimelineAction {
     data class MoveKeyframe(val clipId: String, val keyframeId: String, val newTimeMs: Long) : TimelineAction
     /** Updates the effects applied to a clip. */
     data class UpdateClipEffects(val clipId: String, val effects: List<Effect>) : TimelineAction
+    /** Adds a transition between two adjacent clips on a track. */
+    data class AddTransition(val transition: com.example.core.model.Transition) : TimelineAction
+    /** Updates an existing transition's type, duration, or parameters. */
+    data class UpdateTransition(val transition: com.example.core.model.Transition) : TimelineAction
+    /** Removes a transition. */
+    data class RemoveTransition(val transitionId: String) : TimelineAction
 }
 

@@ -28,7 +28,8 @@ enum class EditorTool(val label: String) {
     TRANSFORM("Transform"),
     CANVAS("Canvas"),
     KEYFRAME("Keyframe"),
-    BEATS("Beat Sync")
+    BEATS("Beat Sync"),
+    TRANSITION("Transition")
 }
 
 @Immutable
@@ -51,6 +52,8 @@ data class EditorUiState(
     val isTransformSheetVisible: Boolean = false,
     val isKeyframeSheetVisible: Boolean = false,
     val isBeatsSheetVisible: Boolean = false,
+    val isTransitionSheetVisible: Boolean = false,
+    val editingTransitionPair: Pair<String, String>? = null,
     val filterSettings: com.example.feature.editor.filter.FilterSettings = com.example.feature.editor.filter.FilterSettings(),
     val assets: Map<String, com.example.core.model.Asset> = emptyMap(),
     val beatMarkers: Set<Long> = emptySet(),

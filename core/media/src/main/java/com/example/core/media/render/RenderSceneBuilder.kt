@@ -186,6 +186,46 @@ object RenderSceneBuilder {
             }
         }
 
+        // 5. Transitions
+        val transitions = mutableListOf<RenderTransition>()
+        for (track in project.tracks) {
+            for (transition in track.transitions) {
+                if (transition.type == com.example.core.model.TransitionType.NONE) continue
+
+                val firstClip = track.clips.find { it.id == transition.firstClipId } ?: continue
+                val secondClip = track.clips.find { it.id == transition.secondClipId } ?: continue
+
+                val boundaryTimeMs = firstClip.endTimeMs
+                val halfDuration = transition.durationMs / 2
+                val startTimeMs = (boundaryTimeMs - halfDuration).coerceAtLeast(0L)
+                val endTimeMs = boundaryTimeMs + halfDuration
+
+                val direction = try {
+                    if (transition.parametersJson != null) {
+                        org.json.JSONObject(transition.parametersJson).optString("direction", "LEFT")
+                    } else "LEFT"
+                } catch (_: Exception) {
+                    "LEFT"
+                }
+
+                transitions.add(
+                    RenderTransition(
+                        id = transition.id,
+                        trackId = track.id,
+                        firstClipId = transition.firstClipId,
+                        secondClipId = transition.secondClipId,
+                        type = transition.type,
+                        durationMs = transition.durationMs,
+                        boundaryTimeMs = boundaryTimeMs,
+                        startTimeMs = startTimeMs,
+                        endTimeMs = endTimeMs,
+                        direction = direction,
+                        parametersJson = transition.parametersJson
+                    )
+                )
+            }
+        }
+
         val totalDurationMs = maxOf(
             project.durationMs,
             (videoLayers.map { it.timelineEndMs } +
@@ -200,7 +240,8 @@ object RenderSceneBuilder {
             videoLayers = videoLayers,
             imageLayers = imageLayers,
             textLayers = textLayers,
-            audioLayers = audioLayers
+            audioLayers = audioLayers,
+            transitions = transitions
         )
     }
 }

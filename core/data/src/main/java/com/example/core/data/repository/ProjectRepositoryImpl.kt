@@ -28,6 +28,7 @@ class ProjectRepositoryImpl(
     private val effectDao = database.effectDao()
     private val keyframeDao = database.keyframeDao()
     private val textClipDao = database.textClipDao()
+    private val transitionDao = database.transitionDao()
 
     override suspend fun createProject(name: String, aspectRatio: AspectRatio): Project = withContext(dispatchers.io) {
         val (width, height) = when (aspectRatio) {
@@ -72,12 +73,14 @@ class ProjectRepositoryImpl(
 
     override suspend fun getProjectById(projectId: String): Project? = withContext(dispatchers.io) {
         val projectWithTracks = projectDao.getProjectWithTracks(projectId) ?: return@withContext null
+        val transitions = transitionDao.getByProjectId(projectId).map { it.toDomain() }
         val tracks = projectWithTracks.tracks.map { trackWithClips ->
             val detailedClips = trackWithClips.clips.map { clipEntity ->
                 val clipWithDetails = clipDao.getClipWithDetails(clipEntity.id)
                 clipWithDetails?.toDomain() ?: clipEntity.toDomain()
             }
-            trackWithClips.track.toDomain(clips = detailedClips)
+            val trackTransitions = transitions.filter { it.trackId == trackWithClips.track.id }
+            trackWithClips.track.toDomain(clips = detailedClips, transitions = trackTransitions)
         }
         projectWithTracks.project.toDomain(tracks = tracks)
     }
@@ -93,12 +96,14 @@ class ProjectRepositoryImpl(
             .map { projectWithTracks ->
                 if (projectWithTracks == null) null
                 else {
+                    val transitions = transitionDao.getByProjectId(projectId).map { it.toDomain() }
                     val tracks = projectWithTracks.tracks.map { trackWithClips ->
                         val detailedClips = trackWithClips.clips.map { clipEntity ->
                             val clipWithDetails = clipDao.getClipWithDetails(clipEntity.id)
                             clipWithDetails?.toDomain() ?: clipEntity.toDomain()
                         }
-                        trackWithClips.track.toDomain(clips = detailedClips)
+                        val trackTransitions = transitions.filter { it.trackId == trackWithClips.track.id }
+                        trackWithClips.track.toDomain(clips = detailedClips, transitions = trackTransitions)
                     }
                     projectWithTracks.project.toDomain(tracks = tracks)
                 }
@@ -114,10 +119,15 @@ class ProjectRepositoryImpl(
 
             // Clean existing hierarchy for project
             trackDao.deleteByProjectId(updatedProject.id)
+            transitionDao.deleteByProjectId(updatedProject.id)
 
             // Insert new hierarchy
             for (track in updatedProject.tracks) {
                 trackDao.insert(track.toEntity())
+
+                for (transition in track.transitions) {
+                    transitionDao.insert(transition.toEntity())
+                }
 
                 for (clip in track.clips) {
                     clipDao.insert(clip.toEntity())
@@ -148,10 +158,15 @@ class ProjectRepositoryImpl(
         val original = getProjectById(projectId) ?: return@withContext null
         val newProjectId = UUID.randomUUID().toString()
 
+        val clipIdMap = mutableMapOf<String, String>()
+        val trackIdMap = mutableMapOf<String, String>()
+
         val duplicatedTracks = original.tracks.map { track ->
             val newTrackId = UUID.randomUUID().toString()
+            trackIdMap[track.id] = newTrackId
             val duplicatedClips = track.clips.map { clip ->
                 val newClipId = UUID.randomUUID().toString()
+                clipIdMap[clip.id] = newClipId
                 clip.copy(
                     id = newClipId,
                     trackId = newTrackId,
@@ -160,10 +175,20 @@ class ProjectRepositoryImpl(
                     textData = clip.textData?.copy(clipId = newClipId)
                 )
             }
+            val duplicatedTransitions = track.transitions.map { transition ->
+                transition.copy(
+                    id = UUID.randomUUID().toString(),
+                    projectId = newProjectId,
+                    trackId = newTrackId,
+                    firstClipId = clipIdMap[transition.firstClipId] ?: transition.firstClipId,
+                    secondClipId = clipIdMap[transition.secondClipId] ?: transition.secondClipId
+                )
+            }
             track.copy(
                 id = newTrackId,
                 projectId = newProjectId,
-                clips = duplicatedClips
+                clips = duplicatedClips,
+                transitions = duplicatedTransitions
             )
         }
 

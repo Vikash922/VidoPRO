@@ -75,6 +75,7 @@ fun TimelineContainer(
     onAddMedia: () -> Unit = {},
     onLongPressClip: (clipId: String) -> Unit = {},
     onMoveKeyframe: (clipId: String, keyframeId: String, newTimeMs: Long) -> Unit = { _, _, _ -> },
+    onEditTransition: (firstClipId: String, secondClipId: String) -> Unit = { _, _ -> },
     onSwitchMode: (TimelineMode) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -187,6 +188,7 @@ fun TimelineContainer(
                     }
                 },
                 onMoveKeyframe = onMoveKeyframe,
+                onEditTransition = onEditTransition,
                 onAddMedia = onAddMedia,
                 onAddSubTrackMedia = onAddSubTrackMedia,
                 onZoomChange = { newZoom -> onAction(TimelineAction.SetZoom(newZoom)) },

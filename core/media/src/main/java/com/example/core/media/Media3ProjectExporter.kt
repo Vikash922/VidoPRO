@@ -124,8 +124,16 @@ class Media3ProjectExporter(
                 val clipVideoEffects = mutableListOf<androidx.media3.common.Effect>()
                 clipVideoEffects.addAll(Media3EffectHelper.createMedia3Effects(layer.effects))
 
-                // Apply per-clip transform effect (position, scale, rotation, keyframes)
-                val transformEffect = Media3EffectHelper.createTransformEffect(layer, settings.width, settings.height)
+                // Apply per-clip transform effect (position, scale, rotation, keyframes, transitions)
+                val transitionAsOutgoing = scene.transitions.find { it.firstClipId == layer.id }
+                val transitionAsIncoming = scene.transitions.find { it.secondClipId == layer.id }
+                val transformEffect = Media3EffectHelper.createTransformEffect(
+                    layer = layer,
+                    canvasWidth = settings.width,
+                    canvasHeight = settings.height,
+                    transitionAsOutgoing = transitionAsOutgoing,
+                    transitionAsIncoming = transitionAsIncoming
+                )
                 if (transformEffect != null) {
                     clipVideoEffects.add(transformEffect)
                 }

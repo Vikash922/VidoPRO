@@ -21,7 +21,8 @@ data class Track(
     val order: Int,
     val isVisible: Boolean = true,
     val isLocked: Boolean = false,
-    val clips: List<Clip> = emptyList()
+    val clips: List<Clip> = emptyList(),
+    val transitions: List<Transition> = emptyList()
 )
 
 data class Clip(

@@ -69,7 +69,7 @@ fun Project.toEntity(): ProjectEntity {
 
 // MARK: - Track Mappers
 
-fun TrackEntity.toDomain(clips: List<Clip> = emptyList()): Track {
+fun TrackEntity.toDomain(clips: List<Clip> = emptyList(), transitions: List<Transition> = emptyList()): Track {
     return Track(
         id = id,
         projectId = projectId,
@@ -77,7 +77,8 @@ fun TrackEntity.toDomain(clips: List<Clip> = emptyList()): Track {
         order = trackOrder,
         isVisible = isVisible,
         isLocked = isLocked,
-        clips = clips
+        clips = clips,
+        transitions = transitions
     )
 }
 

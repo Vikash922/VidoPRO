@@ -70,5 +70,13 @@ sealed interface EditorEvent {
     data class SetActiveKeyframeProperty(val property: String) : EditorEvent
     /** Toggles (adds or removes) a keyframe at the current playhead position on the selected clip. */
     data object ToggleKeyframeAtPlayhead : EditorEvent
+    /** Opens the transition editor bottom sheet for the given adjacent clips. */
+    data class OpenTransitionEditor(val firstClipId: String, val secondClipId: String) : EditorEvent
+    /** Controls visibility of the transition bottom sheet. */
+    data class SetTransitionSheetVisible(val visible: Boolean) : EditorEvent
+    /** Applies or updates a transition. */
+    data class ApplyTransition(val transition: com.example.core.model.Transition) : EditorEvent
+    /** Removes a transition. */
+    data class RemoveTransition(val transitionId: String) : EditorEvent
 }
 

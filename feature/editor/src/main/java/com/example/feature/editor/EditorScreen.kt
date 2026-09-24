@@ -296,9 +296,34 @@ fun EditorScreen(
 
                             val activeMainLayer = renderScene?.mainVideoLayerAt(uiState.playheadPositionMs)
 
-                            val currentTransform = remember(activeMainClip, activeMainLayer, uiState.playheadPositionMs) {
-                                activeMainLayer?.evaluateTransformAt(uiState.playheadPositionMs)
+                            val currentTransform = remember(activeMainClip, activeMainLayer, uiState.playheadPositionMs, renderScene) {
+                                val base = activeMainLayer?.evaluateTransformAt(uiState.playheadPositionMs)
                                     ?: (if (activeMainClip != null) RenderTransform.fromDomainTransform(KeyframeEvaluator.evaluateTransform(activeMainClip, uiState.playheadPositionMs)) else RenderTransform.IDENTITY)
+
+                                val activeTransition = renderScene?.activeTransitionAt(uiState.playheadPositionMs)
+                                if (activeTransition != null && activeTransition.type != com.example.core.model.TransitionType.NONE) {
+                                    val progress = activeTransition.progressAt(uiState.playheadPositionMs)
+                                    val isOutgoing = uiState.playheadPositionMs < activeTransition.cutTimeMs
+                                    if (isOutgoing) {
+                                        com.example.core.media.transition.TransitionEvaluator.evaluateOutgoingTransform(
+                                            transition = activeTransition,
+                                            rawProgress = progress,
+                                            baseTransform = base,
+                                            canvasWidth = projectWidth.toFloat(),
+                                            canvasHeight = projectHeight.toFloat()
+                                        )
+                                    } else {
+                                        com.example.core.media.transition.TransitionEvaluator.evaluateIncomingTransform(
+                                            transition = activeTransition,
+                                            rawProgress = progress,
+                                            baseTransform = base,
+                                            canvasWidth = projectWidth.toFloat(),
+                                            canvasHeight = projectHeight.toFloat()
+                                        )
+                                    }
+                                } else {
+                                    base
+                                }
                             }
 
                             val previewTransform = remember(currentTransform, canvasWidthPx, canvasHeightPx) {
@@ -980,6 +1005,7 @@ fun EditorScreen(
                             onAddMedia = { onNavigateMediaPicker(TrackType.VIDEO) },
                             onLongPressClip = { clipId -> onEvent(EditorEvent.LongPressClip(clipId)) },
                             onMoveKeyframe = { clipId, kfId, newMs -> onEvent(EditorEvent.MoveKeyframe(clipId, kfId, newMs)) },
+                            onEditTransition = { firstId, secondId -> onEvent(EditorEvent.OpenTransitionEditor(firstId, secondId)) },
                             onSwitchMode = { newMode -> timelineMode = newMode },
                             modifier = Modifier.fillMaxSize()
                         )
@@ -1018,12 +1044,17 @@ fun EditorScreen(
                                 EditorToolButton(EditorTool.EFFECTS, Icons.Default.AutoFixHigh) { onEvent(EditorEvent.SetFiltersSheetVisible(true)) }
                                 Spacer(Modifier.width(20.dp))
                                 EditorToolButton(EditorTool.FILTERS, Icons.Default.ColorLens) { onEvent(EditorEvent.SetFiltersSheetVisible(true)) }
+                                Spacer(Modifier.width(20.dp))
+                                EditorToolButton(EditorTool.TRANSITION, Icons.Default.Transform) { onEvent(EditorEvent.ToolClicked(EditorTool.TRANSITION)) }
                             } else {
                                 // Clip-specific tools for selected clip
                                 val clip = uiState.selectedClip
                                 EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
                                     onEvent(EditorEvent.SplitSelectedClip)
                                 }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.TRANSITION, Icons.Default.Transform) { onEvent(EditorEvent.ToolClicked(EditorTool.TRANSITION)) }
+                                Spacer(Modifier.width(18.dp))
                                 if (clip?.type == ClipType.TEXT) {
                                     EditorToolButton(EditorTool.TEXT, Icons.Default.Title) {
                                         onEvent(EditorEvent.SetTextSheetVisible(true))
@@ -1313,6 +1344,35 @@ fun EditorScreen(
                 onReset = { onEvent(EditorEvent.ResetFilterSettings) },
                 onDismiss = { onEvent(EditorEvent.SetFiltersSheetVisible(false)) }
             )
+        }
+        if (uiState.isTransitionSheetVisible) {
+            val pair = uiState.editingTransitionPair
+            val allClips = uiState.project?.tracks?.flatMap { it.clips } ?: emptyList()
+            val clipA = allClips.find { it.id == pair?.first }
+            val clipB = allClips.find { it.id == pair?.second }
+            val track = uiState.project?.tracks?.find { t -> t.clips.any { it.id == clipA?.id } }
+            val existingTransition = track?.transitions?.find {
+                it.firstClipId == clipA?.id && it.secondClipId == clipB?.id
+            }
+
+            if (clipA != null && clipB != null) {
+                TransitionBottomSheet(
+                    firstClipId = clipA.id,
+                    secondClipId = clipB.id,
+                    firstClipDurationMs = clipA.durationMs,
+                    secondClipDurationMs = clipB.durationMs,
+                    existingTransition = existingTransition,
+                    onApply = { transition ->
+                        onEvent(EditorEvent.ApplyTransition(transition))
+                    },
+                    onRemove = { transitionId ->
+                        onEvent(EditorEvent.RemoveTransition(transitionId))
+                    },
+                    onDismiss = {
+                        onEvent(EditorEvent.SetTransitionSheetVisible(false))
+                    }
+                )
+            }
         }
     }
 }

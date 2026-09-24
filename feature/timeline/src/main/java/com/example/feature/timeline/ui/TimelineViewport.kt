@@ -69,6 +69,7 @@ fun TimelineViewport(
     onTrimStartDelta: (clipId: String, deltaMs: Long) -> Unit = { _, _ -> },
     onTrimEndDelta: (clipId: String, deltaMs: Long) -> Unit = { _, _ -> },
     onMoveKeyframe: (clipId: String, keyframeId: String, newTimeMs: Long) -> Unit = { _, _, _ -> },
+    onEditTransition: (firstClipId: String, secondClipId: String) -> Unit = { _, _ -> },
     onAddMedia: () -> Unit = {},
     onAddSubTrackMedia: () -> Unit = {},
     onZoomChange: (Float) -> Unit = {},
@@ -146,7 +147,8 @@ fun TimelineViewport(
                                 onMoveClipDelta = onMoveClipDelta,
                                 onTrimStartDelta = onTrimStartDelta,
                                 onTrimEndDelta = onTrimEndDelta,
-                                onMoveKeyframe = onMoveKeyframe
+                                onMoveKeyframe = onMoveKeyframe,
+                                onEditTransition = onEditTransition
                             )
                             TrackType.OVERLAY -> OverlayTrack(
                                 track = track,

@@ -23,8 +23,14 @@ data class RenderScene(
     val imageLayers: List<ImageRenderLayer>,
     val textLayers: List<TextRenderLayer>,
     val audioLayers: List<AudioRenderLayer>,
+    val transitions: List<RenderTransition> = emptyList(),
     val globalEffects: List<Effect> = emptyList()
 ) {
+    /**
+     * Returns the active transition at [projectTimeMs], if any.
+     */
+    fun activeTransitionAt(projectTimeMs: Long): RenderTransition? =
+        transitions.firstOrNull { it.isActiveAt(projectTimeMs) }
     /**
      * All visual layers sorted deterministically by z-index ascending.
      * Rendering order: lowest zIndex drawn first, highest zIndex drawn on top.

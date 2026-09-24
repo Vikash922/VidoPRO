@@ -5,6 +5,8 @@ import com.example.core.model.InterpolationType
 import com.example.core.model.Keyframe
 import com.example.core.model.Track
 import com.example.core.model.TrackType
+import com.example.core.model.Transition
+import com.example.core.media.transition.TransitionValidator
 import java.util.UUID
 
 /**
@@ -65,6 +67,9 @@ object TimelineReducer {
             is TimelineAction.DeleteKeyframe -> handleDeleteKeyframe(state, action.clipId, action.keyframeId)
             is TimelineAction.MoveKeyframe -> handleMoveKeyframe(state, action.clipId, action.keyframeId, action.newTimeMs)
             is TimelineAction.UpdateClipEffects -> handleUpdateClipEffects(state, action.clipId, action.effects)
+            is TimelineAction.AddTransition -> handleAddTransition(state, action.transition)
+            is TimelineAction.UpdateTransition -> handleUpdateTransition(state, action.transition)
+            is TimelineAction.RemoveTransition -> handleRemoveTransition(state, action.transitionId)
         }
     }
 
@@ -195,7 +200,8 @@ object TimelineReducer {
                 val resolved = if (track.type == TrackType.VIDEO) {
                     resolveMainTrackOverlaps(updatedClips)
                 } else updatedClips
-                track.copy(clips = resolved)
+                val sanitizedTransitions = sanitizeTransitions(track.copy(clips = resolved))
+                track.copy(clips = resolved, transitions = sanitizedTransitions)
             } else track
         }
 
@@ -233,7 +239,8 @@ object TimelineReducer {
                 val resolved = if (track.type == TrackType.VIDEO) {
                     resolveMainTrackOverlaps(updatedClips)
                 } else updatedClips
-                track.copy(clips = resolved)
+                val sanitizedTransitions = sanitizeTransitions(track.copy(clips = resolved))
+                track.copy(clips = resolved, transitions = sanitizedTransitions)
             } else track
         }
 
@@ -306,7 +313,11 @@ object TimelineReducer {
                     }
                 }
                 val resolvedClips = if (track.type == TrackType.VIDEO) resolveMainTrackOverlaps(newClips) else newClips
-                track.copy(clips = resolvedClips)
+                val remappedTransitions = track.transitions.map { trans ->
+                    if (trans.firstClipId == clipId) trans.copy(firstClipId = secondClipId) else trans
+                }
+                val sanitizedTransitions = sanitizeTransitions(track.copy(clips = resolvedClips, transitions = remappedTransitions))
+                track.copy(clips = resolvedClips, transitions = sanitizedTransitions)
             } else track
         }
 
@@ -323,7 +334,8 @@ object TimelineReducer {
                 val resolved = if (track.type == TrackType.VIDEO) {
                     resolveMainTrackOverlaps(remaining)
                 } else remaining
-                track.copy(clips = resolved)
+                val remainingTransitions = track.transitions.filterNot { it.firstClipId == clipId || it.secondClipId == clipId }
+                track.copy(clips = resolved, transitions = remainingTransitions)
             } else track
         }
 
@@ -585,6 +597,101 @@ object TimelineReducer {
             track.copy(clips = track.clips.map { c ->
                 if (c.id == clipId) c.copy(keyframes = updatedKeyframes) else c
             })
+        }
+        return state.copy(tracks = updatedTracks)
+    }
+
+    /** Sanitizes and clamps all transitions for a track based on the actual duration of adjacent clips. */
+    private fun sanitizeTransitions(track: Track): List<Transition> {
+        val clipMap = track.clips.associateBy { it.id }
+        return track.transitions.mapNotNull { transition ->
+            val clipA = clipMap[transition.firstClipId] ?: return@mapNotNull null
+            val clipB = clipMap[transition.secondClipId] ?: return@mapNotNull null
+            val clampedDuration = TransitionValidator.validateAndClamp(
+                transition.durationMs,
+                clipA.durationMs,
+                clipB.durationMs
+            )
+            if (clampedDuration > 0L) {
+                transition.copy(durationMs = clampedDuration)
+            } else {
+                null
+            }
+        }
+    }
+
+    /** Adds or replaces a transition between two adjacent clips on a track. */
+    private fun handleAddTransition(state: TimelineEngineState, transition: Transition): TimelineEngineState {
+        val targetTrack = state.tracks.find { track ->
+            track.clips.any { it.id == transition.firstClipId } &&
+            track.clips.any { it.id == transition.secondClipId }
+        } ?: return state
+
+        val clipA = targetTrack.clips.find { it.id == transition.firstClipId } ?: return state
+        val clipB = targetTrack.clips.find { it.id == transition.secondClipId } ?: return state
+
+        val clampedDuration = TransitionValidator.validateAndClamp(
+            transition.durationMs,
+            clipA.durationMs,
+            clipB.durationMs
+        )
+        if (clampedDuration <= 0L) return state
+
+        val validatedTransition = transition.copy(durationMs = clampedDuration)
+
+        val updatedTracks = state.tracks.map { track ->
+            if (track.id == targetTrack.id) {
+                val filteredTransitions = track.transitions.filterNot {
+                    (it.firstClipId == transition.firstClipId && it.secondClipId == transition.secondClipId) ||
+                    it.id == transition.id
+                }
+                track.copy(transitions = filteredTransitions + validatedTransition)
+            } else {
+                track
+            }
+        }
+        return state.copy(tracks = updatedTracks)
+    }
+
+    /** Updates an existing transition's parameters (e.g. type, duration, properties). */
+    private fun handleUpdateTransition(state: TimelineEngineState, transition: Transition): TimelineEngineState {
+        val targetTrack = state.tracks.find { track ->
+            track.transitions.any { it.id == transition.id } ||
+            (track.clips.any { it.id == transition.firstClipId } && track.clips.any { it.id == transition.secondClipId })
+        } ?: return state
+
+        val clipA = targetTrack.clips.find { it.id == transition.firstClipId }
+        val clipB = targetTrack.clips.find { it.id == transition.secondClipId }
+
+        val clampedDuration = if (clipA != null && clipB != null) {
+            TransitionValidator.validateAndClamp(
+                transition.durationMs,
+                clipA.durationMs,
+                clipB.durationMs
+            )
+        } else {
+            transition.durationMs
+        }
+
+        val validatedTransition = transition.copy(durationMs = clampedDuration)
+
+        val updatedTracks = state.tracks.map { track ->
+            if (track.id == targetTrack.id) {
+                val updatedTransitions = track.transitions.map {
+                    if (it.id == transition.id) validatedTransition else it
+                }
+                track.copy(transitions = updatedTransitions)
+            } else {
+                track
+            }
+        }
+        return state.copy(tracks = updatedTracks)
+    }
+
+    /** Removes a transition by ID across all tracks. */
+    private fun handleRemoveTransition(state: TimelineEngineState, transitionId: String): TimelineEngineState {
+        val updatedTracks = state.tracks.map { track ->
+            track.copy(transitions = track.transitions.filterNot { it.id == transitionId })
         }
         return state.copy(tracks = updatedTracks)
     }

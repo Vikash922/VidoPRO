@@ -163,22 +163,45 @@ object Media3EffectHelper {
 
     /**
      * Creates an [Effect] representing a [com.example.core.media.render.VideoRenderLayer]'s 2D transform,
-     * evaluated dynamically from keyframes or static transform.
+     * evaluated dynamically from keyframes, static transform, and active transitions.
      */
     fun createTransformEffect(
         layer: com.example.core.media.render.VideoRenderLayer,
         canvasWidth: Int,
-        canvasHeight: Int
+        canvasHeight: Int,
+        transitionAsOutgoing: com.example.core.media.render.RenderTransition? = null,
+        transitionAsIncoming: com.example.core.media.render.RenderTransition? = null
     ): Effect? {
         val hasKeyframes = layer.keyframes.any { it.property in KeyframeProperty.ALL }
         val baseTransform = layer.transform
-        if (!hasKeyframes && baseTransform == Transform.DEFAULT) {
+        val hasTransition = transitionAsOutgoing != null || transitionAsIncoming != null
+        if (!hasKeyframes && baseTransform == Transform.DEFAULT && !hasTransition) {
             return null
         }
 
         return MatrixTransformation { presentationTimeUs ->
             val timeMs = layer.timelineStartMs + (presentationTimeUs / 1000L)
-            val currentT = layer.evaluateTransformAt(timeMs)
+            var currentT = layer.evaluateTransformAt(timeMs)
+
+            if (transitionAsOutgoing != null && transitionAsOutgoing.isActiveAt(timeMs)) {
+                val progress = transitionAsOutgoing.progressAt(timeMs)
+                currentT = com.example.core.media.transition.TransitionEvaluator.evaluateOutgoingTransform(
+                    transition = transitionAsOutgoing,
+                    rawProgress = progress,
+                    baseTransform = currentT,
+                    canvasWidth = canvasWidth.toFloat(),
+                    canvasHeight = canvasHeight.toFloat()
+                )
+            } else if (transitionAsIncoming != null && transitionAsIncoming.isActiveAt(timeMs)) {
+                val progress = transitionAsIncoming.progressAt(timeMs)
+                currentT = com.example.core.media.transition.TransitionEvaluator.evaluateIncomingTransform(
+                    transition = transitionAsIncoming,
+                    rawProgress = progress,
+                    baseTransform = currentT,
+                    canvasWidth = canvasWidth.toFloat(),
+                    canvasHeight = canvasHeight.toFloat()
+                )
+            }
 
             val matrix = Matrix()
             matrix.postScale(currentT.scaleX, currentT.scaleY)

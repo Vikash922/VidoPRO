@@ -219,6 +219,16 @@ class EditorViewModel(
                         onTimelineAction(TimelineAction.ToggleBeatMarker(_uiState.value.playheadPositionMs))
                     }
                     EditorTool.TRANSFORM -> { _uiState.update { it.copy(isTransformSheetVisible = true) } }
+                    EditorTool.TRANSITION -> {
+                        val clips = _uiState.value.project?.tracks?.find { it.type == TrackType.VIDEO }?.clips?.sortedBy { it.startTimeMs } ?: emptyList()
+                        val playhead = _uiState.value.playheadPositionMs
+                        val activePair = clips.zipWithNext().find { (a, b) ->
+                            playhead in a.startTimeMs..b.endTimeMs || kotlin.math.abs(a.endTimeMs - playhead) <= 500L
+                        }
+                        if (activePair != null) {
+                            _uiState.update { it.copy(isTransitionSheetVisible = true, editingTransitionPair = activePair.first.id to activePair.second.id) }
+                        }
+                    }
                     EditorTool.DELETE -> {
                         currentClipId?.let { onTimelineAction(TimelineAction.DeleteClip(it)) }
                     }
@@ -442,6 +452,18 @@ class EditorViewModel(
             }
             is EditorEvent.ToggleKeyframeAtPlayhead -> {
                 handleToggleKeyframeAtPlayhead()
+            }
+            is EditorEvent.OpenTransitionEditor -> {
+                _uiState.update { it.copy(isTransitionSheetVisible = true, editingTransitionPair = event.firstClipId to event.secondClipId) }
+            }
+            is EditorEvent.SetTransitionSheetVisible -> {
+                _uiState.update { it.copy(isTransitionSheetVisible = event.visible) }
+            }
+            is EditorEvent.ApplyTransition -> {
+                onTimelineAction(TimelineAction.AddTransition(event.transition))
+            }
+            is EditorEvent.RemoveTransition -> {
+                onTimelineAction(TimelineAction.RemoveTransition(event.transitionId))
             }
             else -> {}
         }
