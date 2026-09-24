@@ -23,6 +23,8 @@ class TimelineHistory(
         redoStack.clear()
     }
 
+    fun record(currentState: TimelineEngineState) = pushState(currentState)
+
     fun undo(currentState: TimelineEngineState): TimelineEngineState? {
         if (undoStack.isEmpty()) return null
         redoStack.addLast(currentState)

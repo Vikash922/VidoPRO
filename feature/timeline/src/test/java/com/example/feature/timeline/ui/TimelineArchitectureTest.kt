@@ -166,8 +166,8 @@ class TimelineArchitectureTest {
 
         // Keyframes belong to individual Clip properties (List<Keyframe>)
         val clipKeyframes = listOf(
-            Keyframe(id = "kf_1", property = "scaleX", timeMs = 1500L, value = 1.2f, interpolation = InterpolationType.LINEAR),
-            Keyframe(id = "kf_2", property = "rotation", timeMs = 3000L, value = 45f, interpolation = InterpolationType.EASE_IN_OUT)
+            Keyframe(id = "kf_1", clipId = "video_1", property = "scaleX", timeMs = 1500L, value = 1.2f, interpolation = InterpolationType.LINEAR),
+            Keyframe(id = "kf_2", clipId = "video_1", property = "rotation", timeMs = 3000L, value = 45f, interpolation = InterpolationType.EASE_IN_OUT)
         )
 
         val clip = Clip(

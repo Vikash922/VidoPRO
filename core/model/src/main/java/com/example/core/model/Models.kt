@@ -182,7 +182,7 @@ data class EffectStack(
 
 data class Keyframe(
     val id: String,
-    val clipId: String,
+    val clipId: String = "",
     val property: String,
     val timeMs: Long,
     val value: Float,
