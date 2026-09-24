@@ -151,9 +151,11 @@ class Media3ProjectExporter(
             val videoDurationMs = clips.maxOfOrNull { it.endTimeMs } ?: project.durationMs
             val totalTimelineDurationMs = maxOf(videoDurationMs, project.durationMs)
 
-            val mappedTracksSegments = audioTracks.mapNotNull { track ->
-                val segments = AudioTimelineMapper.mapTrackToSegments(track, assets, totalTimelineDurationMs)
-                if (segments.any { it is AudioTimelineSegment.ClipSegment }) segments else null
+            val mappedTracksSegments = audioTracks.flatMap { track ->
+                AudioTimelineMapper.partitionIntoNonOverlappingLayers(track.clips).mapNotNull { layer ->
+                    val segments = AudioTimelineMapper.mapClipsToSegments(layer, assets, totalTimelineDurationMs)
+                    if (segments.any { it is AudioTimelineSegment.ClipSegment }) segments else null
+                }
             }
 
             if (mappedTracksSegments.isNotEmpty()) {

@@ -111,15 +111,49 @@ object AudioTimelineMapper {
                     volume = (clip.volume ?: 1f).coerceIn(0f, 1f)
                 )
             )
-            currentTimeMs = clip.startTimeMs + segmentDuration
+        currentTimeMs = maxOf(currentTimeMs, clip.startTimeMs + segmentDuration)
+    }
+
+    // 3. Fill trailing gap up to totalDurationMs
+    if (totalDurationMs > currentTimeMs) {
+        segments.add(AudioTimelineSegment.GapSegment(currentTimeMs, totalDurationMs - currentTimeMs))
+    }
+
+    return segments
+}
+
+    /**
+     * Maps a list of audio clips (which may contain overlapping clips) into one or more
+     * independent non-overlapping layers of [AudioTimelineSegment]s.
+     * Each layer covers the complete timeline from 0 to [totalDurationMs].
+     */
+    fun mapClipsToLayers(
+        clips: List<Clip>,
+        assets: Map<String, Asset>,
+        totalDurationMs: Long = 0L
+    ): List<List<AudioTimelineSegment>> {
+        val validClips = clips
+            .filter { clip ->
+                clip.isVisible &&
+                (clip.volume ?: 1f) > 0f &&
+                clip.durationMs > 0L &&
+                clip.assetId != null &&
+                assets.containsKey(clip.assetId)
+            }
+            .sortedBy { it.startTimeMs }
+
+        if (validClips.isEmpty()) {
+            return if (totalDurationMs > 0L) {
+                listOf(listOf(AudioTimelineSegment.GapSegment(0L, totalDurationMs)))
+            } else {
+                emptyList()
+            }
         }
 
-        // 3. Fill trailing gap up to totalDurationMs
-        if (totalDurationMs > currentTimeMs) {
-            segments.add(AudioTimelineSegment.GapSegment(currentTimeMs, totalDurationMs - currentTimeMs))
+        val layers = partitionIntoNonOverlappingLayers(validClips)
+        return layers.map { layer ->
+            mapClipsToSegments(layer, assets, totalDurationMs)
         }
-
-        return segments
     }
 
     /**
