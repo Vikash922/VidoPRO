@@ -44,10 +44,15 @@ data class Clip(
     val textData: TextClipData? = null,
     /** Alight-Motion-style clip group. Clips sharing the same non-null groupId
      *  receive bulk edits together (speed, volume, transform, delete, duplicate). */
-    val groupId: String? = null
+    val groupId: String? = null,
+    val mask: ClipMask? = null,
+    val blendMode: BlendMode = BlendMode.NORMAL
 ) {
     val endTimeMs: Long
         get() = startTimeMs + durationMs
+
+    val effectStack: EffectStack
+        get() = EffectStack(effects)
 }
 
 data class Asset(
@@ -88,6 +93,79 @@ data class Effect(
     val parameters: Map<String, Float> = emptyMap()
 )
 
+data class ClipMask(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val shape: MaskShape = MaskShape.RECTANGLE,
+    val x: Float = 0f,
+    val y: Float = 0f,
+    val width: Float = 0.8f,
+    val height: Float = 0.8f,
+    val feather: Float = 0f,
+    val opacity: Float = 1.0f,
+    val rotation: Float = 0f,
+    val isInverted: Boolean = false
+) {
+    fun toEffect(clipId: String): Effect {
+        return Effect(
+            id = id,
+            clipId = clipId,
+            type = EffectType.MASK,
+            order = 998,
+            isEnabled = true,
+            parameters = mapOf(
+                "shape" to shape.ordinal.toFloat(),
+                "x" to x,
+                "y" to y,
+                "width" to width,
+                "height" to height,
+                "feather" to feather,
+                "opacity" to opacity,
+                "rotation" to rotation,
+                "isInverted" to if (isInverted) 1f else 0f
+            )
+        )
+    }
+
+    companion object {
+        fun fromEffect(effect: Effect): ClipMask {
+            val p = effect.parameters
+            val shapeOrdinal = (p["shape"] ?: 0f).toInt().coerceIn(0, MaskShape.values().size - 1)
+            return ClipMask(
+                id = effect.id,
+                shape = MaskShape.values()[shapeOrdinal],
+                x = p["x"] ?: 0f,
+                y = p["y"] ?: 0f,
+                width = p["width"] ?: 0.8f,
+                height = p["height"] ?: 0.8f,
+                feather = p["feather"] ?: 0f,
+                opacity = p["opacity"] ?: 1.0f,
+                rotation = p["rotation"] ?: 0f,
+                isInverted = (p["isInverted"] ?: 0f) > 0.5f
+            )
+        }
+    }
+}
+
+data class EffectStack(
+    val effects: List<Effect> = emptyList()
+) {
+    fun activeEffects(): List<Effect> = effects.filter { it.isEnabled }.sortedBy { it.order }
+    fun getEffect(type: EffectType): Effect? = effects.find { it.type == type && it.isEnabled }
+    fun withEffect(effect: Effect): EffectStack {
+        val existingIndex = effects.indexOfFirst { it.type == effect.type || it.id == effect.id }
+        val updated = if (existingIndex >= 0) {
+            effects.mapIndexed { idx, e -> if (idx == existingIndex) effect else e }
+        } else {
+            effects + effect
+        }
+        return EffectStack(updated.sortedBy { it.order })
+    }
+    fun withoutEffect(effectId: String): EffectStack =
+        EffectStack(effects.filterNot { it.id == effectId })
+    fun withoutEffectType(type: EffectType): EffectStack =
+        EffectStack(effects.filterNot { it.type == type })
+}
+
 data class Keyframe(
     val id: String,
     val clipId: String,
@@ -110,7 +188,24 @@ object KeyframeProperty {
     const val OPACITY = "opacity"
     const val VOLUME = "volume"
 
-    val ALL = listOf(POSITION_X, POSITION_Y, SCALE_X, SCALE_Y, ROTATION, OPACITY, VOLUME)
+    // Keyframeable Effect & Mask properties
+    const val BRIGHTNESS = "brightness"
+    const val CONTRAST = "contrast"
+    const val SATURATION = "saturation"
+    const val EXPOSURE = "exposure"
+    const val TEMPERATURE = "temperature"
+    const val TINT = "tint"
+    const val HIGHLIGHTS = "highlights"
+    const val SHADOWS = "shadows"
+    const val MASK_X = "maskX"
+    const val MASK_Y = "maskY"
+    const val MASK_FEATHER = "maskFeather"
+
+    val ALL = listOf(
+        POSITION_X, POSITION_Y, SCALE_X, SCALE_Y, ROTATION, OPACITY, VOLUME,
+        BRIGHTNESS, CONTRAST, SATURATION, EXPOSURE, TEMPERATURE, TINT, HIGHLIGHTS, SHADOWS,
+        MASK_X, MASK_Y, MASK_FEATHER
+    )
 }
 
 data class TextClipData(

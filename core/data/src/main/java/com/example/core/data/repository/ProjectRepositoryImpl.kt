@@ -134,8 +134,28 @@ class ProjectRepositoryImpl(
 
                     transformDao.insert(clip.transform.toEntity(clip.id))
 
-                    if (clip.effects.isNotEmpty()) {
-                        effectDao.insertAll(clip.effects.map { it.toEntity() })
+                    val allClipEffects = clip.effects.toMutableList()
+                    clip.mask?.let { m ->
+                        if (allClipEffects.none { it.type == com.example.core.model.EffectType.MASK }) {
+                            allClipEffects.add(m.toEffect(clip.id))
+                        }
+                    }
+                    if (clip.blendMode != com.example.core.model.BlendMode.NORMAL) {
+                        if (allClipEffects.none { it.type == com.example.core.model.EffectType.BLEND_MODE }) {
+                            allClipEffects.add(
+                                com.example.core.model.Effect(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    clipId = clip.id,
+                                    type = com.example.core.model.EffectType.BLEND_MODE,
+                                    order = 999,
+                                    isEnabled = true,
+                                    parameters = mapOf("mode" to clip.blendMode.ordinal.toFloat())
+                                )
+                            )
+                        }
+                    }
+                    if (allClipEffects.isNotEmpty()) {
+                        effectDao.insertAll(allClipEffects.map { it.toEntity() })
                     }
 
                     if (clip.keyframes.isNotEmpty()) {

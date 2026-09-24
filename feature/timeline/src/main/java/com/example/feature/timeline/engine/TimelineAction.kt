@@ -58,6 +58,22 @@ sealed interface TimelineAction {
     data class MoveKeyframe(val clipId: String, val keyframeId: String, val newTimeMs: Long) : TimelineAction
     /** Updates the effects applied to a clip. */
     data class UpdateClipEffects(val clipId: String, val effects: List<Effect>) : TimelineAction
+    /** Adds or replaces an effect on a clip's effect stack. */
+    data class AddClipEffect(val clipId: String, val effect: Effect) : TimelineAction
+    /** Updates parameters or state of an existing effect on a clip. */
+    data class UpdateClipEffect(val clipId: String, val effect: Effect) : TimelineAction
+    /** Removes an effect by ID from a clip. */
+    data class RemoveClipEffect(val clipId: String, val effectId: String) : TimelineAction
+    /** Reorders effects on a clip to match the specified effect IDs sequence. */
+    data class ReorderClipEffects(val clipId: String, val effectIdsInOrder: List<String>) : TimelineAction
+    /** Resets/clears all effects on a clip. */
+    data class ResetClipEffects(val clipId: String) : TimelineAction
+    /** Sets or clears a mask on a clip. */
+    data class SetClipMask(val clipId: String, val mask: com.example.core.model.ClipMask?) : TimelineAction
+    /** Sets the blend mode on a clip. */
+    data class SetClipBlendMode(val clipId: String, val blendMode: com.example.core.model.BlendMode) : TimelineAction
+    /** Sets the opacity of a clip. */
+    data class SetClipOpacity(val clipId: String, val opacity: Float) : TimelineAction
     /** Adds a transition between two adjacent clips on a track. */
     data class AddTransition(val transition: com.example.core.model.Transition) : TimelineAction
     /** Updates an existing transition's type, duration, or parameters. */

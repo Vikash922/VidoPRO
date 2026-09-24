@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.CropFree
+import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -355,6 +357,17 @@ fun EditorScreen(
                                 }
                             }
 
+                            val activeMainMask = remember(activeMainClip, uiState.playheadPositionMs) {
+                                activeMainClip?.let { KeyframeEvaluator.evaluateMask(it, uiState.playheadPositionMs) }
+                            }
+                            val mainMaskShape = remember(activeMainMask) {
+                                activeMainMask?.let { m ->
+                                    androidx.compose.foundation.shape.GenericShape { size, _ ->
+                                        addPath(com.example.core.media.mask.MaskEvaluator.createComposePath(m, size.width, size.height))
+                                    }
+                                }
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -365,7 +378,11 @@ fun EditorScreen(
                                         scaleY = previewTransform.scaleY
                                         rotationZ = previewTransform.rotation
                                         alpha = previewTransform.opacity
+                                        if (activeMainClip != null && activeMainClip.blendMode != com.example.core.model.BlendMode.NORMAL) {
+                                            blendMode = com.example.core.media.blend.BlendModeHelper.toComposeBlendMode(activeMainClip.blendMode)
+                                        }
                                     }
+                                    .then(if (mainMaskShape != null) Modifier.clip(mainMaskShape) else Modifier)
                                     .pointerInput(activeMainClip?.id, isMainVideoSelected) {
                                         if (activeMainClip != null && isMainVideoSelected) {
                                             detectTransformGestures { _, pan, zoom, rotation ->
@@ -564,6 +581,17 @@ fun EditorScreen(
                                 )
                             }
 
+                            val activeOverlayMask = remember(overlayClip, uiState.playheadPositionMs) {
+                                KeyframeEvaluator.evaluateMask(overlayClip, uiState.playheadPositionMs)
+                            }
+                            val overlayMaskShape = remember(activeOverlayMask) {
+                                activeOverlayMask?.let { m ->
+                                    androidx.compose.foundation.shape.GenericShape { size, _ ->
+                                        addPath(com.example.core.media.mask.MaskEvaluator.createComposePath(m, size.width, size.height))
+                                    }
+                                }
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .offset {
@@ -577,6 +605,7 @@ fun EditorScreen(
                                         scaleY = previewTransform.scaleY
                                         rotationZ = previewTransform.rotation
                                         alpha = previewTransform.opacity
+                                        blendMode = com.example.core.media.blend.BlendModeHelper.toComposeBlendMode(overlayClip.blendMode)
                                     }
                                     .size(baseWidth, baseHeight)
                                     .pointerInput(overlayClip.id) {
@@ -639,7 +668,7 @@ fun EditorScreen(
                                         },
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .clip(RoundedCornerShape(4.dp))
+                                            .clip(overlayMaskShape ?: RoundedCornerShape(4.dp))
                                     )
                                 } else {
                                     AsyncImage(
@@ -648,7 +677,7 @@ fun EditorScreen(
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .clip(RoundedCornerShape(4.dp))
+                                            .clip(overlayMaskShape ?: RoundedCornerShape(4.dp))
                                     )
                                 }
 
@@ -1085,6 +1114,14 @@ fun EditorScreen(
                                     onEvent(EditorEvent.SetTransformSheetVisible(true))
                                 }
                                 Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.MASK, Icons.Default.CropFree) {
+                                    onEvent(EditorEvent.SetMaskSheetVisible(true))
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.BLEND, Icons.Default.Opacity) {
+                                    onEvent(EditorEvent.SetBlendSheetVisible(true))
+                                }
+                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
                                     onEvent(EditorEvent.SetKeyframeSheetVisible(true))
                                 }
@@ -1142,6 +1179,14 @@ fun EditorScreen(
                                 Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
                                     onEvent(EditorEvent.DeleteSelectedClip)
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.MASK, Icons.Default.CropFree) {
+                                    onEvent(EditorEvent.SetMaskSheetVisible(true))
+                                }
+                                Spacer(Modifier.width(18.dp))
+                                EditorToolButton(EditorTool.BLEND, Icons.Default.Opacity) {
+                                    onEvent(EditorEvent.SetBlendSheetVisible(true))
                                 }
                                 Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
@@ -1263,7 +1308,9 @@ fun EditorScreen(
                 onTransform = { onEvent(EditorEvent.SetTransformSheetVisible(true)) },
                 onCanvas = { onEvent(EditorEvent.SetCanvasSheetVisible(true)) },
                 onKeyframe = { onEvent(EditorEvent.SetKeyframeSheetVisible(true)) },
-                onBeats = { onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs)) }
+                onBeats = { onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs)) },
+                onMask = { onEvent(EditorEvent.SetMaskSheetVisible(true)) },
+                onBlend = { onEvent(EditorEvent.SetBlendSheetVisible(true)) }
             )
         }
         if (uiState.isKeyframeSheetVisible) {
@@ -1373,6 +1420,28 @@ fun EditorScreen(
                     }
                 )
             }
+        }
+        if (uiState.isMaskSheetVisible) {
+            MaskBottomSheet(
+                currentMask = uiState.selectedClip?.mask,
+                onMaskChanged = { newMask ->
+                    onEvent(EditorEvent.ChangeClipMask(newMask))
+                },
+                onDismiss = { onEvent(EditorEvent.SetMaskSheetVisible(false)) }
+            )
+        }
+        if (uiState.isBlendSheetVisible) {
+            BlendBottomSheet(
+                currentBlendMode = uiState.selectedClip?.blendMode ?: com.example.core.model.BlendMode.NORMAL,
+                currentOpacity = uiState.selectedClip?.transform?.opacity ?: 1.0f,
+                onBlendModeChanged = { newMode ->
+                    onEvent(EditorEvent.ChangeClipBlendMode(newMode))
+                },
+                onOpacityChanged = { newOpacity ->
+                    onEvent(EditorEvent.ChangeClipOpacity(newOpacity))
+                },
+                onDismiss = { onEvent(EditorEvent.SetBlendSheetVisible(false)) }
+            )
         }
     }
 }

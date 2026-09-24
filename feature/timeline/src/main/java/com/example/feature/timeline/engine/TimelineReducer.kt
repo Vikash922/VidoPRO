@@ -67,6 +67,14 @@ object TimelineReducer {
             is TimelineAction.DeleteKeyframe -> handleDeleteKeyframe(state, action.clipId, action.keyframeId)
             is TimelineAction.MoveKeyframe -> handleMoveKeyframe(state, action.clipId, action.keyframeId, action.newTimeMs)
             is TimelineAction.UpdateClipEffects -> handleUpdateClipEffects(state, action.clipId, action.effects)
+            is TimelineAction.AddClipEffect -> handleAddClipEffect(state, action.clipId, action.effect)
+            is TimelineAction.UpdateClipEffect -> handleUpdateClipEffect(state, action.clipId, action.effect)
+            is TimelineAction.RemoveClipEffect -> handleRemoveClipEffect(state, action.clipId, action.effectId)
+            is TimelineAction.ReorderClipEffects -> handleReorderClipEffects(state, action.clipId, action.effectIdsInOrder)
+            is TimelineAction.ResetClipEffects -> handleResetClipEffects(state, action.clipId)
+            is TimelineAction.SetClipMask -> handleSetClipMask(state, action.clipId, action.mask)
+            is TimelineAction.SetClipBlendMode -> handleSetClipBlendMode(state, action.clipId, action.blendMode)
+            is TimelineAction.SetClipOpacity -> handleSetClipOpacity(state, action.clipId, action.opacity)
             is TimelineAction.AddTransition -> handleAddTransition(state, action.transition)
             is TimelineAction.UpdateTransition -> handleUpdateTransition(state, action.transition)
             is TimelineAction.RemoveTransition -> handleRemoveTransition(state, action.transitionId)
@@ -444,6 +452,133 @@ object TimelineReducer {
             tracks = updatedTracks,
             selectedClip = updatedSelected
         )
+    }
+
+    private fun handleAddClipEffect(
+        state: TimelineEngineState,
+        clipId: String,
+        effect: com.example.core.model.Effect
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val existingIndex = clip.effects.indexOfFirst { it.id == effect.id || it.type == effect.type }
+        val updatedEffects = if (existingIndex >= 0) {
+            clip.effects.mapIndexed { idx, e -> if (idx == existingIndex) effect else e }
+        } else {
+            clip.effects + effect.copy(order = clip.effects.size)
+        }.sortedBy { it.order }
+
+        return handleUpdateClipEffects(state, clipId, updatedEffects)
+    }
+
+    private fun handleUpdateClipEffect(
+        state: TimelineEngineState,
+        clipId: String,
+        effect: com.example.core.model.Effect
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val updatedEffects = clip.effects.map { if (it.id == effect.id) effect else it }
+        return handleUpdateClipEffects(state, clipId, updatedEffects)
+    }
+
+    private fun handleRemoveClipEffect(
+        state: TimelineEngineState,
+        clipId: String,
+        effectId: String
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val updatedEffects = clip.effects.filterNot { it.id == effectId }
+        return handleUpdateClipEffects(state, clipId, updatedEffects)
+    }
+
+    private fun handleReorderClipEffects(
+        state: TimelineEngineState,
+        clipId: String,
+        effectIdsInOrder: List<String>
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val effectMap = clip.effects.associateBy { it.id }
+        val reordered = effectIdsInOrder.mapIndexedNotNull { index, id ->
+            effectMap[id]?.copy(order = index)
+        }
+        val remaining = clip.effects.filterNot { it.id in effectIdsInOrder }
+            .mapIndexed { index, e -> e.copy(order = reordered.size + index) }
+        return handleUpdateClipEffects(state, clipId, reordered + remaining)
+    }
+
+    private fun handleResetClipEffects(
+        state: TimelineEngineState,
+        clipId: String
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val nonFilter = clip.effects.filter {
+            it.type == com.example.core.model.EffectType.MASK ||
+            it.type == com.example.core.model.EffectType.BLEND_MODE
+        }
+        return handleUpdateClipEffects(state, clipId, nonFilter)
+    }
+
+    private fun handleSetClipMask(
+        state: TimelineEngineState,
+        clipId: String,
+        mask: com.example.core.model.ClipMask?
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val updatedEffects = clip.effects.filterNot { it.type == com.example.core.model.EffectType.MASK }.toMutableList()
+        if (mask != null) {
+            updatedEffects.add(mask.toEffect(clipId))
+        }
+        val updatedTracks = state.tracks.map { track ->
+            val updated = track.clips.map { c ->
+                if (c.id == clipId) c.copy(mask = mask, effects = updatedEffects) else c
+            }
+            track.copy(clips = updated)
+        }
+        val updatedSelected = if (state.selectedClip?.id == clipId) {
+            state.selectedClip.copy(mask = mask, effects = updatedEffects)
+        } else state.selectedClip
+        return state.copy(tracks = updatedTracks, selectedClip = updatedSelected)
+    }
+
+    private fun handleSetClipBlendMode(
+        state: TimelineEngineState,
+        clipId: String,
+        blendMode: com.example.core.model.BlendMode
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val updatedEffects = clip.effects.filterNot { it.type == com.example.core.model.EffectType.BLEND_MODE }.toMutableList()
+        if (blendMode != com.example.core.model.BlendMode.NORMAL) {
+            updatedEffects.add(
+                com.example.core.model.Effect(
+                    id = java.util.UUID.randomUUID().toString(),
+                    clipId = clipId,
+                    type = com.example.core.model.EffectType.BLEND_MODE,
+                    order = 999,
+                    isEnabled = true,
+                    parameters = mapOf("mode" to blendMode.ordinal.toFloat())
+                )
+            )
+        }
+        val updatedTracks = state.tracks.map { track ->
+            val updated = track.clips.map { c ->
+                if (c.id == clipId) c.copy(blendMode = blendMode, effects = updatedEffects) else c
+            }
+            track.copy(clips = updated)
+        }
+        val updatedSelected = if (state.selectedClip?.id == clipId) {
+            state.selectedClip.copy(blendMode = blendMode, effects = updatedEffects)
+        } else state.selectedClip
+        return state.copy(tracks = updatedTracks, selectedClip = updatedSelected)
+    }
+
+    private fun handleSetClipOpacity(
+        state: TimelineEngineState,
+        clipId: String,
+        opacity: Float
+    ): TimelineEngineState {
+        val clip = state.findClip(clipId) ?: return state
+        val clamped = opacity.coerceIn(0f, 1f)
+        val newTransform = clip.transform.copy(opacity = clamped)
+        return handleUpdateClipTransform(state, clipId, newTransform)
     }
 
     /**

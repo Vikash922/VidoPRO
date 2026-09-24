@@ -199,7 +199,9 @@ class Media3ProjectExporter(
                                 zIndex = vl.zIndex,
                                 transform = vl.transform,
                                 keyframes = vl.keyframes,
-                                effects = vl.effects
+                                effects = vl.effects,
+                                mask = vl.mask,
+                                blendMode = vl.blendMode
                             )
                         )
                         overlayAssets[vl.assetId] = Asset(
@@ -224,7 +226,9 @@ class Media3ProjectExporter(
                                 zIndex = il.zIndex,
                                 transform = il.transform,
                                 keyframes = il.keyframes,
-                                effects = il.effects
+                                effects = il.effects,
+                                mask = il.mask,
+                                blendMode = il.blendMode
                             )
                         )
                         overlayAssets[il.assetId] = Asset(

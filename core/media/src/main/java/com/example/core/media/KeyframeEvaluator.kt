@@ -112,4 +112,56 @@ object KeyframeEvaluator {
             }
         }
     }
+
+    /**
+     * Evaluates the active [com.example.core.model.ClipMask] of a [Clip] at a specific timeline timestamp [timeMs],
+     * dynamically interpolating position, size, and feather if keyframes are present.
+     */
+    fun evaluateMask(clip: Clip, timeMs: Long): com.example.core.model.ClipMask? {
+        val baseMask = clip.mask ?: return null
+        if (clip.keyframes.isEmpty()) return baseMask
+
+        val x = evaluateProperty(clip.keyframes, KeyframeProperty.MASK_X, timeMs, baseMask.x)
+        val y = evaluateProperty(clip.keyframes, KeyframeProperty.MASK_Y, timeMs, baseMask.y)
+        val feather = evaluateProperty(clip.keyframes, KeyframeProperty.MASK_FEATHER, timeMs, baseMask.feather)
+
+        return baseMask.copy(x = x, y = y, feather = feather)
+    }
+
+    /**
+     * Evaluates a clip's effects at [timeMs], interpolating any parameters that have corresponding keyframes.
+     */
+    fun evaluateEffects(clip: Clip, timeMs: Long): List<com.example.core.model.Effect> {
+        if (clip.keyframes.isEmpty()) return clip.effects
+
+        return clip.effects.map { eff ->
+            when (eff.type) {
+                com.example.core.model.EffectType.BRIGHTNESS -> {
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.BRIGHTNESS, timeMs, eff.parameters["value"] ?: 0f)
+                    eff.copy(parameters = eff.parameters + mapOf("value" to v, "brightness" to v))
+                }
+                com.example.core.model.EffectType.CONTRAST -> {
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.CONTRAST, timeMs, eff.parameters["value"] ?: 1f)
+                    eff.copy(parameters = eff.parameters + mapOf("value" to v, "contrast" to v))
+                }
+                com.example.core.model.EffectType.SATURATION -> {
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.SATURATION, timeMs, eff.parameters["value"] ?: 1f)
+                    eff.copy(parameters = eff.parameters + mapOf("value" to v, "saturation" to v))
+                }
+                com.example.core.model.EffectType.EXPOSURE -> {
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.EXPOSURE, timeMs, eff.parameters["value"] ?: 0f)
+                    eff.copy(parameters = eff.parameters + mapOf("value" to v, "exposure" to v))
+                }
+                com.example.core.model.EffectType.TEMPERATURE -> {
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.TEMPERATURE, timeMs, eff.parameters["value"] ?: 0f)
+                    eff.copy(parameters = eff.parameters + mapOf("value" to v, "temperature" to v))
+                }
+                com.example.core.model.EffectType.TINT -> {
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.TINT, timeMs, eff.parameters["value"] ?: 0f)
+                    eff.copy(parameters = eff.parameters + mapOf("value" to v, "tint" to v))
+                }
+                else -> eff
+            }
+        }
+    }
 }

@@ -229,6 +229,8 @@ class EditorViewModel(
                             _uiState.update { it.copy(isTransitionSheetVisible = true, editingTransitionPair = activePair.first.id to activePair.second.id) }
                         }
                     }
+                    EditorTool.MASK -> { _uiState.update { it.copy(isMaskSheetVisible = true) } }
+                    EditorTool.BLEND -> { _uiState.update { it.copy(isBlendSheetVisible = true) } }
                     EditorTool.DELETE -> {
                         currentClipId?.let { onTimelineAction(TimelineAction.DeleteClip(it)) }
                     }
@@ -465,6 +467,42 @@ class EditorViewModel(
             is EditorEvent.RemoveTransition -> {
                 onTimelineAction(TimelineAction.RemoveTransition(event.transitionId))
             }
+            is EditorEvent.SetMaskSheetVisible -> {
+                _uiState.update { it.copy(isMaskSheetVisible = event.visible) }
+            }
+            is EditorEvent.SetBlendSheetVisible -> {
+                _uiState.update { it.copy(isBlendSheetVisible = event.visible) }
+            }
+            is EditorEvent.ChangeClipMask -> {
+                val clipId = _uiState.value.selectedClipId
+                if (clipId != null) {
+                    onTimelineAction(TimelineAction.SetClipMask(clipId, event.mask))
+                }
+            }
+            is EditorEvent.ChangeClipBlendMode -> {
+                val clipId = _uiState.value.selectedClipId
+                if (clipId != null) {
+                    onTimelineAction(TimelineAction.SetClipBlendMode(clipId, event.blendMode))
+                }
+            }
+            is EditorEvent.ChangeClipOpacity -> {
+                val clipId = _uiState.value.selectedClipId
+                if (clipId != null) {
+                    onTimelineAction(TimelineAction.SetClipOpacity(clipId, event.opacity))
+                }
+            }
+            is EditorEvent.AddClipEffect -> {
+                val clipId = _uiState.value.selectedClipId
+                if (clipId != null) {
+                    onTimelineAction(TimelineAction.AddClipEffect(clipId, event.effect))
+                }
+            }
+            is EditorEvent.RemoveClipEffect -> {
+                val clipId = _uiState.value.selectedClipId
+                if (clipId != null) {
+                    onTimelineAction(TimelineAction.RemoveClipEffect(clipId, event.effectId))
+                }
+            }
             else -> {}
         }
     }
@@ -549,6 +587,17 @@ class EditorViewModel(
                 KeyframeProperty.ROTATION -> clip.transform.rotation
                 KeyframeProperty.OPACITY -> clip.transform.opacity
                 KeyframeProperty.VOLUME -> clip.volume ?: 1.0f
+                KeyframeProperty.BRIGHTNESS -> clip.effects.find { it.type == com.example.core.model.EffectType.BRIGHTNESS }?.parameters?.get("brightness") ?: 0f
+                KeyframeProperty.CONTRAST -> clip.effects.find { it.type == com.example.core.model.EffectType.CONTRAST }?.parameters?.get("contrast") ?: 1f
+                KeyframeProperty.SATURATION -> clip.effects.find { it.type == com.example.core.model.EffectType.SATURATION }?.parameters?.get("saturation") ?: 1f
+                KeyframeProperty.EXPOSURE -> clip.effects.find { it.type == com.example.core.model.EffectType.EXPOSURE }?.parameters?.get("exposure") ?: 0f
+                KeyframeProperty.TEMPERATURE -> clip.effects.find { it.type == com.example.core.model.EffectType.TEMPERATURE }?.parameters?.get("temperature") ?: 0f
+                KeyframeProperty.TINT -> clip.effects.find { it.type == com.example.core.model.EffectType.TINT }?.parameters?.get("tint") ?: 0f
+                KeyframeProperty.HIGHLIGHTS -> clip.effects.find { it.type == com.example.core.model.EffectType.HIGHLIGHTS }?.parameters?.get("highlights") ?: 0f
+                KeyframeProperty.SHADOWS -> clip.effects.find { it.type == com.example.core.model.EffectType.SHADOWS }?.parameters?.get("shadows") ?: 0f
+                KeyframeProperty.MASK_X -> clip.mask?.x ?: 0.5f
+                KeyframeProperty.MASK_Y -> clip.mask?.y ?: 0.5f
+                KeyframeProperty.MASK_FEATHER -> clip.mask?.feather ?: 0f
                 else -> 0f
             }
             val clampedTime = playhead.coerceIn(clip.startTimeMs, clip.endTimeMs)

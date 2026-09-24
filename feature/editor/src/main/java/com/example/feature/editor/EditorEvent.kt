@@ -78,5 +78,19 @@ sealed interface EditorEvent {
     data class ApplyTransition(val transition: com.example.core.model.Transition) : EditorEvent
     /** Removes a transition. */
     data class RemoveTransition(val transitionId: String) : EditorEvent
+    /** Controls visibility of the mask bottom sheet. */
+    data class SetMaskSheetVisible(val visible: Boolean) : EditorEvent
+    /** Controls visibility of the blend bottom sheet. */
+    data class SetBlendSheetVisible(val visible: Boolean) : EditorEvent
+    /** Updates or removes mask on selected clip. */
+    data class ChangeClipMask(val mask: com.example.core.model.ClipMask?) : EditorEvent
+    /** Updates blend mode on selected clip. */
+    data class ChangeClipBlendMode(val blendMode: com.example.core.model.BlendMode) : EditorEvent
+    /** Updates layer opacity on selected clip. */
+    data class ChangeClipOpacity(val opacity: Float) : EditorEvent
+    /** Adds an effect to the selected clip. */
+    data class AddClipEffect(val effect: com.example.core.model.Effect) : EditorEvent
+    /** Removes an effect from the selected clip. */
+    data class RemoveClipEffect(val effectId: String) : EditorEvent
 }
 

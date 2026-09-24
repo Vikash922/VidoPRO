@@ -95,8 +95,10 @@ class VideoOverlayGenerator(
                 getImageBitmap(asset)
             } ?: return@forEach
 
-            // Dynamically evaluate keyframe animated or static transform
+            // Dynamically evaluate keyframe animated or static transform, mask, and effects
             val currentT = KeyframeEvaluator.evaluateTransform(clip, timeMs)
+            val currentMask = KeyframeEvaluator.evaluateMask(clip, timeMs)
+            val currentEffects = KeyframeEvaluator.evaluateEffects(clip, timeMs)
 
             // Compute PiP base sizing proportional to canvas width
             val targetBaseWidth = videoWidth * 0.42f
@@ -117,9 +119,35 @@ class VideoOverlayGenerator(
             val dy = (videoHeight / 2f - cy) + currentT.y
             matrix.postTranslate(dx, dy)
 
+            // Apply opacity and blend mode
             paint.alpha = (currentT.opacity * 255).toInt().coerceIn(0, 255)
+            paint.xfermode = com.example.core.media.blend.BlendModeHelper.toXfermode(clip.blendMode)
 
-            canvas.drawBitmap(sourceBitmap, matrix, paint)
+            // Apply color filter effects
+            if (currentEffects.isNotEmpty()) {
+                val filterSettings = com.example.feature.editor.filter.FilterSettingsMapper.fromEffects(currentEffects)
+                val colorArray = com.example.feature.editor.filter.ColorFilterHelper.createColorMatrixArray(filterSettings)
+                paint.colorFilter = android.graphics.ColorMatrixColorFilter(colorArray)
+            } else {
+                paint.colorFilter = null
+            }
+
+            // Apply mask if configured
+            if (currentMask != null) {
+                canvas.save()
+                val maskPath = com.example.core.media.mask.MaskEvaluator.createMaskPath(
+                    mask = currentMask,
+                    layerWidth = sourceBitmap.width.toFloat(),
+                    layerHeight = sourceBitmap.height.toFloat()
+                )
+                val transformedMaskPath = android.graphics.Path(maskPath)
+                transformedMaskPath.transform(matrix)
+                canvas.clipPath(transformedMaskPath)
+                canvas.drawBitmap(sourceBitmap, matrix, paint)
+                canvas.restore()
+            } else {
+                canvas.drawBitmap(sourceBitmap, matrix, paint)
+            }
         }
 
         return canvasBitmap

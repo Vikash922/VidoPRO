@@ -62,7 +62,9 @@ object RenderSceneBuilder {
                         volume = clip.volume ?: 1.0f,
                         isMainVideo = true,
                         sourceWidth = asset?.width,
-                        sourceHeight = asset?.height
+                        sourceHeight = asset?.height,
+                        mask = clip.mask,
+                        blendMode = clip.blendMode
                     )
                 )
             }
@@ -96,7 +98,9 @@ object RenderSceneBuilder {
                             volume = clip.volume ?: 1.0f,
                             isMainVideo = false,
                             sourceWidth = asset?.width,
-                            sourceHeight = asset?.height
+                            sourceHeight = asset?.height,
+                            mask = clip.mask,
+                            blendMode = clip.blendMode
                         )
                     )
 
@@ -133,7 +137,9 @@ object RenderSceneBuilder {
                             assetId = clip.assetId ?: "",
                             sourceUri = uri,
                             sourceWidth = asset?.width,
-                            sourceHeight = asset?.height
+                            sourceHeight = asset?.height,
+                            mask = clip.mask,
+                            blendMode = clip.blendMode
                         )
                     )
                 }
@@ -155,6 +161,8 @@ object RenderSceneBuilder {
                         transform = clip.transform,
                         keyframes = clip.keyframes,
                         effects = clip.effects,
+                        mask = clip.mask,
+                        blendMode = clip.blendMode,
                         textData = clip.textData!!
                     )
                 )

@@ -41,7 +41,9 @@ fun EditBottomSheet(
     onTransform: () -> Unit,
     onCanvas: () -> Unit,
     onKeyframe: () -> Unit,
-    onBeats: () -> Unit
+    onBeats: () -> Unit,
+    onMask: () -> Unit = {},
+    onBlend: () -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -99,6 +101,8 @@ fun EditBottomSheet(
             }
             if (clip.type == ClipType.VIDEO || clip.type == ClipType.IMAGE) {
                 items.add(BottomSheetItem("Filters", Icons.Default.ColorLens, onFilters))
+                items.add(BottomSheetItem("Mask", Icons.Default.CropFree, onMask))
+                items.add(BottomSheetItem("Blend", Icons.Default.Opacity, onBlend))
                 items.add(BottomSheetItem("Keyframe", Icons.Default.Star, onKeyframe))
                 items.add(BottomSheetItem("Canvas", Icons.Default.AspectRatio, onCanvas))
             }

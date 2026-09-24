@@ -37,12 +37,36 @@ enum class EffectType {
     CONTRAST,
     SATURATION,
     EXPOSURE,
+    TEMPERATURE,
+    TINT,
+    HIGHLIGHTS,
+    SHADOWS,
     BLUR,
     VIGNETTE,
     SHARPEN,
+    OPACITY,
+    MASK,
+    BLEND_MODE,
     GLITCH,
     RGB_SPLIT,
     PIXELATE
+}
+
+enum class MaskShape(val label: String) {
+    RECTANGLE("Rectangle"),
+    CIRCLE("Circle"),
+    LINEAR_GRADIENT("Linear"),
+    RADIAL_GRADIENT("Radial")
+}
+
+enum class BlendMode(val label: String) {
+    NORMAL("Normal"),
+    MULTIPLY("Multiply"),
+    SCREEN("Screen"),
+    OVERLAY("Overlay"),
+    DARKEN("Darken"),
+    LIGHTEN("Lighten"),
+    ADD("Add")
 }
 
 enum class InterpolationType {

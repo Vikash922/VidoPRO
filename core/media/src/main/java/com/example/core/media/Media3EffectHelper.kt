@@ -50,6 +50,25 @@ object Media3EffectHelper {
                 EffectType.CONTRAST -> contrast = p["contrast"] ?: v
                 EffectType.SATURATION -> saturation = p["saturation"] ?: v
                 EffectType.EXPOSURE -> exposure = p["exposure"] ?: v
+                EffectType.TEMPERATURE -> {
+                    val temp = p["temperature"] ?: v
+                    redBalance += temp * 0.5f
+                    blueBalance -= temp * 0.5f
+                }
+                EffectType.TINT -> {
+                    val tint = p["tint"] ?: v
+                    greenBalance -= tint * 0.5f
+                    redBalance += tint * 0.25f
+                    blueBalance += tint * 0.25f
+                }
+                EffectType.HIGHLIGHTS -> {
+                    val hl = p["highlights"] ?: v
+                    exposure += hl * 0.3f
+                }
+                EffectType.SHADOWS -> {
+                    val sh = p["shadows"] ?: v
+                    brightness += sh * 0.3f
+                }
                 else -> {}
             }
 

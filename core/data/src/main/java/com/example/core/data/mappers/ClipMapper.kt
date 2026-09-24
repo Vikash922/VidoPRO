@@ -30,6 +30,14 @@ fun ClipEntity.toDomain(
     keyframes: List<Keyframe> = emptyList(),
     textData: TextClipData? = null
 ): Clip {
+    val maskEffect = effects.find { it.type == EffectType.MASK }
+    val blendEffect = effects.find { it.type == EffectType.BLEND_MODE }
+    val mask = maskEffect?.let { ClipMask.fromEffect(it) }
+    val blendMode = blendEffect?.let {
+        val modeOrdinal = (it.parameters["mode"] ?: 0f).toInt().coerceIn(0, com.example.core.model.BlendMode.values().size - 1)
+        com.example.core.model.BlendMode.values()[modeOrdinal]
+    } ?: com.example.core.model.BlendMode.NORMAL
+
     return Clip(
         id = id,
         trackId = trackId,
@@ -47,7 +55,9 @@ fun ClipEntity.toDomain(
         effects = effects,
         keyframes = keyframes,
         textData = textData,
-        groupId = groupId
+        groupId = groupId,
+        mask = mask,
+        blendMode = blendMode
     )
 }
 

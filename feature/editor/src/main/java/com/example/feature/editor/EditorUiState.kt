@@ -53,6 +53,8 @@ data class EditorUiState(
     val isKeyframeSheetVisible: Boolean = false,
     val isBeatsSheetVisible: Boolean = false,
     val isTransitionSheetVisible: Boolean = false,
+    val isMaskSheetVisible: Boolean = false,
+    val isBlendSheetVisible: Boolean = false,
     val editingTransitionPair: Pair<String, String>? = null,
     val filterSettings: com.example.feature.editor.filter.FilterSettings = com.example.feature.editor.filter.FilterSettings(),
     val assets: Map<String, com.example.core.model.Asset> = emptyMap(),

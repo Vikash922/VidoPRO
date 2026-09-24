@@ -1,6 +1,9 @@
 package com.example.core.media.render
 
+import com.example.core.model.BlendMode
+import com.example.core.model.ClipMask
 import com.example.core.model.Effect
+import com.example.core.model.EffectStack
 import com.example.core.model.Keyframe
 import com.example.core.model.TextClipData
 import com.example.core.model.Transform
@@ -13,6 +16,8 @@ import com.example.core.model.Transform
  * - Layer Z-order (stacking precedence)
  * - Geometric and optical transform (position, scale, rotation, opacity, keyframes)
  * - Color and filter effects stack
+ * - Optional clip mask (shape, feather, opacity)
+ * - Composite blend mode
  */
 sealed interface RenderLayer {
     val id: String
@@ -23,6 +28,13 @@ sealed interface RenderLayer {
     val transform: Transform
     val keyframes: List<Keyframe>
     val effects: List<Effect>
+    val mask: ClipMask?
+        get() = null
+    val blendMode: BlendMode
+        get() = BlendMode.NORMAL
+
+    val effectStack: EffectStack
+        get() = EffectStack(effects)
 
     val durationMs: Long
         get() = (timelineEndMs - timelineStartMs).coerceAtLeast(0L)
@@ -49,6 +61,8 @@ data class VideoRenderLayer(
     override val transform: Transform = Transform.DEFAULT,
     override val keyframes: List<Keyframe> = emptyList(),
     override val effects: List<Effect> = emptyList(),
+    override val mask: ClipMask? = null,
+    override val blendMode: BlendMode = BlendMode.NORMAL,
     val assetId: String,
     val sourceUri: String,
     val sourceInPointMs: Long = 0L,
@@ -76,6 +90,8 @@ data class ImageRenderLayer(
     override val transform: Transform = Transform.DEFAULT,
     override val keyframes: List<Keyframe> = emptyList(),
     override val effects: List<Effect> = emptyList(),
+    override val mask: ClipMask? = null,
+    override val blendMode: BlendMode = BlendMode.NORMAL,
     val assetId: String,
     val sourceUri: String,
     val sourceWidth: Int? = null,
@@ -94,6 +110,8 @@ data class TextRenderLayer(
     override val transform: Transform = Transform.DEFAULT,
     override val keyframes: List<Keyframe> = emptyList(),
     override val effects: List<Effect> = emptyList(),
+    override val mask: ClipMask? = null,
+    override val blendMode: BlendMode = BlendMode.NORMAL,
     val textData: TextClipData
 ) : RenderLayer
 
