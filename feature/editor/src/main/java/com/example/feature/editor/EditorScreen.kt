@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AspectRatio
@@ -1088,7 +1089,7 @@ fun EditorScreen(
                                 Spacer(Modifier.width(20.dp))
                                 EditorToolButton(EditorTool.FILTERS, Icons.Default.ColorLens) { onEvent(EditorEvent.SetFiltersSheetVisible(true)) }
                                 Spacer(Modifier.width(20.dp))
-                                EditorToolButton(EditorTool.TRANSITION, Icons.Default.Transform) { onEvent(EditorEvent.ToolClicked(EditorTool.TRANSITION)) }
+                                EditorToolButton(EditorTool.TRANSITION, Icons.AutoMirrored.Filled.ArrowForward) { onEvent(EditorEvent.ToolClicked(EditorTool.TRANSITION)) }
                             } else {
                                 // Clip-specific tools for selected clip
                                 val clip = uiState.selectedClip
@@ -1096,7 +1097,7 @@ fun EditorScreen(
                                     onEvent(EditorEvent.SplitSelectedClip)
                                 }
                                 Spacer(Modifier.width(18.dp))
-                                EditorToolButton(EditorTool.TRANSITION, Icons.Default.Transform) { onEvent(EditorEvent.ToolClicked(EditorTool.TRANSITION)) }
+                                EditorToolButton(EditorTool.TRANSITION, Icons.AutoMirrored.Filled.ArrowForward) { onEvent(EditorEvent.ToolClicked(EditorTool.TRANSITION)) }
                                 Spacer(Modifier.width(18.dp))
                                 if (clip?.type == ClipType.TEXT) {
                                     EditorToolButton(EditorTool.TEXT, Icons.Default.Title) {

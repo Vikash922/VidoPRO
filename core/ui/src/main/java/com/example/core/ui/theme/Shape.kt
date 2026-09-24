@@ -12,6 +12,9 @@ object AppRadius {
     val small: Dp = 8.dp
     val medium: Dp = 12.dp
     val large: Dp = 16.dp
+    val sm: Dp get() = small
+    val md: Dp get() = medium
+    val lg: Dp get() = large
     val sheet: Dp = 24.dp
     val clip: Dp = 10.dp
     val card: Dp = 16.dp

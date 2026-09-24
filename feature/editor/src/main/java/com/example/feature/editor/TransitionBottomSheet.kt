@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.LinearScale
 import androidx.compose.material.icons.filled.Opacity
-import androidx.compose.material.icons.filled.Transform
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -78,7 +77,7 @@ private val SUPPORTED_TRANSITIONS = listOf(
     TransitionOption(TransitionType.FADE, "Fade", Icons.Default.Opacity),
     TransitionOption(TransitionType.SLIDE, "Slide", Icons.Default.LinearScale),
     TransitionOption(TransitionType.ZOOM, "Zoom", Icons.Default.ZoomIn),
-    TransitionOption(TransitionType.WIPE, "Wipe", Icons.Default.Transform)
+    TransitionOption(TransitionType.WIPE, "Wipe", Icons.AutoMirrored.Filled.ArrowForward)
 )
 
 private val DIRECTIONS = listOf(
@@ -142,7 +141,7 @@ fun TransitionBottomSheet(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.Transform,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary
                     )
@@ -175,7 +174,7 @@ fun TransitionBottomSheet(
                 items(SUPPORTED_TRANSITIONS) { option ->
                     val isSelected = selectedType == option.type
                     Card(
-                        shape = RoundedCornerShape(AppRadius.md),
+                        shape = RoundedCornerShape(AppRadius.medium),
                         colors = CardDefaults.cardColors(
                             containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
                         ),
@@ -258,7 +257,7 @@ fun TransitionBottomSheet(
                         DIRECTIONS.forEach { (dirName, dirIcon) ->
                             val isSelected = selectedDirection == dirName
                             Surface(
-                                shape = RoundedCornerShape(AppRadius.sm),
+                                shape = RoundedCornerShape(AppRadius.small),
                                 color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                                 border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
                                 modifier = Modifier
