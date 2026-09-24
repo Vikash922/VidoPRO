@@ -5,6 +5,7 @@ import com.example.core.model.InterpolationType
 import com.example.core.model.Keyframe
 import com.example.core.model.KeyframeProperty
 import com.example.core.model.Transform
+import kotlin.math.abs
 import kotlin.math.pow
 
 /**
@@ -12,6 +13,7 @@ import kotlin.math.pow
  *
  * Evaluates dynamic property values at any arbitrary timeline timestamp (timeMs),
  * interpolating between surrounding keyframes according to their [InterpolationType].
+ * Optimized for zero runtime heap allocations during playback and rendering.
  */
 object KeyframeEvaluator {
 
@@ -47,107 +49,12 @@ object KeyframeEvaluator {
     }
 
     /**
-     * Evaluates continuous and shortest-path angle rotation at [timeMs].
-     * Avoids unwanted reverse spins when crossing the 0°/360° boundary,
-     * while preserving multi-turn continuous revolutions (e.g. 0° -> 720°).
+     * Interpolates between [from] and [to] values at progress [t] in [0..1]
+     * using the specified [InterpolationType] curve.
      */
-    fun evaluateRotation(
-        keyframes: List<Keyframe>,
-        timeMs: Long,
-        defaultValue: Float
-    ): Float {
-        val matchingKeyframes = keyframes.filter { it.property == KeyframeProperty.ROTATION }.sortedBy { it.timeMs }
-        if (matchingKeyframes.isEmpty()) return defaultValue
-
-        if (timeMs <= matchingKeyframes.first().timeMs) {
-            return matchingKeyframes.first().value
-        }
-        if (timeMs >= matchingKeyframes.last().timeMs) {
-            return matchingKeyframes.last().value
-        }
-
-        for (i in 0 until matchingKeyframes.size - 1) {
-            val k0 = matchingKeyframes[i]
-            val k1 = matchingKeyframes[i + 1]
-
-            if (timeMs in k0.timeMs..k1.timeMs) {
-                val duration = k1.timeMs - k0.timeMs
-                if (duration <= 0L) return k1.value
-
-                val rawT = (timeMs - k0.timeMs).toFloat() / duration.toFloat()
-                val easedT = applyInterpolation(rawT.coerceIn(0f, 1f), k0)
-
-                val v0 = k0.value
-                val v1 = k1.value
-                val diff = v1 - v0
-
-                // If diff magnitude is strictly within (180, 360), apply shortest path across 0/360 boundary
-                val effectiveDiff = if (kotlin.math.abs(diff) in 180.001f..359.999f) {
-                    var d = diff % 360f
-                    if (d > 180f) d -= 360f
-                    if (d < -180f) d += 360f
-                    d
-                } else {
-                    diff
-                }
-
-                return v0 + effectiveDiff * easedT
-            }
-        }
-
-        return defaultValue
-    }
-
-    /**
-     * Evaluates a single named property (e.g. [KeyframeProperty.SCALE_X]) at [timeMs].
-     * Returns [defaultValue] if no keyframes exist for this property.
-     */
-    fun evaluateProperty(
-        keyframes: List<Keyframe>,
-        property: String,
-        timeMs: Long,
-        defaultValue: Float
-    ): Float {
-        if (property == KeyframeProperty.ROTATION) {
-            return evaluateRotation(keyframes, timeMs, defaultValue)
-        }
-        val matchingKeyframes = keyframes.filter { it.property == property }.sortedBy { it.timeMs }
-        if (matchingKeyframes.isEmpty()) return defaultValue
-
-        // Before first keyframe
-        if (timeMs <= matchingKeyframes.first().timeMs) {
-            return matchingKeyframes.first().value
-        }
-
-        // After last keyframe
-        if (timeMs >= matchingKeyframes.last().timeMs) {
-            return matchingKeyframes.last().value
-        }
-
-        // Between two keyframes
-        for (i in 0 until matchingKeyframes.size - 1) {
-            val k0 = matchingKeyframes[i]
-            val k1 = matchingKeyframes[i + 1]
-
-            if (timeMs in k0.timeMs..k1.timeMs) {
-                val duration = k1.timeMs - k0.timeMs
-                if (duration <= 0L) return k1.value
-
-                val rawT = (timeMs - k0.timeMs).toFloat() / duration.toFloat()
-                val easedT = applyInterpolation(rawT.coerceIn(0f, 1f), k0)
-                return k0.value + (k1.value - k0.value) * easedT
-            }
-        }
-
-        return defaultValue
-    }
-
-    /**
-     * Applies deterministic easing/interpolation curve based on the keyframe's [InterpolationType].
-     */
-    fun applyInterpolation(t: Float, keyframe: Keyframe): Float {
+    fun interpolate(from: Float, to: Float, t: Float, type: InterpolationType): Float {
         val clampedT = t.coerceIn(0f, 1f)
-        return when (keyframe.interpolation) {
+        val progress = when (type) {
             InterpolationType.LINEAR -> clampedT
             InterpolationType.HOLD -> if (clampedT < 1f) 0f else 1f
             InterpolationType.EASE_IN -> clampedT * clampedT
@@ -169,10 +76,134 @@ object KeyframeEvaluator {
                 }
             }
             InterpolationType.SMOOTH -> clampedT * clampedT * (3f - 2f * clampedT)
-            InterpolationType.BEZIER -> {
-                clampedT * clampedT * (3f - 2f * clampedT)
+            InterpolationType.BEZIER -> clampedT * clampedT * (3f - 2f * clampedT)
+        }
+        return from + (to - from) * progress
+    }
+
+    /**
+     * Interpolates rotation angles between [from] and [to] at progress [t] in [0..1].
+     * Applies shortest-path boundary crossing when diff is within (180, 360) degrees,
+     * while preserving multi-turn continuous revolutions (e.g. 0° -> 720°).
+     */
+    fun evaluateRotation(from: Float, to: Float, t: Float, type: InterpolationType): Float {
+        val diff = to - from
+        val effectiveDiff = if (abs(diff) in 180.001f..359.999f) {
+            var d = diff % 360f
+            if (d > 180f) d -= 360f
+            if (d < -180f) d += 360f
+            d
+        } else {
+            diff
+        }
+        val easedT = interpolate(0f, 1f, t, type)
+        return from + effectiveDiff * easedT
+    }
+
+    /**
+     * Evaluates continuous and shortest-path angle rotation at [timeMs].
+     * Avoids unwanted reverse spins when crossing the 0°/360° boundary,
+     * while preserving multi-turn continuous revolutions (e.g. 0° -> 720°).
+     * Single-pass zero-allocation search.
+     */
+    fun evaluateRotation(
+        keyframes: List<Keyframe>,
+        timeMs: Long,
+        defaultValue: Float
+    ): Float {
+        if (keyframes.isEmpty()) return defaultValue
+
+        var first: Keyframe? = null
+        var last: Keyframe? = null
+        var prev: Keyframe? = null
+        var next: Keyframe? = null
+
+        for (i in keyframes.indices) {
+            val k = keyframes[i]
+            if (k.property != KeyframeProperty.ROTATION) continue
+
+            if (first == null || k.timeMs < first.timeMs) first = k
+            if (last == null || k.timeMs > last.timeMs) last = k
+
+            if (k.timeMs <= timeMs) {
+                if (prev == null || k.timeMs > prev.timeMs) prev = k
+            }
+            if (k.timeMs >= timeMs) {
+                if (next == null || k.timeMs < next.timeMs) next = k
             }
         }
+
+        if (first == null) return defaultValue
+        if (timeMs <= first.timeMs) return first.value
+        val l = last ?: return first.value
+        if (timeMs >= l.timeMs) return l.value
+
+        val k0 = prev ?: first
+        val k1 = next ?: l
+
+        val duration = k1.timeMs - k0.timeMs
+        if (duration <= 0L) return k1.value
+
+        val rawT = (timeMs - k0.timeMs).toFloat() / duration.toFloat()
+        return evaluateRotation(k0.value, k1.value, rawT, k0.interpolation)
+    }
+
+    /**
+     * Evaluates a single named property (e.g. [KeyframeProperty.SCALE_X]) at [timeMs].
+     * Returns [defaultValue] if no keyframes exist for this property.
+     * Single-pass zero-allocation search.
+     */
+    fun evaluateProperty(
+        keyframes: List<Keyframe>,
+        property: String,
+        timeMs: Long,
+        defaultValue: Float
+    ): Float {
+        if (keyframes.isEmpty()) return defaultValue
+        if (property == KeyframeProperty.ROTATION) {
+            return evaluateRotation(keyframes, timeMs, defaultValue)
+        }
+
+        var first: Keyframe? = null
+        var last: Keyframe? = null
+        var prev: Keyframe? = null
+        var next: Keyframe? = null
+
+        for (i in keyframes.indices) {
+            val k = keyframes[i]
+            if (k.property != property) continue
+
+            if (first == null || k.timeMs < first.timeMs) first = k
+            if (last == null || k.timeMs > last.timeMs) last = k
+
+            if (k.timeMs <= timeMs) {
+                if (prev == null || k.timeMs > prev.timeMs) prev = k
+            }
+            if (k.timeMs >= timeMs) {
+                if (next == null || k.timeMs < next.timeMs) next = k
+            }
+        }
+
+        if (first == null) return defaultValue
+        if (timeMs <= first.timeMs) return first.value
+        val l = last ?: return first.value
+        if (timeMs >= l.timeMs) return l.value
+
+        val k0 = prev ?: first
+        val k1 = next ?: l
+
+        val duration = k1.timeMs - k0.timeMs
+        if (duration <= 0L) return k1.value
+
+        val rawT = (timeMs - k0.timeMs).toFloat() / duration.toFloat()
+        return interpolate(k0.value, k1.value, rawT, k0.interpolation)
+    }
+
+    /**
+     * Applies deterministic easing/interpolation curve based on the keyframe's [InterpolationType].
+     */
+    fun applyInterpolation(t: Float, keyframe: Keyframe): Float {
+        return interpolate(0f, 1f, t, keyframe.interpolation)
     }
 
     /**
@@ -199,39 +230,49 @@ object KeyframeEvaluator {
         return clip.effects.map { eff ->
             when (eff.type) {
                 com.example.core.model.EffectType.BRIGHTNESS -> {
-                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.BRIGHTNESS, timeMs, eff.parameters["value"] ?: 0f)
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.BRIGHTNESS, timeMs, eff.parameters["value"] ?: eff.parameters["brightness"] ?: 0f)
                     eff.copy(parameters = eff.parameters + mapOf("value" to v, "brightness" to v))
                 }
                 com.example.core.model.EffectType.CONTRAST -> {
-                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.CONTRAST, timeMs, eff.parameters["value"] ?: 1f)
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.CONTRAST, timeMs, eff.parameters["value"] ?: eff.parameters["contrast"] ?: 1f)
                     eff.copy(parameters = eff.parameters + mapOf("value" to v, "contrast" to v))
                 }
                 com.example.core.model.EffectType.SATURATION -> {
-                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.SATURATION, timeMs, eff.parameters["value"] ?: 1f)
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.SATURATION, timeMs, eff.parameters["value"] ?: eff.parameters["saturation"] ?: 1f)
                     eff.copy(parameters = eff.parameters + mapOf("value" to v, "saturation" to v))
                 }
                 com.example.core.model.EffectType.EXPOSURE -> {
-                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.EXPOSURE, timeMs, eff.parameters["value"] ?: 0f)
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.EXPOSURE, timeMs, eff.parameters["value"] ?: eff.parameters["exposure"] ?: 0f)
                     eff.copy(parameters = eff.parameters + mapOf("value" to v, "exposure" to v))
                 }
                 com.example.core.model.EffectType.TEMPERATURE -> {
-                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.TEMPERATURE, timeMs, eff.parameters["value"] ?: 0f)
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.TEMPERATURE, timeMs, eff.parameters["value"] ?: eff.parameters["temperature"] ?: 0f)
                     eff.copy(parameters = eff.parameters + mapOf("value" to v, "temperature" to v))
                 }
                 com.example.core.model.EffectType.TINT -> {
-                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.TINT, timeMs, eff.parameters["value"] ?: 0f)
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.TINT, timeMs, eff.parameters["value"] ?: eff.parameters["tint"] ?: 0f)
                     eff.copy(parameters = eff.parameters + mapOf("value" to v, "tint" to v))
                 }
                 com.example.core.model.EffectType.HIGHLIGHTS -> {
-                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.HIGHLIGHTS, timeMs, eff.parameters["value"] ?: 0f)
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.HIGHLIGHTS, timeMs, eff.parameters["value"] ?: eff.parameters["highlights"] ?: 0f)
                     eff.copy(parameters = eff.parameters + mapOf("value" to v, "highlights" to v))
                 }
                 com.example.core.model.EffectType.SHADOWS -> {
-                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.SHADOWS, timeMs, eff.parameters["value"] ?: 0f)
+                    val v = evaluateProperty(clip.keyframes, KeyframeProperty.SHADOWS, timeMs, eff.parameters["value"] ?: eff.parameters["shadows"] ?: 0f)
                     eff.copy(parameters = eff.parameters + mapOf("value" to v, "shadows" to v))
                 }
                 else -> eff
             }
         }
+    }
+
+    /**
+     * Evaluates volume at [timeMs], interpolating any volume keyframes.
+     * Returns base volume if no keyframes are set.
+     */
+    fun evaluateVolume(clip: Clip, timeMs: Long): Float {
+        val baseVolume = clip.volume ?: 1f
+        if (clip.keyframes.isEmpty()) return baseVolume
+        return evaluateProperty(clip.keyframes, KeyframeProperty.VOLUME, timeMs, baseVolume).coerceIn(0f, 2f)
     }
 }

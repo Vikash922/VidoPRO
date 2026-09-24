@@ -15,6 +15,7 @@ import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,7 +42,9 @@ class Media3PreviewPlayer(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main + Job())
 ) : PreviewPlayerController, PreviewRenderer {
 
-    private val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context.applicationContext)
+    private val appContext = context.applicationContext
+
+    private val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(appContext)
         .setEnableDecoderFallback(true)
         // Prefer hardware-accelerated codec extensions over platform codecs
         .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
@@ -58,7 +61,7 @@ class Media3PreviewPlayer(
         .build()
 
 
-    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context.applicationContext)
+    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(appContext)
         .setRenderersFactory(renderersFactory)
         .setLoadControl(loadControl)
         .build()
@@ -84,7 +87,7 @@ class Media3PreviewPlayer(
     private var audioClipsList: List<Clip> = emptyList()
     private var videoOverlayClips: List<Clip> = emptyList()
     private var audioLayersSegments: List<List<AudioTimelineSegment>> = emptyList()
-    private val mediaSourceFactory = DefaultMediaSourceFactory(context.applicationContext)
+    private val mediaSourceFactory = DefaultMediaSourceFactory(appContext)
     private var currentPlaybackSpeed: Float = 1.0f
     private var currentVolume: Float = 1.0f
     private var assetsMap: Map<String, Asset> = emptyMap()
@@ -186,15 +189,9 @@ class Media3PreviewPlayer(
 
     override fun setClips(clips: List<Clip>, assets: Map<String, Asset>) {
         val sorted = clips.sortedBy { it.startTimeMs }
-        assetsMap = assets
-
         val wasPlaying = exoPlayer.isPlaying
         // Save current timeline position so split/trim doesn't reset playhead
         val savedPositionMs = _currentPositionMs.value
-
-        clipsList = sorted
-        val totalDuration = sorted.maxOfOrNull { it.endTimeMs } ?: 0L
-        _durationMs.value = totalDuration
 
         // Check if underlying media sources actually changed (URIs, clip boundaries, speed, duration).
         // If only visual properties (transform, effects, keyframes) changed, avoid re-preparing ExoPlayer.
@@ -208,8 +205,12 @@ class Media3PreviewPlayer(
             old.durationMs == new.durationMs
         } && assets == assetsMap
 
+        clipsList = sorted
+        assetsMap = assets
+        val totalDuration = sorted.maxOfOrNull { it.endTimeMs } ?: 0L
+        _durationMs.value = totalDuration
+
         if (sourcesUnchanged && exoPlayer.mediaItemCount == sorted.size) {
-            clipsList = sorted
             return
         }
 
@@ -252,7 +253,7 @@ class Media3PreviewPlayer(
 
         // Adjust player count to match layer count
         while (audioPlayers.size < layers.size) {
-            val player = ExoPlayer.Builder(context.applicationContext).build()
+            val player = ExoPlayer.Builder(appContext).build()
             audioPlayers.add(player)
         }
         while (audioPlayers.size > layers.size) {
@@ -319,7 +320,7 @@ class Media3PreviewPlayer(
 
         for (clip in videoClips) {
             val player = overlayPlayers.getOrPut(clip.id) {
-                ExoPlayer.Builder(context.applicationContext)
+                ExoPlayer.Builder(appContext)
                     .setRenderersFactory(renderersFactory)
                     .setLoadControl(loadControl)
                     .build()
@@ -604,6 +605,7 @@ class Media3PreviewPlayer(
 
     override fun release() {
         stopPositionTicker()
+        scope.cancel()
         exoPlayer.removeListener(playerListener)
         exoPlayer.release()
         for (player in audioPlayers) {

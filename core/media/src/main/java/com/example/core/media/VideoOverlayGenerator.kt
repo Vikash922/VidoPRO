@@ -164,8 +164,31 @@ class VideoOverlayGenerator(
     private fun getImageBitmap(asset: Asset): Bitmap? {
         return cachedImages.getOrPut(asset.id) {
             try {
-                val inputStream = context.contentResolver.openInputStream(Uri.parse(asset.uri))
-                BitmapFactory.decodeStream(inputStream)?.also { inputStream?.close() }
+                val uri = Uri.parse(asset.uri)
+                val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream, null, options)
+                }
+
+                var sampleSize = 1
+                val reqWidth = if (videoWidth > 0) videoWidth else 1920
+                val reqHeight = if (videoHeight > 0) videoHeight else 1080
+                if (options.outHeight > reqHeight || options.outWidth > reqWidth) {
+                    val halfHeight = options.outHeight / 2
+                    val halfWidth = options.outWidth / 2
+                    while ((halfHeight / sampleSize) >= reqHeight && (halfWidth / sampleSize) >= reqWidth) {
+                        sampleSize *= 2
+                    }
+                }
+
+                val decodeOptions = BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                }
+
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream, null, decodeOptions)
+                }
             } catch (e: Exception) {
                 null
             } ?: return null
