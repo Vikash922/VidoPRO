@@ -125,8 +125,7 @@ class VideoOverlayGenerator(
 
             // Apply color filter effects
             if (currentEffects.isNotEmpty()) {
-                val filterSettings = com.example.feature.editor.filter.FilterSettingsMapper.fromEffects(currentEffects)
-                val colorArray = com.example.feature.editor.filter.ColorFilterHelper.createColorMatrixArray(filterSettings)
+                val colorArray = com.example.core.media.effect.ColorMatrixHelper.createColorMatrix(currentEffects)
                 paint.colorFilter = android.graphics.ColorMatrixColorFilter(colorArray)
             } else {
                 paint.colorFilter = null

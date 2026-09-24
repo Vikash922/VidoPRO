@@ -6,7 +6,7 @@ import com.example.core.model.Keyframe
 import com.example.core.model.Track
 import com.example.core.model.TrackType
 import com.example.core.model.Transition
-import com.example.core.media.transition.TransitionValidator
+import com.example.core.model.TransitionValidator
 import java.util.UUID
 
 /**
@@ -447,14 +447,8 @@ object TimelineReducer {
             }
             track.copy(clips = updated)
         }
-        val updatedSelected = if (state.selectedClip?.id == clipId) {
-            state.selectedClip.copy(effects = effects)
-        } else {
-            state.selectedClip
-        }
         return state.copy(
-            tracks = updatedTracks,
-            selectedClip = updatedSelected
+            tracks = updatedTracks
         )
     }
 
@@ -537,10 +531,7 @@ object TimelineReducer {
             }
             track.copy(clips = updated)
         }
-        val updatedSelected = if (state.selectedClip?.id == clipId) {
-            state.selectedClip.copy(mask = mask, effects = updatedEffects)
-        } else state.selectedClip
-        return state.copy(tracks = updatedTracks, selectedClip = updatedSelected)
+        return state.copy(tracks = updatedTracks)
     }
 
     private fun handleSetClipBlendMode(
@@ -568,10 +559,7 @@ object TimelineReducer {
             }
             track.copy(clips = updated)
         }
-        val updatedSelected = if (state.selectedClip?.id == clipId) {
-            state.selectedClip.copy(blendMode = blendMode, effects = updatedEffects)
-        } else state.selectedClip
-        return state.copy(tracks = updatedTracks, selectedClip = updatedSelected)
+        return state.copy(tracks = updatedTracks)
     }
 
     private fun handleSetClipOpacity(

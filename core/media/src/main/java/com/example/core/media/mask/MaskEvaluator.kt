@@ -72,16 +72,4 @@ object MaskEvaluator {
 
         return path
     }
-
-    /**
-     * Converts an Android [Path] to a Compose [androidx.compose.ui.graphics.Path] for real-time preview clipping.
-     */
-    fun createComposePath(
-        mask: ClipMask,
-        layerWidth: Float,
-        layerHeight: Float
-    ): androidx.compose.ui.graphics.Path {
-        val androidPath = createMaskPath(mask, layerWidth, layerHeight)
-        return androidx.compose.ui.graphics.asComposePath(androidPath)
-    }
 }

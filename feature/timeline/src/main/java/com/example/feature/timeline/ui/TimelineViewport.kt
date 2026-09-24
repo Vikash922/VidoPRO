@@ -122,7 +122,7 @@ fun TimelineViewport(
                         contentAlignment = Alignment.Center
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Add, null, tint = Color.White, Modifier.size(18.dp))
+                            Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp), tint = Color.White)
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 when (timelineMode) {

@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.CropRotate
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -376,7 +377,7 @@ fun EditorScreen(
                             val mainMaskShape = remember(activeMainMask) {
                                 activeMainMask?.let { m ->
                                     androidx.compose.foundation.shape.GenericShape { size, _ ->
-                                        addPath(com.example.core.media.mask.MaskEvaluator.createComposePath(m, size.width, size.height))
+                                        addPath(com.example.core.media.mask.MaskEvaluator.createMaskPath(m, size.width, size.height).asComposePath())
                                     }
                                 }
                             }
@@ -600,7 +601,7 @@ fun EditorScreen(
                             val overlayMaskShape = remember(activeOverlayMask) {
                                 activeOverlayMask?.let { m ->
                                     androidx.compose.foundation.shape.GenericShape { size, _ ->
-                                        addPath(com.example.core.media.mask.MaskEvaluator.createComposePath(m, size.width, size.height))
+                                        addPath(com.example.core.media.mask.MaskEvaluator.createMaskPath(m, size.width, size.height).asComposePath())
                                     }
                                 }
                             }
