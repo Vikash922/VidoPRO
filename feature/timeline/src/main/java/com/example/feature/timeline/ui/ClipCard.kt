@@ -41,6 +41,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -77,6 +78,7 @@ fun ClipCard(
     clip: Clip,
     isSelected: Boolean,
     isMultiSelected: Boolean = false,
+    selectedKeyframeId: String? = null,
     pixelsPerMs: Float,
     assets: Map<String, Asset> = emptyMap(),
     onSelect: () -> Unit,
@@ -86,6 +88,7 @@ fun ClipCard(
     onTrimStartDelta: (Long) -> Unit,
     onTrimEndDelta: (Long) -> Unit,
     onMoveKeyframe: (keyframeId: String, newTimeMs: Long) -> Unit = { _, _ -> },
+    onSelectKeyframe: (keyframeId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -138,6 +141,7 @@ fun ClipCard(
     val currentOnTrimStartDelta by rememberUpdatedState(onTrimStartDelta)
     val currentOnTrimEndDelta by rememberUpdatedState(onTrimEndDelta)
     val currentOnMoveKeyframe by rememberUpdatedState(onMoveKeyframe)
+    val currentOnSelectKeyframe by rememberUpdatedState(onSelectKeyframe)
 
     Box(
         modifier = modifier
@@ -302,51 +306,96 @@ fun ClipCard(
         }
 
         // ── Keyframe diamonds drawn on top of clip body ──────────────────────
-        // Only shown for selected clip that has keyframes
-        if (isSelected && clip.keyframes.isNotEmpty()) {
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp) // avoid trim handles
-                    .pointerInput(clip.id, clip.keyframes, pixelsPerMs) {
-                        detectDragGestures(
-                            onDragStart = {},
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                // Find closest keyframe to touch x
-                                val touchX = change.position.x
-                                val touchMs = clip.startTimeMs + (touchX / pixelsPerMs).toLong()
-                                val nearest = clip.keyframes.minByOrNull { kf ->
-                                    val kfX = ((kf.timeMs - clip.startTimeMs) * pixelsPerMs)
-                                    (kfX - touchX).absoluteValue
-                                }
-                                if (nearest != null) {
-                                    val deltaMs = (dragAmount.x / pixelsPerMs).toLong()
-                                    val newTimeMs = (nearest.timeMs + deltaMs).coerceIn(clip.startTimeMs, clip.endTimeMs)
-                                    currentOnMoveKeyframe(nearest.id, newTimeMs)
-                                }
-                            },
-                            onDragEnd = {},
-                            onDragCancel = {}
-                        )
-                    }
-            ) {
-                val diamondSize = 8.dp.toPx()
+        if (clip.keyframes.isNotEmpty()) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
                 val centerY = size.height / 2f
                 clip.keyframes.forEach { kf ->
                     val relativeMs = kf.timeMs - clip.startTimeMs
                     val x = relativeMs * pixelsPerMs
                     if (x >= 0f && x <= size.width) {
+                        val isKfSelected = isSelected && (kf.id == selectedKeyframeId)
+                        val diamondSize = if (isKfSelected) 8.dp.toPx() else if (isSelected) 6.dp.toPx() else 4.dp.toPx()
+
                         val diamond = Path().apply {
                             moveTo(x, centerY - diamondSize)
-                            lineTo(x + diamondSize * 0.6f, centerY)
+                            lineTo(x + diamondSize * 0.7f, centerY)
                             lineTo(x, centerY + diamondSize)
-                            lineTo(x - diamondSize * 0.6f, centerY)
+                            lineTo(x - diamondSize * 0.7f, centerY)
                             close()
                         }
-                        drawPath(diamond, color = Color(0xFFFFD600)) // Vivid yellow diamond
-                        drawPath(diamond, color = Color.Black.copy(alpha = 0.35f)) // subtle stroke sim
+
+                        if (isSelected) {
+                            if (isKfSelected) {
+                                // Selected keyframe: Vibrant Cyan with dark outline
+                                drawPath(diamond, color = Color(0xFF00E5FF))
+                                drawPath(
+                                    diamond,
+                                    color = Color(0xFF0A0D14),
+                                    style = Stroke(width = 2.dp.toPx())
+                                )
+                            } else {
+                                // Vivid Yellow with dark outline
+                                drawPath(diamond, color = Color(0xFFFFD600))
+                                drawPath(
+                                    diamond,
+                                    color = Color(0xFF0A0D14),
+                                    style = Stroke(width = 1.5.dp.toPx())
+                                )
+                            }
+                        } else {
+                            // Subtle yellow marker for unselected clip
+                            drawPath(diamond, color = Color(0xAAFFD600))
+                            drawPath(
+                                diamond,
+                                color = Color.Black.copy(alpha = 0.5f),
+                                style = Stroke(width = 1.dp.toPx())
+                            )
+                        }
                     }
+                }
+            }
+
+            // Interactive hit-targets when clip is selected
+            if (isSelected) {
+                clip.keyframes.forEach { kf ->
+                    val relativeMs = kf.timeMs - clip.startTimeMs
+                    val kfXPx = relativeMs * pixelsPerMs
+                    val touchBoxSize = 32.dp
+
+                    Box(
+                        modifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    (kfXPx - touchBoxSize.toPx() / 2f).roundToInt(),
+                                    ((52.dp.toPx() - touchBoxSize.toPx()) / 2f).roundToInt()
+                                )
+                            }
+                            .size(touchBoxSize)
+                            .pointerInput(kf.id, pixelsPerMs) {
+                                detectTapGestures(
+                                    onTap = {
+                                        currentOnSelectKeyframe(kf.id)
+                                        currentOnSeek(kf.timeMs)
+                                    }
+                                )
+                            }
+                            .pointerInput(kf.id, pixelsPerMs) {
+                                detectDragGestures(
+                                    onDragStart = {
+                                        currentOnSelectKeyframe(kf.id)
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        val deltaMs = (dragAmount.x / pixelsPerMs).toLong()
+                                        if (deltaMs != 0L) {
+                                            val newTimeMs = (kf.timeMs + deltaMs).coerceIn(clip.startTimeMs, clip.endTimeMs)
+                                            currentOnMoveKeyframe(kf.id, newTimeMs)
+                                            currentOnSeek(newTimeMs)
+                                        }
+                                    }
+                                )
+                            }
+                    )
                 }
             }
         }

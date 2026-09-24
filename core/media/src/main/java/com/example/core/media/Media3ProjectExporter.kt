@@ -139,7 +139,8 @@ class Media3ProjectExporter(
                 }
 
                 // Apply per-clip opacity effect (dimming toward background canvas)
-                if (layer.opacity < 1.0f) {
+                val hasOpacityKeyframes = layer.keyframes.any { it.property == com.example.core.model.KeyframeProperty.OPACITY }
+                if (layer.opacity < 1.0f || hasOpacityKeyframes) {
                     val opacityEffect = Media3EffectHelper.createOpacityEffect(layer.opacity)
                     if (opacityEffect != null) {
                         clipVideoEffects.add(opacityEffect)

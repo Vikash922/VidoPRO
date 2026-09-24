@@ -37,6 +37,7 @@ data class EditorUiState(
     val isLoading: Boolean = true,
     val project: Project? = null,
     val selectedClipId: String? = null,
+    val selectedKeyframeId: String? = null,
     val multiSelectedClipIds: Set<String> = emptySet(),
     val playheadPositionMs: Long = 0L,
     val isPlaying: Boolean = false,

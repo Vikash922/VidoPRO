@@ -30,6 +30,7 @@ import kotlin.math.roundToInt
 fun AudioTrack(
     track: Track,
     selectionState: TimelineSelectionState,
+    selectedKeyframeId: String? = null,
     pixelsPerMs: Float,
     assets: Map<String, Asset>,
     onSelectClip: (String) -> Unit,
@@ -39,6 +40,7 @@ fun AudioTrack(
     onTrimStartDelta: (clipId: String, deltaMs: Long) -> Unit,
     onTrimEndDelta: (clipId: String, deltaMs: Long) -> Unit,
     onMoveKeyframe: (clipId: String, keyframeId: String, newTimeMs: Long) -> Unit,
+    onSelectKeyframe: (keyframeId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -77,6 +79,7 @@ fun AudioTrack(
                 clip = clip,
                 isSelected = isSelected,
                 isMultiSelected = isMultiSelected,
+                selectedKeyframeId = selectedKeyframeId,
                 pixelsPerMs = pixelsPerMs,
                 assets = assets,
                 onSelect = onSelectCb,
@@ -86,6 +89,7 @@ fun AudioTrack(
                 onTrimStartDelta = onTrimStartCb,
                 onTrimEndDelta = onTrimEndCb,
                 onMoveKeyframe = onMoveKfCb,
+                onSelectKeyframe = onSelectKeyframe,
                 modifier = Modifier.offset {
                     IntOffset((clip.startTimeMs * pixelsPerMs).roundToInt(), 0)
                 }

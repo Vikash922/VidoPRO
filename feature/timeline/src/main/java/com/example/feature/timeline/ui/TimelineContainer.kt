@@ -75,6 +75,7 @@ fun TimelineContainer(
     onAddMedia: () -> Unit = {},
     onLongPressClip: (clipId: String) -> Unit = {},
     onMoveKeyframe: (clipId: String, keyframeId: String, newTimeMs: Long) -> Unit = { _, _, _ -> },
+    onSelectKeyframe: (keyframeId: String) -> Unit = {},
     onEditTransition: (firstClipId: String, secondClipId: String) -> Unit = { _, _ -> },
     onSwitchMode: (TimelineMode) -> Unit = {},
     modifier: Modifier = Modifier
@@ -159,6 +160,7 @@ fun TimelineContainer(
                 beatMarkers = state.beatMarkers,
                 visibleTracks = visibleTracks,
                 selectionState = selectionState,
+                selectedKeyframeId = state.selectedKeyframeId,
                 assets = assets,
                 timelineMode = timelineMode,
                 zoomLevel = state.zoomLevel,
@@ -188,6 +190,10 @@ fun TimelineContainer(
                     }
                 },
                 onMoveKeyframe = onMoveKeyframe,
+                onSelectKeyframe = { kfId ->
+                    onAction(TimelineAction.SelectKeyframe(kfId))
+                    onSelectKeyframe(kfId)
+                },
                 onEditTransition = onEditTransition,
                 onAddMedia = onAddMedia,
                 onAddSubTrackMedia = onAddSubTrackMedia,

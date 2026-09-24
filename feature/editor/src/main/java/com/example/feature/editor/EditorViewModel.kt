@@ -437,6 +437,9 @@ class EditorViewModel(
                 onTimelineAction(TimelineAction.UngroupClips(gid))
                 _uiState.update { it.copy(multiSelectedClipIds = emptySet()) }
             }
+            is EditorEvent.SelectKeyframe -> {
+                onTimelineAction(TimelineAction.SelectKeyframe(event.keyframeId))
+            }
             is EditorEvent.MoveKeyframe -> {
                 onTimelineAction(TimelineAction.MoveKeyframe(event.clipId, event.keyframeId, event.newTimeMs))
             }
@@ -530,6 +533,7 @@ class EditorViewModel(
             current.copy(
                 playheadPositionMs = newState.playheadPositionMs,
                 selectedClipId = newState.selectedClipId,
+                selectedKeyframeId = newState.selectedKeyframeId,
                 multiSelectedClipIds = newState.multiSelectedClipIds,
                 beatMarkers = newState.beatMarkers,
                 project = updatedProject,
@@ -579,7 +583,7 @@ class EditorViewModel(
         if (existingKf != null) {
             onTimelineAction(TimelineAction.DeleteKeyframe(clip.id, existingKf.id))
         } else {
-            val currentValue = when (property) {
+            val baseValue = when (property) {
                 KeyframeProperty.POSITION_X -> clip.transform.x
                 KeyframeProperty.POSITION_Y -> clip.transform.y
                 KeyframeProperty.SCALE_X -> clip.transform.scaleX
@@ -600,6 +604,7 @@ class EditorViewModel(
                 KeyframeProperty.MASK_FEATHER -> clip.mask?.feather ?: 0f
                 else -> 0f
             }
+            val currentValue = com.example.core.media.KeyframeEvaluator.evaluateProperty(clip.keyframes, property, playhead, baseValue)
             val clampedTime = playhead.coerceIn(clip.startTimeMs, clip.endTimeMs)
             onTimelineAction(
                 TimelineAction.AddKeyframe(
@@ -773,6 +778,7 @@ class EditorViewModel(
             current.copy(
                 playheadPositionMs = timelineEngineState.playheadPositionMs,
                 selectedClipId = timelineEngineState.selectedClipId,
+                selectedKeyframeId = timelineEngineState.selectedKeyframeId,
                 multiSelectedClipIds = timelineEngineState.multiSelectedClipIds,
                 beatMarkers = timelineEngineState.beatMarkers,
                 isEditSheetVisible = sheetVisible,

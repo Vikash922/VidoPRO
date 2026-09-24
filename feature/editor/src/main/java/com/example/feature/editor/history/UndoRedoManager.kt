@@ -73,9 +73,15 @@ class UndoRedoManager(
             lastCmd is StateSnapshotCommand && newCmd is StateSnapshotCommand -> {
                 val lastAction = lastCmd.action
                 val newAction = newCmd.action
-                if (lastAction is TimelineAction.MoveKeyframe && newAction is TimelineAction.MoveKeyframe) {
-                    lastAction.keyframeId == newAction.keyframeId
-                } else false
+                when {
+                    lastAction is TimelineAction.MoveKeyframe && newAction is TimelineAction.MoveKeyframe -> {
+                        lastAction.keyframeId == newAction.keyframeId
+                    }
+                    lastAction is TimelineAction.UpdateKeyframe && newAction is TimelineAction.UpdateKeyframe -> {
+                        lastAction.keyframeId == newAction.keyframeId
+                    }
+                    else -> false
+                }
             }
             else -> false
         }

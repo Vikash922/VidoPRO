@@ -47,6 +47,8 @@ sealed interface EditorEvent {
     data object GroupSelectedClips : EditorEvent
     /** Ungroups clips that belong to the same group as the currently selected clip. */
     data object UngroupSelectedClips : EditorEvent
+    /** Selects or deselects a keyframe on the timeline. */
+    data class SelectKeyframe(val keyframeId: String?) : EditorEvent
     /** Drags a keyframe diamond to a new position on the timeline. */
     data class MoveKeyframe(val clipId: String, val keyframeId: String, val newTimeMs: Long) : EditorEvent
     /** Adds a keyframe to a clip. */

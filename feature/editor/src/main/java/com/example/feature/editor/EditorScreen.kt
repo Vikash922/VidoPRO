@@ -347,8 +347,21 @@ fun EditorScreen(
                                     val allClips = uiState.project?.tracks?.flatMap { it.clips } ?: emptyList()
                                     val activeClip = uiState.selectedClipId?.let { selId -> allClips.find { it.id == selId } }
                                         ?: allClips.find { uiState.playheadPositionMs in it.startTimeMs..it.endTimeMs }
-                                    if (activeClip != null && activeClip.effects.isNotEmpty()) {
-                                        com.example.feature.editor.filter.FilterSettingsMapper.fromEffects(activeClip.effects)
+                                    val hasEffectKeyframes = activeClip?.keyframes?.any {
+                                        it.property in listOf(
+                                            com.example.core.model.KeyframeProperty.BRIGHTNESS,
+                                            com.example.core.model.KeyframeProperty.CONTRAST,
+                                            com.example.core.model.KeyframeProperty.SATURATION,
+                                            com.example.core.model.KeyframeProperty.EXPOSURE,
+                                            com.example.core.model.KeyframeProperty.TEMPERATURE,
+                                            com.example.core.model.KeyframeProperty.TINT,
+                                            com.example.core.model.KeyframeProperty.HIGHLIGHTS,
+                                            com.example.core.model.KeyframeProperty.SHADOWS
+                                        )
+                                    } == true
+                                    if (activeClip != null && (activeClip.effects.isNotEmpty() || hasEffectKeyframes)) {
+                                        val evaluatedEffects = com.example.core.media.KeyframeEvaluator.evaluateEffects(activeClip, uiState.playheadPositionMs)
+                                        com.example.feature.editor.filter.FilterSettingsMapper.fromEffects(evaluatedEffects)
                                     } else if (uiState.selectedClipId == null && !uiState.filterSettings.isDefault) {
                                         uiState.filterSettings
                                     } else {
@@ -998,13 +1011,15 @@ fun EditorScreen(
                             uiState.selectedClipId,
                             uiState.multiSelectedClipIds,
                             uiState.durationMs,
-                            uiState.beatMarkers
+                            uiState.beatMarkers,
+                            uiState.selectedKeyframeId
                         ) {
                             com.example.feature.timeline.engine.TimelineEngineState(
                                 tracks = uiState.project?.tracks ?: emptyList(),
                                 playheadPositionMs = uiState.playheadPositionMs,
                                 durationMs = uiState.durationMs,
                                 selectedClipId = uiState.selectedClipId,
+                                selectedKeyframeId = uiState.selectedKeyframeId,
                                 multiSelectedClipIds = uiState.multiSelectedClipIds,
                                 beatMarkers = uiState.beatMarkers
                             )
@@ -1034,6 +1049,7 @@ fun EditorScreen(
                             onAddMedia = { onNavigateMediaPicker(TrackType.VIDEO) },
                             onLongPressClip = { clipId -> onEvent(EditorEvent.LongPressClip(clipId)) },
                             onMoveKeyframe = { clipId, kfId, newMs -> onEvent(EditorEvent.MoveKeyframe(clipId, kfId, newMs)) },
+                            onSelectKeyframe = { kfId -> onEvent(EditorEvent.SelectKeyframe(kfId)) },
                             onEditTransition = { firstId, secondId -> onEvent(EditorEvent.OpenTransitionEditor(firstId, secondId)) },
                             onSwitchMode = { newMode -> timelineMode = newMode },
                             modifier = Modifier.fillMaxSize()

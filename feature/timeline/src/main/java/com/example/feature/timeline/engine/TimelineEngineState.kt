@@ -14,6 +14,7 @@ data class TimelineEngineState(
     val playheadPositionMs: Long = 0L,
     val durationMs: Long = 0L,
     val selectedClipId: String? = null,
+    val selectedKeyframeId: String? = null,
     val multiSelectedClipIds: Set<String> = emptySet(),
     val zoomLevel: Float = 1.0f,
     val isSnappingEnabled: Boolean = true,

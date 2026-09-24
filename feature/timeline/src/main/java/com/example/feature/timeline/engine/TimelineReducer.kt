@@ -21,7 +21,11 @@ object TimelineReducer {
             is TimelineAction.SetTracks -> handleLoadProject(state, action.tracks, null)
             is TimelineAction.Seek -> handleSeek(state, action.positionMs)
             is TimelineAction.SeekPlayhead -> handleSeek(state, action.positionMs)
-            is TimelineAction.SelectClip -> state.copy(selectedClipId = action.clipId, multiSelectedClipIds = emptySet())
+            is TimelineAction.SelectClip -> {
+                val newKfId = if (action.clipId != state.selectedClipId) null else state.selectedKeyframeId
+                state.copy(selectedClipId = action.clipId, selectedKeyframeId = newKfId, multiSelectedClipIds = emptySet())
+            }
+            is TimelineAction.SelectKeyframe -> state.copy(selectedKeyframeId = action.keyframeId)
             is TimelineAction.SelectMultipleClips -> state.copy(
                 multiSelectedClipIds = action.clipIds,
                 selectedClipId = action.clipIds.firstOrNull()
@@ -674,7 +678,8 @@ object TimelineReducer {
                 if (c.id == clipId) c.copy(keyframes = updatedKeyframes) else c
             })
         }
-        return state.copy(tracks = updatedTracks)
+        val targetKfId = if (existingIndex >= 0) clip.keyframes[existingIndex].id else updatedKeyframes.find { it.property == property && it.timeMs == clampedTime }?.id
+        return state.copy(tracks = updatedTracks, selectedKeyframeId = targetKfId)
     }
 
     /** Updates value and/or interpolation on an existing keyframe. */
@@ -694,7 +699,7 @@ object TimelineReducer {
                 if (c.id == clipId) c.copy(keyframes = updatedKeyframes) else c
             })
         }
-        return state.copy(tracks = updatedTracks)
+        return state.copy(tracks = updatedTracks, selectedKeyframeId = keyframeId)
     }
 
     /** Deletes a keyframe from a clip. */
@@ -710,7 +715,10 @@ object TimelineReducer {
                 if (c.id == clipId) c.copy(keyframes = updatedKeyframes) else c
             })
         }
-        return state.copy(tracks = updatedTracks)
+        return state.copy(
+            tracks = updatedTracks,
+            selectedKeyframeId = if (state.selectedKeyframeId == keyframeId) null else state.selectedKeyframeId
+        )
     }
 
     /** Moves a keyframe diamond to a new timeMs on the timeline, respecting clip boundaries. */
@@ -733,7 +741,7 @@ object TimelineReducer {
                 if (c.id == clipId) c.copy(keyframes = updatedKeyframes) else c
             })
         }
-        return state.copy(tracks = updatedTracks)
+        return state.copy(tracks = updatedTracks, selectedKeyframeId = keyframeId)
     }
 
     /** Sanitizes and clamps all transitions for a track based on the actual duration of adjacent clips. */

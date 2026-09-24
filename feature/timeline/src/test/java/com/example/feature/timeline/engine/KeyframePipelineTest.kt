@@ -294,4 +294,61 @@ class KeyframePipelineTest {
         assertEquals(3500L, secondClip.keyframes[0].timeMs)
         assertEquals(secondClip.id, secondClip.keyframes[0].clipId)
     }
+
+    @Test
+    fun testSelectKeyframeActionAndDeselection() {
+        val kf1 = Keyframe("kf_1", "clip_1", KeyframeProperty.POSITION_X, 1500L, 10f)
+        val clip = createTestClip(id = "clip_1", keyframes = listOf(kf1))
+        val state = createInitialState(clip)
+
+        // 1. Select keyframe
+        val stateSelected = TimelineReducer.reduce(state, TimelineAction.SelectKeyframe("kf_1"))
+        assertEquals("kf_1", stateSelected.selectedKeyframeId)
+
+        // 2. Deselect keyframe directly
+        val stateDeselected = TimelineReducer.reduce(stateSelected, TimelineAction.SelectKeyframe(null))
+        assertNull(stateDeselected.selectedKeyframeId)
+
+        // 3. Deselecting clip clears selected keyframe
+        val stateWithKfSelected = TimelineReducer.reduce(state, TimelineAction.SelectKeyframe("kf_1"))
+        val stateClipDeselected = TimelineReducer.reduce(stateWithKfSelected, TimelineAction.SelectClip(null))
+        assertNull(stateClipDeselected.selectedKeyframeId)
+
+        // 4. Deleting selected keyframe clears selectedKeyframeId
+        val stateWithKfSelected2 = TimelineReducer.reduce(state, TimelineAction.SelectKeyframe("kf_1"))
+        val stateDeleted = TimelineReducer.reduce(stateWithKfSelected2, TimelineAction.DeleteKeyframe("clip_1", "kf_1"))
+        assertNull(stateDeleted.selectedKeyframeId)
+    }
+
+    @Test
+    fun testNewInterpolationTypesInPipeline() {
+        val clip = createTestClip(id = "clip_1", startTimeMs = 1000L, durationMs = 5000L)
+        val state = createInitialState(clip)
+
+        // Add with HOLD
+        val stateHold = TimelineReducer.reduce(
+            state,
+            TimelineAction.AddKeyframe("clip_1", KeyframeProperty.OPACITY, 2000L, 0.5f, InterpolationType.HOLD)
+        )
+        val kfHold = stateHold.findClip("clip_1")!!.keyframes[0]
+        assertEquals(InterpolationType.HOLD, kfHold.interpolation)
+
+        // Update with CUBIC_EASE_IN_OUT
+        val stateCubic = TimelineReducer.reduce(
+            stateHold,
+            TimelineAction.UpdateKeyframe("clip_1", kfHold.id, 0.9f, InterpolationType.CUBIC_EASE_IN_OUT)
+        )
+        val kfCubic = stateCubic.findClip("clip_1")!!.keyframes[0]
+        assertEquals(InterpolationType.CUBIC_EASE_IN_OUT, kfCubic.interpolation)
+        assertEquals(0.9f, kfCubic.value, 0.001f)
+
+        // Update with SMOOTH
+        val stateSmooth = TimelineReducer.reduce(
+            stateCubic,
+            TimelineAction.UpdateKeyframe("clip_1", kfHold.id, 1.0f, InterpolationType.SMOOTH)
+        )
+        val kfSmooth = stateSmooth.findClip("clip_1")!!.keyframes[0]
+        assertEquals(InterpolationType.SMOOTH, kfSmooth.interpolation)
+    }
 }
+

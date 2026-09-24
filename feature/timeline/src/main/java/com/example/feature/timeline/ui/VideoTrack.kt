@@ -33,6 +33,7 @@ import kotlin.math.roundToInt
 fun VideoTrack(
     track: Track,
     selectionState: TimelineSelectionState,
+    selectedKeyframeId: String? = null,
     pixelsPerMs: Float,
     assets: Map<String, Asset>,
     onSelectClip: (String) -> Unit,
@@ -42,6 +43,7 @@ fun VideoTrack(
     onTrimStartDelta: (clipId: String, deltaMs: Long) -> Unit,
     onTrimEndDelta: (clipId: String, deltaMs: Long) -> Unit,
     onMoveKeyframe: (clipId: String, keyframeId: String, newTimeMs: Long) -> Unit,
+    onSelectKeyframe: (keyframeId: String) -> Unit = {},
     onEditTransition: (firstClipId: String, secondClipId: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
@@ -68,6 +70,7 @@ fun VideoTrack(
                 clip = clip,
                 isSelected = isSelected,
                 isMultiSelected = isMultiSelected,
+                selectedKeyframeId = selectedKeyframeId,
                 pixelsPerMs = pixelsPerMs,
                 assets = assets,
                 onSelect = onSelectCb,
@@ -77,6 +80,7 @@ fun VideoTrack(
                 onTrimStartDelta = onTrimStartCb,
                 onTrimEndDelta = onTrimEndCb,
                 onMoveKeyframe = onMoveKfCb,
+                onSelectKeyframe = onSelectKeyframe,
                 modifier = Modifier.offset {
                     IntOffset((clip.startTimeMs * pixelsPerMs).roundToInt(), 0)
                 }

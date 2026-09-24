@@ -23,6 +23,7 @@ import kotlin.math.roundToInt
 fun TextTrack(
     track: Track,
     selectionState: TimelineSelectionState,
+    selectedKeyframeId: String? = null,
     pixelsPerMs: Float,
     assets: Map<String, Asset>,
     onSelectClip: (String) -> Unit,
@@ -32,6 +33,7 @@ fun TextTrack(
     onTrimStartDelta: (clipId: String, deltaMs: Long) -> Unit,
     onTrimEndDelta: (clipId: String, deltaMs: Long) -> Unit,
     onMoveKeyframe: (clipId: String, keyframeId: String, newTimeMs: Long) -> Unit,
+    onSelectKeyframe: (keyframeId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -57,6 +59,7 @@ fun TextTrack(
                 clip = clip,
                 isSelected = isSelected,
                 isMultiSelected = isMultiSelected,
+                selectedKeyframeId = selectedKeyframeId,
                 pixelsPerMs = pixelsPerMs,
                 assets = assets,
                 onSelect = onSelectCb,
@@ -66,6 +69,7 @@ fun TextTrack(
                 onTrimStartDelta = onTrimStartCb,
                 onTrimEndDelta = onTrimEndCb,
                 onMoveKeyframe = onMoveKfCb,
+                onSelectKeyframe = onSelectKeyframe,
                 modifier = Modifier.offset {
                     IntOffset((clip.startTimeMs * pixelsPerMs).roundToInt(), 0)
                 }

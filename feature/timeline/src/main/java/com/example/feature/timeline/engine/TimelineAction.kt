@@ -56,6 +56,8 @@ sealed interface TimelineAction {
     data class DeleteKeyframe(val clipId: String, val keyframeId: String) : TimelineAction
     /** Moves a keyframe diamond to a new time position (drag-on-timeline). */
     data class MoveKeyframe(val clipId: String, val keyframeId: String, val newTimeMs: Long) : TimelineAction
+    /** Selects a keyframe on the timeline. */
+    data class SelectKeyframe(val keyframeId: String?) : TimelineAction
     /** Updates the effects applied to a clip. */
     data class UpdateClipEffects(val clipId: String, val effects: List<Effect>) : TimelineAction
     /** Adds or replaces an effect on a clip's effect stack. */

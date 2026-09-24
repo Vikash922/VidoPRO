@@ -58,6 +58,7 @@ fun TimelineViewport(
     beatMarkers: Set<Long>,
     visibleTracks: List<Track>,
     selectionState: TimelineSelectionState,
+    selectedKeyframeId: String? = null,
     assets: Map<String, Asset> = emptyMap(),
     timelineMode: TimelineMode = TimelineMode.MAIN,
     zoomLevel: Float = 1.0f,
@@ -69,6 +70,7 @@ fun TimelineViewport(
     onTrimStartDelta: (clipId: String, deltaMs: Long) -> Unit = { _, _ -> },
     onTrimEndDelta: (clipId: String, deltaMs: Long) -> Unit = { _, _ -> },
     onMoveKeyframe: (clipId: String, keyframeId: String, newTimeMs: Long) -> Unit = { _, _, _ -> },
+    onSelectKeyframe: (keyframeId: String) -> Unit = {},
     onEditTransition: (firstClipId: String, secondClipId: String) -> Unit = { _, _ -> },
     onAddMedia: () -> Unit = {},
     onAddSubTrackMedia: () -> Unit = {},
@@ -139,6 +141,7 @@ fun TimelineViewport(
                             TrackType.VIDEO -> VideoTrack(
                                 track = track,
                                 selectionState = selectionState,
+                                selectedKeyframeId = selectedKeyframeId,
                                 pixelsPerMs = pixelsPerMs,
                                 assets = assets,
                                 onSelectClip = onSelectClip,
@@ -148,11 +151,13 @@ fun TimelineViewport(
                                 onTrimStartDelta = onTrimStartDelta,
                                 onTrimEndDelta = onTrimEndDelta,
                                 onMoveKeyframe = onMoveKeyframe,
+                                onSelectKeyframe = onSelectKeyframe,
                                 onEditTransition = onEditTransition
                             )
                             TrackType.OVERLAY -> OverlayTrack(
                                 track = track,
                                 selectionState = selectionState,
+                                selectedKeyframeId = selectedKeyframeId,
                                 pixelsPerMs = pixelsPerMs,
                                 assets = assets,
                                 onSelectClip = onSelectClip,
@@ -161,11 +166,13 @@ fun TimelineViewport(
                                 onMoveClipDelta = onMoveClipDelta,
                                 onTrimStartDelta = onTrimStartDelta,
                                 onTrimEndDelta = onTrimEndDelta,
-                                onMoveKeyframe = onMoveKeyframe
+                                onMoveKeyframe = onMoveKeyframe,
+                                onSelectKeyframe = onSelectKeyframe
                             )
                             TrackType.AUDIO -> AudioTrack(
                                 track = track,
                                 selectionState = selectionState,
+                                selectedKeyframeId = selectedKeyframeId,
                                 pixelsPerMs = pixelsPerMs,
                                 assets = assets,
                                 onSelectClip = onSelectClip,
@@ -174,11 +181,13 @@ fun TimelineViewport(
                                 onMoveClipDelta = onMoveClipDelta,
                                 onTrimStartDelta = onTrimStartDelta,
                                 onTrimEndDelta = onTrimEndDelta,
-                                onMoveKeyframe = onMoveKeyframe
+                                onMoveKeyframe = onMoveKeyframe,
+                                onSelectKeyframe = onSelectKeyframe
                             )
                             TrackType.TEXT -> TextTrack(
                                 track = track,
                                 selectionState = selectionState,
+                                selectedKeyframeId = selectedKeyframeId,
                                 pixelsPerMs = pixelsPerMs,
                                 assets = assets,
                                 onSelectClip = onSelectClip,
@@ -187,7 +196,8 @@ fun TimelineViewport(
                                 onMoveClipDelta = onMoveClipDelta,
                                 onTrimStartDelta = onTrimStartDelta,
                                 onTrimEndDelta = onTrimEndDelta,
-                                onMoveKeyframe = onMoveKeyframe
+                                onMoveKeyframe = onMoveKeyframe,
+                                onSelectKeyframe = onSelectKeyframe
                             )
                         }
                         Spacer(Modifier.height(4.dp))

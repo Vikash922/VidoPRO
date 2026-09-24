@@ -71,11 +71,15 @@ enum class BlendMode(val label: String) {
 
 enum class InterpolationType {
     LINEAR,
+    HOLD,
     EASE_IN,
     EASE_OUT,
     EASE_IN_OUT,
-    BEZIER,
-    HOLD
+    CUBIC_EASE_IN,
+    CUBIC_EASE_OUT,
+    CUBIC_EASE_IN_OUT,
+    SMOOTH,
+    BEZIER
 }
 
 enum class TransitionType {

@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 import com.example.core.model.Clip
+import com.example.core.model.EffectType
 import com.example.core.model.InterpolationType
 import com.example.core.model.Keyframe
 import com.example.core.model.KeyframeProperty
@@ -100,7 +101,18 @@ fun KeyframeBottomSheet(
                     KeyframeProperty.SCALE_Y to "Scale Y",
                     KeyframeProperty.ROTATION to "Rotation",
                     KeyframeProperty.OPACITY to "Opacity",
-                    KeyframeProperty.VOLUME to "Volume"
+                    KeyframeProperty.VOLUME to "Volume",
+                    KeyframeProperty.BRIGHTNESS to "Brightness",
+                    KeyframeProperty.CONTRAST to "Contrast",
+                    KeyframeProperty.SATURATION to "Saturation",
+                    KeyframeProperty.EXPOSURE to "Exposure",
+                    KeyframeProperty.TEMPERATURE to "Temp",
+                    KeyframeProperty.TINT to "Tint",
+                    KeyframeProperty.HIGHLIGHTS to "Highlights",
+                    KeyframeProperty.SHADOWS to "Shadows",
+                    KeyframeProperty.MASK_X to "Mask X",
+                    KeyframeProperty.MASK_Y to "Mask Y",
+                    KeyframeProperty.MASK_FEATHER to "Mask Feather"
                 )
 
                 LazyRow(
@@ -144,20 +156,47 @@ fun KeyframeBottomSheet(
                     KeyframeProperty.ROTATION -> clip.transform.rotation
                     KeyframeProperty.OPACITY -> clip.transform.opacity
                     KeyframeProperty.VOLUME -> clip.volume ?: 1.0f
+                    KeyframeProperty.BRIGHTNESS -> clip.effects.find { it.type == EffectType.BRIGHTNESS }?.parameters?.get("brightness") ?: 0f
+                    KeyframeProperty.CONTRAST -> clip.effects.find { it.type == EffectType.CONTRAST }?.parameters?.get("contrast") ?: 1f
+                    KeyframeProperty.SATURATION -> clip.effects.find { it.type == EffectType.SATURATION }?.parameters?.get("saturation") ?: 1f
+                    KeyframeProperty.EXPOSURE -> clip.effects.find { it.type == EffectType.EXPOSURE }?.parameters?.get("exposure") ?: 0f
+                    KeyframeProperty.TEMPERATURE -> clip.effects.find { it.type == EffectType.TEMPERATURE }?.parameters?.get("temperature") ?: 0f
+                    KeyframeProperty.TINT -> clip.effects.find { it.type == EffectType.TINT }?.parameters?.get("tint") ?: 0f
+                    KeyframeProperty.HIGHLIGHTS -> clip.effects.find { it.type == EffectType.HIGHLIGHTS }?.parameters?.get("highlights") ?: 0f
+                    KeyframeProperty.SHADOWS -> clip.effects.find { it.type == EffectType.SHADOWS }?.parameters?.get("shadows") ?: 0f
+                    KeyframeProperty.MASK_X -> clip.mask?.x ?: 0.5f
+                    KeyframeProperty.MASK_Y -> clip.mask?.y ?: 0.5f
+                    KeyframeProperty.MASK_FEATHER -> clip.mask?.feather ?: 0f
                     else -> 0f
+                }
+
+                val liveEvaluatedValue = remember(clip, activeProperty, playheadPositionMs) {
+                    com.example.core.media.KeyframeEvaluator.evaluateProperty(
+                        clip.keyframes,
+                        activeProperty,
+                        playheadPositionMs,
+                        clipDefaultValue
+                    )
                 }
 
                 val valueRange: ClosedFloatingPointRange<Float> = when (activeProperty) {
                     KeyframeProperty.POSITION_X, KeyframeProperty.POSITION_Y -> -1000f..1000f
                     KeyframeProperty.SCALE_X, KeyframeProperty.SCALE_Y -> 0.1f..5f
-                    KeyframeProperty.ROTATION -> -180f..180f
+                    KeyframeProperty.ROTATION -> -360f..360f
                     KeyframeProperty.OPACITY -> 0f..1f
                     KeyframeProperty.VOLUME -> 0f..2f
+                    KeyframeProperty.BRIGHTNESS -> -1f..1f
+                    KeyframeProperty.CONTRAST -> 0.2f..3f
+                    KeyframeProperty.SATURATION -> 0f..3f
+                    KeyframeProperty.EXPOSURE -> -2f..2f
+                    KeyframeProperty.TEMPERATURE, KeyframeProperty.TINT -> -1f..1f
+                    KeyframeProperty.HIGHLIGHTS, KeyframeProperty.SHADOWS -> -1f..1f
+                    KeyframeProperty.MASK_X, KeyframeProperty.MASK_Y, KeyframeProperty.MASK_FEATHER -> 0f..1f
                     else -> -100f..100f
                 }
 
-                val currentValue = existingKf?.value ?: clipDefaultValue
-                var sliderValue by remember(activeProperty, existingKf?.id, existingKf?.value) {
+                val currentValue = existingKf?.value ?: liveEvaluatedValue
+                var sliderValue by remember(activeProperty, existingKf?.id, existingKf?.value, liveEvaluatedValue) {
                     mutableFloatStateOf(currentValue)
                 }
 
@@ -251,29 +290,34 @@ fun KeyframeBottomSheet(
                             Spacer(Modifier.height(4.dp))
                             val interpolations = listOf(
                                 InterpolationType.LINEAR to "Linear",
+                                InterpolationType.HOLD to "Hold",
                                 InterpolationType.EASE_IN to "Ease In",
                                 InterpolationType.EASE_OUT to "Ease Out",
-                                InterpolationType.EASE_IN_OUT to "Ease In-Out"
+                                InterpolationType.EASE_IN_OUT to "Ease In-Out",
+                                InterpolationType.CUBIC_EASE_IN to "Cubic In",
+                                InterpolationType.CUBIC_EASE_OUT to "Cubic Out",
+                                InterpolationType.CUBIC_EASE_IN_OUT to "Cubic In-Out",
+                                InterpolationType.SMOOTH to "Smooth"
                             )
-                            Row(
+                            LazyRow(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                interpolations.forEach { (interpType, interpLabel) ->
+                                items(interpolations) { (interpType, interpLabel) ->
                                     val isCurrent = existingKf.interpolation == interpType
                                     Box(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(4.dp))
+                                            .clip(RoundedCornerShape(6.dp))
                                             .background(if (isCurrent) Color(0xFF00D2FF) else Color(0xFF1E2230))
                                             .clickable {
                                                 onUpdateKeyframe(clip.id, existingKf.id, existingKf.value, interpType)
                                             }
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
                                     ) {
                                         Text(
                                             interpLabel,
                                             color = if (isCurrent) Color(0xFF0A0D14) else Color.White,
-                                            fontSize = 10.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
                                         )
                                     }
