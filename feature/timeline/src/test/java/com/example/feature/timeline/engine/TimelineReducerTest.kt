@@ -243,7 +243,6 @@ class TimelineReducerTest {
         )
         val track = Track(id = trackId, projectId = "proj_1", type = TrackType.VIDEO, order = 0, clips = listOf(clip))
         val initialState = createInitialState(listOf(track)).copy(
-            selectedClip = clip,
             selectedClipId = clip.id
         )
 

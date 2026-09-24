@@ -72,4 +72,11 @@ object MaskEvaluator {
 
         return path
     }
+
+    /**
+     * Alias for [createMaskPath] returning an Android [android.graphics.Path].
+     */
+    fun createAndroidPath(mask: ClipMask, layerWidth: Float, layerHeight: Float): Path {
+        return createMaskPath(mask, layerWidth, layerHeight)
+    }
 }

@@ -63,7 +63,7 @@ class AdvancedEffectsTimelineTest {
         assertEquals(30f, c3.effects.find { it.id == "eff_1" }?.parameters?.get("brightness"))
 
         // 4. Reorder
-        val s4 = TimelineReducer.reduce(s3, TimelineAction.ReorderClipEffects(clip.id, 1, 0))
+        val s4 = TimelineReducer.reduce(s3, TimelineAction.ReorderClipEffects(clip.id, listOf("eff_2", "eff_1")))
         val c4 = s4.tracks[0].clips[0]
         assertEquals("eff_2", c4.effects[0].id)
         assertEquals("eff_1", c4.effects[1].id)

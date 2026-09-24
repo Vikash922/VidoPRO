@@ -97,7 +97,7 @@ class AdvancedKeyframeMotionTest {
             assetId = "a1",
             type = ClipType.VIDEO,
             startTimeMs = 0L,
-            endTimeMs = 5000L,
+            durationMs = 5000L,
             transform = Transform(x = 0f, y = 0f, scaleX = 1f, scaleY = 1f, rotation = 0f, opacity = 1f),
             keyframes = listOf(
                 Keyframe("k1", "c1", KeyframeProperty.POSITION_X, 1000L, 100f, InterpolationType.LINEAR),
@@ -138,7 +138,7 @@ class AdvancedKeyframeMotionTest {
             assetId = "a1",
             type = ClipType.VIDEO,
             startTimeMs = 0L,
-            endTimeMs = 4000L,
+            durationMs = 4000L,
             effects = listOf(
                 Effect("e1", "c1", EffectType.BRIGHTNESS, parameters = mapOf("brightness" to 0f)),
                 Effect("e2", "c1", EffectType.CONTRAST, parameters = mapOf("contrast" to 1f))
@@ -185,7 +185,7 @@ class AdvancedKeyframeMotionTest {
             assetId = "a1",
             type = ClipType.VIDEO,
             startTimeMs = 0L,
-            endTimeMs = 4000L,
+            durationMs = 4000L,
             mask = ClipMask(shape = MaskShape.RECTANGLE, x = 0.5f, y = 0.5f, feather = 0f),
             keyframes = listOf(
                 Keyframe("k1", "c1", KeyframeProperty.MASK_X, 0L, 0.2f, InterpolationType.LINEAR),
@@ -214,7 +214,7 @@ class AdvancedKeyframeMotionTest {
             assetId = "a1",
             type = ClipType.AUDIO,
             startTimeMs = 0L,
-            endTimeMs = 5000L,
+            durationMs = 5000L,
             volume = 1.0f,
             keyframes = listOf(
                 Keyframe("k1", "c1", KeyframeProperty.VOLUME, 0L, 0f, InterpolationType.LINEAR),

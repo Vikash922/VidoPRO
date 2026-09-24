@@ -20,14 +20,15 @@ class VideoTransitionPipelineTest {
         val end = cutTimeMs + (durationMs / 2)
         return RenderTransition(
             id = "t1",
-            type = type,
-            durationMs = durationMs,
-            cutTimeMs = cutTimeMs,
-            startTimeMs = start,
-            endTimeMs = end,
+            trackId = "track_main",
             firstClipId = "clip1",
             secondClipId = "clip2",
-            properties = mapOf("direction" to direction)
+            type = type,
+            durationMs = durationMs,
+            boundaryTimeMs = cutTimeMs,
+            startTimeMs = start,
+            endTimeMs = end,
+            direction = direction
         )
     }
 

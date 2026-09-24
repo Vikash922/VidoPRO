@@ -16,9 +16,10 @@ data class Project(
 
 data class Track(
     val id: String,
-    val projectId: String,
+    val projectId: String = "p1",
     val type: TrackType,
-    val order: Int,
+    val order: Int = 0,
+    val name: String = "",
     val isVisible: Boolean = true,
     val isLocked: Boolean = false,
     val clips: List<Clip> = emptyList(),
@@ -149,8 +150,10 @@ data class ClipMask(
 data class EffectStack(
     val effects: List<Effect> = emptyList()
 ) {
+    val size: Int get() = effects.size
     fun activeEffects(): List<Effect> = effects.filter { it.isEnabled }.sortedBy { it.order }
     fun getEffect(type: EffectType): Effect? = effects.find { it.type == type && it.isEnabled }
+    fun get(effectId: String): Effect? = effects.find { it.id == effectId }
     fun withEffect(effect: Effect): EffectStack {
         val existingIndex = effects.indexOfFirst { it.type == effect.type || it.id == effect.id }
         val updated = if (existingIndex >= 0) {
@@ -160,10 +163,21 @@ data class EffectStack(
         }
         return EffectStack(updated.sortedBy { it.order })
     }
+    fun add(effect: Effect): EffectStack = withEffect(effect)
+    fun update(effect: Effect): EffectStack = withEffect(effect)
     fun withoutEffect(effectId: String): EffectStack =
         EffectStack(effects.filterNot { it.id == effectId })
+    fun remove(effectId: String): EffectStack = withoutEffect(effectId)
     fun withoutEffectType(type: EffectType): EffectStack =
         EffectStack(effects.filterNot { it.type == type })
+    fun reset(): EffectStack = EffectStack(emptyList())
+    fun reorder(fromIndex: Int, toIndex: Int): EffectStack {
+        if (fromIndex !in effects.indices || toIndex !in effects.indices) return this
+        val mutable = effects.toMutableList()
+        val item = mutable.removeAt(fromIndex)
+        mutable.add(toIndex, item)
+        return EffectStack(mutable.mapIndexed { idx, e -> e.copy(order = idx) })
+    }
 }
 
 data class Keyframe(
@@ -222,13 +236,14 @@ data class TextClipData(
 
 data class Transition(
     val id: String,
-    val projectId: String,
-    val trackId: String,
+    val projectId: String = "p1",
+    val trackId: String = "t1",
     val firstClipId: String,
     val secondClipId: String,
     val type: TransitionType = TransitionType.NONE,
     val durationMs: Long = 500L,
-    val parametersJson: String? = null
+    val parametersJson: String? = null,
+    val properties: Map<String, Any> = emptyMap()
 )
 
 data class ExportSettings(
