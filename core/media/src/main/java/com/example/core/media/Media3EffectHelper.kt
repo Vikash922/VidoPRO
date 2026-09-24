@@ -162,6 +162,35 @@ object Media3EffectHelper {
     }
 
     /**
+     * Creates an [Effect] representing a [com.example.core.media.render.VideoRenderLayer]'s 2D transform,
+     * evaluated dynamically from keyframes or static transform.
+     */
+    fun createTransformEffect(
+        layer: com.example.core.media.render.VideoRenderLayer,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ): Effect? {
+        val hasKeyframes = layer.keyframes.any { it.property in KeyframeProperty.ALL }
+        val baseTransform = layer.transform
+        if (!hasKeyframes && baseTransform == Transform.DEFAULT) {
+            return null
+        }
+
+        return MatrixTransformation { presentationTimeUs ->
+            val timeMs = layer.timelineStartMs + (presentationTimeUs / 1000L)
+            val currentT = layer.evaluateTransformAt(timeMs)
+
+            val matrix = Matrix()
+            matrix.postScale(currentT.scaleX, currentT.scaleY)
+            matrix.postRotate(-currentT.rotation)
+            val (ndcDx, ndcDy) = CanvasCoordinateHelper.toNdcCoordinates(currentT.toDomainTransform(), canvasWidth, canvasHeight)
+            matrix.postTranslate(ndcDx, ndcDy)
+
+            matrix
+        }
+    }
+
+    /**
      * Creates an [Effect] to adjust clip opacity by scaling RGB values toward the background.
      * Returns null if opacity is 1.0f (fully opaque).
      */

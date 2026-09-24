@@ -22,8 +22,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+import com.example.core.media.render.PreviewRenderer
+import com.example.core.media.render.RenderScene
+import com.example.core.media.render.TimeMapping
+
 /**
- * Media3 ExoPlayer implementation of PreviewPlayerController.
+ * Media3 ExoPlayer implementation of PreviewPlayerController and PreviewRenderer.
  *
  * Optimisations (media3 1.5.1):
  *  - EXTENSION_RENDERER_MODE_PREFER → hardware codec preference for 4K.
@@ -35,7 +39,7 @@ import kotlinx.coroutines.launch
 class Media3PreviewPlayer(
     context: Context,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main + Job())
-) : PreviewPlayerController {
+) : PreviewPlayerController, PreviewRenderer {
 
     private val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context.applicationContext)
         .setEnableDecoderFallback(true)
@@ -338,6 +342,107 @@ class Media3PreviewPlayer(
         syncOverlayPlayerPositions(_currentPositionMs.value)
     }
 
+    override fun updateScene(scene: RenderScene) {
+        val assets = mutableMapOf<String, Asset>()
+        val mainClips = scene.videoLayers.filter { it.isMainVideo }.map { vl ->
+            assets[vl.assetId] = Asset(
+                id = vl.assetId,
+                uri = vl.sourceUri,
+                mediaType = com.example.core.model.MediaType.VIDEO,
+                width = vl.sourceWidth,
+                height = vl.sourceHeight
+            )
+            Clip(
+                id = vl.id,
+                trackId = "track_main",
+                type = com.example.core.model.ClipType.VIDEO,
+                assetId = vl.assetId,
+                startTimeMs = vl.timelineStartMs,
+                durationMs = vl.durationMs,
+                inPointMs = vl.sourceInPointMs,
+                outPointMs = vl.sourceOutPointMs,
+                speed = vl.speed,
+                volume = vl.volume,
+                isVisible = vl.isVisible,
+                zIndex = vl.zIndex,
+                transform = vl.transform,
+                keyframes = vl.keyframes,
+                effects = vl.effects
+            )
+        }
+
+        for (vl in scene.videoLayers) {
+            if (!assets.containsKey(vl.assetId)) {
+                assets[vl.assetId] = Asset(
+                    id = vl.assetId,
+                    uri = vl.sourceUri,
+                    mediaType = com.example.core.model.MediaType.VIDEO,
+                    width = vl.sourceWidth,
+                    height = vl.sourceHeight
+                )
+            }
+        }
+        for (al in scene.audioLayers) {
+            if (!assets.containsKey(al.assetId)) {
+                assets[al.assetId] = Asset(
+                    id = al.assetId,
+                    uri = al.sourceUri,
+                    mediaType = com.example.core.model.MediaType.AUDIO
+                )
+            }
+        }
+        for (il in scene.imageLayers) {
+            if (!assets.containsKey(il.assetId)) {
+                assets[il.assetId] = Asset(
+                    id = il.assetId,
+                    uri = il.sourceUri,
+                    mediaType = com.example.core.model.MediaType.IMAGE,
+                    width = il.sourceWidth,
+                    height = il.sourceHeight
+                )
+            }
+        }
+
+        setClips(mainClips, assets)
+
+        val audioClips = scene.audioLayers.map { al ->
+            Clip(
+                id = al.id,
+                trackId = al.trackId,
+                type = com.example.core.model.ClipType.AUDIO,
+                assetId = al.assetId,
+                startTimeMs = al.timelineStartMs,
+                durationMs = al.durationMs,
+                inPointMs = al.sourceInPointMs,
+                outPointMs = al.sourceOutPointMs,
+                speed = al.speed,
+                volume = al.volume
+            )
+        }
+        setAudioClips(audioClips, assets)
+
+        val overlayVideoClips = scene.videoLayers.filter { !it.isMainVideo }.map { vl ->
+            Clip(
+                id = vl.id,
+                trackId = "track_overlay",
+                type = com.example.core.model.ClipType.VIDEO,
+                assetId = vl.assetId,
+                startTimeMs = vl.timelineStartMs,
+                durationMs = vl.durationMs,
+                inPointMs = vl.sourceInPointMs,
+                outPointMs = vl.sourceOutPointMs,
+                speed = vl.speed,
+                volume = vl.volume,
+                isVisible = vl.isVisible,
+                zIndex = vl.zIndex,
+                transform = vl.transform,
+                keyframes = vl.keyframes,
+                effects = vl.effects
+            )
+        }
+        setOverlayClips(overlayVideoClips, assets)
+    }
+
     override fun getOverlayPlayer(clipId: String): Player? = overlayPlayers[clipId]
 
     private fun syncOverlayPlayerPositions(timelinePos: Long) {
@@ -349,7 +454,7 @@ class Media3PreviewPlayer(
             } else if (timelinePos >= clip.endTimeMs) {
                 (clip.durationMs * clip.speed).toLong()
             } else {
-                ((timelinePos - clip.startTimeMs) * clip.speed).toLong()
+                TimeMapping.projectTimeToSourceTime(timelinePos, clip.startTimeMs, 0L, clip.speed)
             }
             player.seekTo(targetOffsetMs)
             if (isActive && exoPlayer.isPlaying) {

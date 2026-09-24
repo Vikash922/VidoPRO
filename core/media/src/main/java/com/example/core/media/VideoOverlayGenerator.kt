@@ -14,6 +14,7 @@ import com.example.core.model.Asset
 import com.example.core.model.Clip
 import com.example.core.model.ClipType
 import com.example.core.model.MediaType
+import com.example.core.media.render.TimeMapping
 
 /**
  * High-performance, memory-safe [BitmapOverlay] for Media3 Transformer that renders
@@ -81,19 +82,27 @@ class VideoOverlayGenerator(
             val isVideo = clip.type == ClipType.VIDEO || asset.mediaType == MediaType.VIDEO
 
             val sourceBitmap = if (isVideo) {
-                // Calculate deterministic source time in microseconds
-                val sourceOffsetMs = (timeMs - clip.startTimeMs) + clip.inPointMs
+                // Calculate deterministic source time using unified TimeMapping pipeline
+                val sourceOffsetMs = TimeMapping.projectTimeToSourceTime(
+                    projectTimeMs = timeMs,
+                    layerStartMs = clip.startTimeMs,
+                    sourceInPointMs = clip.inPointMs,
+                    speed = clip.speed
+                )
                 val sourceTimeUs = sourceOffsetMs * 1000L
                 getVideoFrame(clip, asset, sourceTimeUs)
             } else {
                 getImageBitmap(asset)
             } ?: return@forEach
 
+            // Dynamically evaluate keyframe animated or static transform
+            val currentT = KeyframeEvaluator.evaluateTransform(clip, timeMs)
+
             // Compute PiP base sizing proportional to canvas width
             val targetBaseWidth = videoWidth * 0.42f
             val baseScale = targetBaseWidth / sourceBitmap.width.toFloat()
-            val totalScaleX = baseScale * clip.transform.scaleX
-            val totalScaleY = baseScale * clip.transform.scaleY
+            val totalScaleX = baseScale * currentT.scaleX
+            val totalScaleY = baseScale * currentT.scaleY
 
             val matrix = Matrix()
             val cx = sourceBitmap.width / 2f
@@ -101,14 +110,14 @@ class VideoOverlayGenerator(
 
             // Apply scale and rotation around center of bitmap
             matrix.postScale(totalScaleX, totalScaleY, cx, cy)
-            matrix.postRotate(clip.transform.rotation, cx, cy)
+            matrix.postRotate(currentT.rotation, cx, cy)
 
             // Translate to center of video canvas, plus clip offset
-            val dx = (videoWidth / 2f - cx) + clip.transform.x
-            val dy = (videoHeight / 2f - cy) + clip.transform.y
+            val dx = (videoWidth / 2f - cx) + currentT.x
+            val dy = (videoHeight / 2f - cy) + currentT.y
             matrix.postTranslate(dx, dy)
 
-            paint.alpha = (clip.transform.opacity * 255).toInt().coerceIn(0, 255)
+            paint.alpha = (currentT.opacity * 255).toInt().coerceIn(0, 255)
 
             canvas.drawBitmap(sourceBitmap, matrix, paint)
         }

@@ -90,6 +90,10 @@ import androidx.media3.ui.PlayerView
 import com.example.core.common.TimeUtils
 import com.example.core.media.CanvasCoordinateHelper
 import com.example.core.media.KeyframeEvaluator
+import com.example.core.media.render.CanvasConfig
+import com.example.core.media.render.RenderScene
+import com.example.core.media.render.RenderSceneBuilder
+import com.example.core.media.render.RenderTransform
 import com.example.core.model.ClipType
 import com.example.core.model.MediaType
 import com.example.core.model.TrackType
@@ -279,28 +283,26 @@ fun EditorScreen(
                             val projectWidth = uiState.project?.width ?: 1080
                             val projectHeight = uiState.project?.height ?: 1920
 
+                            val renderScene = remember(uiState.project, uiState.assets) {
+                                uiState.project?.let { RenderSceneBuilder.buildScene(it, uiState.assets) }
+                            }
+                            val canvasConfig = renderScene?.canvasConfig ?: CanvasConfig(projectWidth, projectHeight, currentAspectRatio)
+
                             val mainTrack = uiState.project?.tracks?.find { it.type == TrackType.VIDEO }
                             val mainClips = mainTrack?.clips ?: emptyList()
                             val activeMainClip = uiState.selectedClip?.takeIf { it.type == ClipType.VIDEO }
                                 ?: mainClips.find { uiState.playheadPositionMs in it.startTimeMs..it.endTimeMs }
                                 ?: mainClips.firstOrNull()
 
-                            val currentTransform = remember(activeMainClip, uiState.playheadPositionMs) {
-                                if (activeMainClip != null) {
-                                    KeyframeEvaluator.evaluateTransform(activeMainClip, uiState.playheadPositionMs)
-                                } else {
-                                    com.example.core.model.Transform.DEFAULT
-                                }
+                            val activeMainLayer = renderScene?.mainVideoLayerAt(uiState.playheadPositionMs)
+
+                            val currentTransform = remember(activeMainClip, activeMainLayer, uiState.playheadPositionMs) {
+                                activeMainLayer?.evaluateTransformAt(uiState.playheadPositionMs)
+                                    ?: (if (activeMainClip != null) RenderTransform.fromDomainTransform(KeyframeEvaluator.evaluateTransform(activeMainClip, uiState.playheadPositionMs)) else RenderTransform.IDENTITY)
                             }
 
-                            val previewTransform = remember(currentTransform, canvasWidthPx, canvasHeightPx, projectWidth, projectHeight) {
-                                CanvasCoordinateHelper.toPreviewCoordinates(
-                                    currentTransform,
-                                    canvasWidthPx = canvasWidthPx,
-                                    canvasHeightPx = canvasHeightPx,
-                                    projectWidth = projectWidth,
-                                    projectHeight = projectHeight
-                                )
+                            val previewTransform = remember(currentTransform, canvasWidthPx, canvasHeightPx) {
+                                canvasConfig.projectToPreview(currentTransform, canvasWidthPx, canvasHeightPx)
                             }
 
                             val isMainVideoSelected = uiState.selectedClipId != null && uiState.selectedClipId == activeMainClip?.id
@@ -343,13 +345,11 @@ fun EditorScreen(
                                         if (activeMainClip != null && isMainVideoSelected) {
                                             detectTransformGestures { _, pan, zoom, rotation ->
                                                 val currentT = activeMainClip.transform
-                                                val (deltaX, deltaY) = CanvasCoordinateHelper.fromPreviewPan(
+                                                val (deltaX, deltaY) = canvasConfig.previewPanToProject(
                                                     panX = pan.x,
                                                     panY = pan.y,
-                                                    canvasWidthPx = canvasWidthPx,
-                                                    canvasHeightPx = canvasHeightPx,
-                                                    projectWidth = projectWidth,
-                                                    projectHeight = projectHeight
+                                                    previewWidthPx = canvasWidthPx,
+                                                    previewHeightPx = canvasHeightPx
                                                 )
                                                 val newX = currentT.x + deltaX
                                                 val newY = currentT.y + deltaY
@@ -528,14 +528,14 @@ fun EditorScreen(
                             val baseWidth = with(density) { (projectWidth * 0.42f * (canvasWidthPx / projectWidth)).toDp() }
                             val baseHeight = (baseWidth.value / assetRatio).dp
 
-                            val currentT = overlayClip.transform
-                            val previewTransform = remember(currentT, canvasWidthPx, canvasHeightPx, projectWidth, projectHeight) {
-                                CanvasCoordinateHelper.toPreviewCoordinates(
-                                    currentT,
-                                    canvasWidthPx = canvasWidthPx,
-                                    canvasHeightPx = canvasHeightPx,
-                                    projectWidth = projectWidth,
-                                    projectHeight = projectHeight
+                            val currentT = remember(overlayClip, uiState.playheadPositionMs) {
+                                KeyframeEvaluator.evaluateTransform(overlayClip, uiState.playheadPositionMs)
+                            }
+                            val previewTransform = remember(currentT, canvasWidthPx, canvasHeightPx) {
+                                canvasConfig.projectToPreview(
+                                    RenderTransform.fromDomainTransform(currentT),
+                                    previewWidthPx = canvasWidthPx,
+                                    previewHeightPx = canvasHeightPx
                                 )
                             }
 
@@ -570,13 +570,11 @@ fun EditorScreen(
                                                 onTimelineAction(TimelineAction.SelectClip(overlayClip.id))
                                                 timelineMode = TimelineMode.OVERLAY
                                             }
-                                            val (deltaX, deltaY) = CanvasCoordinateHelper.fromPreviewPan(
+                                            val (deltaX, deltaY) = canvasConfig.previewPanToProject(
                                                 panX = pan.x,
                                                 panY = pan.y,
-                                                canvasWidthPx = canvasWidthPx,
-                                                canvasHeightPx = canvasHeightPx,
-                                                projectWidth = projectWidth,
-                                                projectHeight = projectHeight
+                                                previewWidthPx = canvasWidthPx,
+                                                previewHeightPx = canvasHeightPx
                                             )
                                             val newScale = (currentT.scaleX * zoom).coerceIn(0.1f, 10.0f)
                                             val newRotation = (currentT.rotation + rotation) % 360f
@@ -751,9 +749,32 @@ fun EditorScreen(
                                 else -> androidx.compose.ui.text.style.TextAlign.Center
                             }
 
+                            val currentT = remember(textClip, uiState.playheadPositionMs) {
+                                KeyframeEvaluator.evaluateTransform(textClip, uiState.playheadPositionMs)
+                            }
+                            val previewTransform = remember(currentT, canvasWidthPx, canvasHeightPx) {
+                                canvasConfig.projectToPreview(
+                                    RenderTransform.fromDomainTransform(currentT),
+                                    previewWidthPx = canvasWidthPx,
+                                    previewHeightPx = canvasHeightPx
+                                )
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .offset {
+                                        IntOffset(
+                                            previewTransform.x.roundToInt(),
+                                            previewTransform.y.roundToInt()
+                                        )
+                                    }
+                                    .graphicsLayer {
+                                        scaleX = previewTransform.scaleX
+                                        scaleY = previewTransform.scaleY
+                                        rotationZ = previewTransform.rotation
+                                        alpha = previewTransform.opacity
+                                    }
                                     .padding(horizontal = 20.dp)
                                     .clickable {
                                         onEvent(EditorEvent.SelectClip(textClip.id))
