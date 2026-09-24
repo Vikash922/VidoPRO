@@ -136,9 +136,10 @@ class EditorViewModel(
 
     private fun syncClipsToPlayer(project: com.example.core.model.Project) {
         viewModelScope.launch {
+            val visibleTracks = project.tracks.filter { it.isVisible }
+            val videoClips = visibleTracks.filter { it.type == TrackType.VIDEO }.flatMap { it.clips }
+            val audioClips = visibleTracks.filter { it.type == TrackType.AUDIO }.flatMap { it.clips }
             val allClips = project.tracks.flatMap { it.clips }
-            val videoClips = allClips.filter { it.type == ClipType.VIDEO }
-            val audioClips = allClips.filter { it.type == ClipType.AUDIO }
             val assetMap = _uiState.value.assets.toMutableMap()
             assetRepository?.let { repo ->
                 allClips.forEach { clip ->
@@ -805,9 +806,9 @@ class EditorViewModel(
                 )
                 undoRedoManager.recordStateChange("Add media", preState, timelineEngineState)
 
-                val allClips = tracks.flatMap { it.clips }
-                val videoClips = allClips.filter { it.type == ClipType.VIDEO }
-                val audioClips = allClips.filter { it.type == ClipType.AUDIO }
+                val visibleTracks = tracks.filter { it.isVisible }
+                val videoClips = visibleTracks.filter { it.type == TrackType.VIDEO }.flatMap { it.clips }
+                val audioClips = visibleTracks.filter { it.type == TrackType.AUDIO }.flatMap { it.clips }
                 previewPlayer?.setClips(videoClips, newAssetsMap)
                 previewPlayer?.setAudioClips(audioClips, newAssetsMap)
 

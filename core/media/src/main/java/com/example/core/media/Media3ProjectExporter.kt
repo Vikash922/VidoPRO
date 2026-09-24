@@ -42,6 +42,7 @@ class Media3ProjectExporter(
     private var activeTransformer: Transformer? = null
     private var progressJob: Job? = null
     private var activeTextOverlay: TextOverlayGenerator? = null
+    private var activeSilenceFile: File? = null
 
     override suspend fun export(
         project: Project,
@@ -145,29 +146,67 @@ class Media3ProjectExporter(
             val sequences = mutableListOf<EditedMediaItemSequence>()
             sequences.add(EditedMediaItemSequence.Builder(editedMediaItems).build())
 
-            // Include multi-track Audio Sequences (DEV-069)
+            // Include multi-track Audio Sequences with precise timeline gap handling (DEV-069, DEV-070, FIX-06)
             val audioTracks = project.tracks.filter { it.type == TrackType.AUDIO && it.isVisible }
-            for (audioTrack in audioTracks) {
-                val audioClips = audioTrack.clips.filter { it.isVisible && it.assetId != null }.sortedBy { it.startTimeMs }
-                val audioItems = mutableListOf<EditedMediaItem>()
-                for (audioClip in audioClips) {
-                    val asset = assets[audioClip.assetId] ?: continue
-                    val uri = Uri.parse(asset.uri)
-                    val clippingConfig = MediaItem.ClippingConfiguration.Builder().apply {
-                        if (audioClip.inPointMs > 0L) setStartPositionMs(audioClip.inPointMs)
-                        if (audioClip.outPointMs > 0L) setEndPositionMs(audioClip.outPointMs)
-                    }.build()
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(uri)
-                        .setClippingConfiguration(clippingConfig)
-                        .build()
-                    val editedItem = EditedMediaItem.Builder(mediaItem)
-                        .setRemoveVideo(true)
-                        .build()
-                    audioItems.add(editedItem)
-                }
-                if (audioItems.isNotEmpty()) {
-                    sequences.add(EditedMediaItemSequence.Builder(audioItems).build())
+            val videoDurationMs = clips.maxOfOrNull { it.endTimeMs } ?: project.durationMs
+            val totalTimelineDurationMs = maxOf(videoDurationMs, project.durationMs)
+
+            val mappedTracksSegments = audioTracks.mapNotNull { track ->
+                val segments = AudioTimelineMapper.mapTrackToSegments(track, assets, totalTimelineDurationMs)
+                if (segments.any { it is AudioTimelineSegment.ClipSegment }) segments else null
+            }
+
+            if (mappedTracksSegments.isNotEmpty()) {
+                val maxGapMs = mappedTracksSegments.flatten()
+                    .filterIsInstance<AudioTimelineSegment.GapSegment>()
+                    .maxOfOrNull { it.durationMs } ?: 0L
+
+                val silenceFile = if (maxGapMs > 0L) {
+                    val file = File(context.cacheDir, "export_silence_${System.currentTimeMillis()}.wav")
+                    SilentAudioGenerator.createSilenceWavFile(file, maxGapMs)
+                    activeSilenceFile = file
+                    file
+                } else null
+
+                for (trackSegments in mappedTracksSegments) {
+                    val audioItems = mutableListOf<EditedMediaItem>()
+                    for (segment in trackSegments) {
+                        when (segment) {
+                            is AudioTimelineSegment.ClipSegment -> {
+                                val clippingConfig = MediaItem.ClippingConfiguration.Builder().apply {
+                                    if (segment.sourceInPointMs > 0L) setStartPositionMs(segment.sourceInPointMs)
+                                    if (segment.sourceOutPointMs > 0L) setEndPositionMs(segment.sourceOutPointMs)
+                                }.build()
+                                val mediaItem = MediaItem.Builder()
+                                    .setUri(Uri.parse(segment.asset.uri))
+                                    .setClippingConfiguration(clippingConfig)
+                                    .build()
+                                val editedItem = EditedMediaItem.Builder(mediaItem)
+                                    .setRemoveVideo(true)
+                                    .build()
+                                audioItems.add(editedItem)
+                            }
+                            is AudioTimelineSegment.GapSegment -> {
+                                if (silenceFile != null && silenceFile.exists()) {
+                                    val clippingConfig = MediaItem.ClippingConfiguration.Builder()
+                                        .setStartPositionMs(0L)
+                                        .setEndPositionMs(segment.durationMs)
+                                        .build()
+                                    val mediaItem = MediaItem.Builder()
+                                        .setUri(Uri.fromFile(silenceFile))
+                                        .setClippingConfiguration(clippingConfig)
+                                        .build()
+                                    val editedItem = EditedMediaItem.Builder(mediaItem)
+                                        .setRemoveVideo(true)
+                                        .build()
+                                    audioItems.add(editedItem)
+                                }
+                            }
+                        }
+                    }
+                    if (audioItems.isNotEmpty()) {
+                        sequences.add(EditedMediaItemSequence.Builder(audioItems).build())
+                    }
                 }
             }
 
@@ -235,6 +274,8 @@ class Media3ProjectExporter(
             activeTransformer = null
             activeTextOverlay?.release()
             activeTextOverlay = null
+            activeSilenceFile?.let { if (it.exists()) it.delete() }
+            activeSilenceFile = null
         }
     }
 
@@ -248,6 +289,8 @@ class Media3ProjectExporter(
         activeTransformer = null
         activeTextOverlay?.release()
         activeTextOverlay = null
+        activeSilenceFile?.let { if (it.exists()) it.delete() }
+        activeSilenceFile = null
     }
 
     private fun startProgressTicker(

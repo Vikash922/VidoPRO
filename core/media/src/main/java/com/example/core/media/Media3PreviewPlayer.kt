@@ -7,8 +7,11 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.SilenceMediaSource
 import com.example.core.model.Asset
 import com.example.core.model.Clip
+import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -74,24 +77,50 @@ class Media3PreviewPlayer(
 
     private var clipsList: List<Clip> = emptyList()
     private var audioClipsList: List<Clip> = emptyList()
+    private var audioSegments: List<AudioTimelineSegment> = emptyList()
+    private val mediaSourceFactory = DefaultMediaSourceFactory(context.applicationContext)
+    private var currentPlaybackSpeed: Float = 1.0f
+    private var currentVolume: Float = 1.0f
     private var assetsMap: Map<String, Asset> = emptyMap()
     private var tickerJob: Job? = null
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(playing: Boolean) {
             _isPlaying.value = playing
-            if (playing) startPositionTicker() else {
+            if (playing) {
+                startPositionTicker()
+                if (audioSegments.isNotEmpty() && !audioPlayer.isPlaying) {
+                    if (audioPlayer.playbackState == Player.STATE_ENDED) {
+                        seekAudioTo(_currentPositionMs.value)
+                    }
+                    audioPlayer.play()
+                }
+            } else {
                 stopPositionTicker()
                 updatePositionFromPlayer()
+                if (audioSegments.isNotEmpty() && audioPlayer.isPlaying) {
+                    audioPlayer.pause()
+                }
             }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             _isBuffering.value = (playbackState == Player.STATE_BUFFERING)
-            if (playbackState == Player.STATE_ENDED) {
+            if (playbackState == Player.STATE_BUFFERING) {
+                if (audioSegments.isNotEmpty() && audioPlayer.isPlaying) {
+                    audioPlayer.pause()
+                }
+            } else if (playbackState == Player.STATE_READY && exoPlayer.isPlaying) {
+                if (audioSegments.isNotEmpty() && !audioPlayer.isPlaying) {
+                    audioPlayer.play()
+                }
+            } else if (playbackState == Player.STATE_ENDED) {
                 _isPlaying.value = false
                 stopPositionTicker()
                 _currentPositionMs.value = _durationMs.value
+                if (audioSegments.isNotEmpty()) {
+                    audioPlayer.pause()
+                }
             }
         }
 
@@ -108,6 +137,9 @@ class Media3PreviewPlayer(
             _isPlaying.value = false
             _isBuffering.value = false
             stopPositionTicker()
+            if (audioSegments.isNotEmpty()) {
+                audioPlayer.pause()
+            }
         }
     }
 
@@ -132,6 +164,11 @@ class Media3PreviewPlayer(
         exoPlayer.setMediaItems(mediaItems)
         exoPlayer.prepare()
 
+        // Re-map audio segments if audio clips were previously set
+        if (audioClipsList.isNotEmpty()) {
+            setAudioClips(audioClipsList, assetsMap)
+        }
+
         // Restore playhead to saved position (fixes: split causes reset to 0)
         if (savedPositionMs > 0L && savedPositionMs < totalDuration) {
             seekTo(savedPositionMs)
@@ -142,19 +179,52 @@ class Media3PreviewPlayer(
     }
 
     override fun setAudioClips(clips: List<Clip>, assets: Map<String, Asset>) {
-        val sorted = clips.sortedBy { it.startTimeMs }
-        audioClipsList = sorted
+        audioClipsList = clips
+        assetsMap = assets
 
-        val mediaItems = sorted.mapNotNull { clip ->
-            val asset = assets[clip.assetId] ?: return@mapNotNull null
-            val builder = MediaItem.Builder()
-                .setUri(Uri.parse(asset.uri))
-                .setMediaId(clip.id)
-            applyClipping(builder, clip, asset)
-            builder.build()
+        val effectiveDuration = _durationMs.value.coerceAtLeast(clips.maxOfOrNull { it.endTimeMs } ?: 0L)
+        val segments = AudioTimelineMapper.mapClipsToSegments(clips, assets, effectiveDuration)
+        audioSegments = segments
+
+        if (segments.isEmpty()) {
+            audioPlayer.clearMediaItems()
+            return
         }
-        audioPlayer.setMediaItems(mediaItems)
+
+        val mediaSources = segments.map { segment ->
+            when (segment) {
+                is AudioTimelineSegment.GapSegment -> {
+                    SilenceMediaSource(segment.durationMs * 1000L)
+                }
+                is AudioTimelineSegment.ClipSegment -> {
+                    val builder = MediaItem.Builder()
+                        .setUri(Uri.parse(segment.asset.uri))
+                        .setMediaId(segment.clip.id)
+                    val isTrimmedStart = segment.sourceInPointMs > 0L
+                    val assetDuration = segment.asset.durationMs ?: 0L
+                    val isTrimmedEnd = segment.sourceOutPointMs > 0L &&
+                            (assetDuration <= 0L || segment.sourceOutPointMs < assetDuration)
+                    if (isTrimmedStart || isTrimmedEnd) {
+                        builder.setClippingConfiguration(
+                            MediaItem.ClippingConfiguration.Builder().apply {
+                                if (isTrimmedStart) setStartPositionMs(segment.sourceInPointMs)
+                                if (isTrimmedEnd) setEndPositionMs(segment.sourceOutPointMs)
+                            }.build()
+                        )
+                    }
+                    mediaSourceFactory.createMediaSource(builder.build())
+                }
+            }
+        }
+
+        val wasPlaying = audioPlayer.isPlaying
+        audioPlayer.setMediaSources(mediaSources)
         audioPlayer.prepare()
+
+        seekAudioTo(_currentPositionMs.value)
+        if (wasPlaying && exoPlayer.isPlaying) {
+            audioPlayer.play()
+        }
     }
 
     override fun play() {
@@ -162,8 +232,8 @@ class Media3PreviewPlayer(
         if (exoPlayer.playbackState == Player.STATE_IDLE) exoPlayer.prepare()
         exoPlayer.play()
 
-        if (audioClipsList.isNotEmpty()) {
-            if (audioPlayer.playbackState == Player.STATE_ENDED) audioPlayer.seekTo(0L)
+        if (audioSegments.isNotEmpty()) {
+            if (audioPlayer.playbackState == Player.STATE_ENDED) seekAudioTo(0L)
             if (audioPlayer.playbackState == Player.STATE_IDLE) audioPlayer.prepare()
             audioPlayer.play()
         }
@@ -171,7 +241,7 @@ class Media3PreviewPlayer(
 
     override fun pause() {
         exoPlayer.pause()
-        if (audioClipsList.isNotEmpty()) audioPlayer.pause()
+        if (audioSegments.isNotEmpty()) audioPlayer.pause()
     }
 
     override fun seekTo(timelinePositionMs: Long) {
@@ -180,41 +250,79 @@ class Media3PreviewPlayer(
 
         if (clipsList.isEmpty()) {
             exoPlayer.seekTo(0L)
-            return
-        }
-
-        val targetIndex = clipsList.indexOfFirst { clamped >= it.startTimeMs && clamped < it.endTimeMs }
-        if (targetIndex != -1) {
-            val clip = clipsList[targetIndex]
-            exoPlayer.seekTo(targetIndex, clamped - clip.startTimeMs)
-        } else if (clamped <= (clipsList.firstOrNull()?.startTimeMs ?: 0L)) {
-            exoPlayer.seekTo(0, 0L)
         } else {
-            val last = clipsList.lastIndex
-            exoPlayer.seekTo(last, clipsList[last].durationMs)
+            val targetIndex = clipsList.indexOfFirst { clamped >= it.startTimeMs && clamped < it.endTimeMs }
+            if (targetIndex != -1) {
+                val clip = clipsList[targetIndex]
+                exoPlayer.seekTo(targetIndex, clamped - clip.startTimeMs)
+            } else if (clamped <= (clipsList.firstOrNull()?.startTimeMs ?: 0L)) {
+                exoPlayer.seekTo(0, 0L)
+            } else {
+                val last = clipsList.lastIndex
+                exoPlayer.seekTo(last, clipsList[last].durationMs)
+            }
         }
 
-        if (audioClipsList.isNotEmpty()) {
-            val idx = audioClipsList.indexOfFirst { clamped >= it.startTimeMs && clamped < it.endTimeMs }
-            if (idx != -1) {
-                audioPlayer.seekTo(idx, clamped - audioClipsList[idx].startTimeMs)
-            } else {
-                audioPlayer.pause()
-            }
+        seekAudioTo(clamped)
+    }
+
+    private fun seekAudioTo(timelinePositionMs: Long) {
+        if (audioSegments.isEmpty()) return
+        val clamped = timelinePositionMs.coerceIn(0L, _durationMs.value.coerceAtLeast(0L))
+
+        val idx = audioSegments.indexOfFirst { clamped >= it.startTimeMs && clamped < it.endTimeMs }
+        if (idx != -1) {
+            val segment = audioSegments[idx]
+            val offsetMs = clamped - segment.startTimeMs
+            audioPlayer.seekTo(idx, offsetMs)
+            applySegmentParameters(segment)
+        } else if (clamped <= 0L) {
+            audioPlayer.seekTo(0, 0L)
+            if (audioSegments.isNotEmpty()) applySegmentParameters(audioSegments[0])
+        } else {
+            val lastIdx = audioSegments.lastIndex
+            audioPlayer.seekTo(lastIdx, audioSegments[lastIdx].durationMs)
+            applySegmentParameters(audioSegments[lastIdx])
+        }
+    }
+
+    private fun applySegmentParameters(segment: AudioTimelineSegment) {
+        if (segment is AudioTimelineSegment.ClipSegment) {
+            val effectiveSpeed = (segment.speed * currentPlaybackSpeed).coerceIn(0.1f, 4.0f)
+            audioPlayer.playbackParameters = PlaybackParameters(effectiveSpeed)
+            audioPlayer.volume = (segment.volume * currentVolume).coerceIn(0f, 1f)
+        } else {
+            audioPlayer.playbackParameters = PlaybackParameters(currentPlaybackSpeed)
+            audioPlayer.volume = currentVolume
         }
     }
 
     override fun setPlaybackSpeed(speed: Float) {
         val s = speed.coerceIn(0.1f, 4.0f)
+        currentPlaybackSpeed = s
         exoPlayer.playbackParameters = PlaybackParameters(s)
-        if (audioClipsList.isNotEmpty()) {
-            audioPlayer.playbackParameters = PlaybackParameters(s)
+        if (audioSegments.isNotEmpty()) {
+            val curIdx = audioPlayer.currentMediaItemIndex
+            if (curIdx in audioSegments.indices) {
+                applySegmentParameters(audioSegments[curIdx])
+            } else {
+                audioPlayer.playbackParameters = PlaybackParameters(s)
+            }
         }
     }
 
     override fun setVolume(volume: Float) {
-        exoPlayer.volume = volume.coerceIn(0f, 1f)
-        if (audioClipsList.isNotEmpty()) audioPlayer.volume = volume.coerceIn(0f, 1f)
+        val v = volume.coerceIn(0f, 1f)
+        currentVolume = v
+        exoPlayer.volume = v
+        if (audioSegments.isNotEmpty()) {
+            val curIdx = audioPlayer.currentMediaItemIndex
+            if (curIdx in audioSegments.indices) {
+                applySegmentParameters(audioSegments[curIdx])
+            } else {
+                audioPlayer.volume = v
+            }
+        }
     }
 
     override fun release() {
@@ -275,6 +383,18 @@ class Media3PreviewPlayer(
         if (idx in clipsList.indices) {
             val timelinePos = clipsList[idx].startTimeMs + exoPlayer.currentPosition
             _currentPositionMs.value = timelinePos.coerceIn(0L, _durationMs.value)
+
+            // Audio synchronization & drift correction during playback
+            if (exoPlayer.isPlaying && audioSegments.isNotEmpty()) {
+                val audioIdx = audioPlayer.currentMediaItemIndex
+                if (audioIdx in audioSegments.indices) {
+                    val currentSegment = audioSegments[audioIdx]
+                    val audioTimelinePos = currentSegment.startTimeMs + audioPlayer.currentPosition
+                    if (abs(audioTimelinePos - timelinePos) > 100L) {
+                        seekAudioTo(timelinePos)
+                    }
+                }
+            }
         }
     }
 }
