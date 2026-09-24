@@ -2,24 +2,66 @@ package com.example.feature.timeline.ui
 
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import kotlin.math.absoluteValue
+import com.example.feature.timeline.engine.TimelineEngineState
+import com.example.feature.timeline.engine.TimelineUtils
+import kotlin.math.abs
 
 /**
- * Modular gesture handling utilities for timeline interactions (drag, scrub, trim, keyframe move).
+ * Modular gesture handling and coordinate system utilities for timeline interactions:
+ * - Centralized Time <-> Pixel conversions
+ * - Pinch-to-zoom gesture
+ * - Drag-to-move clip gesture
+ * - Drag-to-trim clip gesture
+ * - Tap-to-seek and drag-to-scrub gestures
+ * - Deterministic snapping
  */
 object TimelineGestureHandler {
 
+    /**
+     * Converts a pixel delta/offset to milliseconds based on pixelsPerMs.
+     */
     fun pixelsToMs(pixels: Float, pixelsPerMs: Float): Long {
         if (pixelsPerMs <= 0f) return 0L
         return (pixels / pixelsPerMs).toLong()
     }
 
+    /**
+     * Converts milliseconds to pixel offset based on pixelsPerMs.
+     */
     fun msToPixels(ms: Long, pixelsPerMs: Float): Float {
         return ms * pixelsPerMs
+    }
+
+    /**
+     * Converts a timeline millisecond timestamp to horizontal pixel coordinate X.
+     */
+    fun timeToX(timeMs: Long, pixelsPerMs: Float): Float {
+        return TimelineUtils.timeToX(timeMs, pixelsPerMs)
+    }
+
+    /**
+     * Converts a horizontal pixel coordinate X to timeline millisecond timestamp.
+     */
+    fun xToTime(x: Float, pixelsPerMs: Float): Long {
+        return TimelineUtils.xToTime(x, pixelsPerMs)
+    }
+
+    /**
+     * Snaps [targetTimeMs] to nearest snap point if [isSnappingEnabled] is true and within threshold.
+     */
+    fun snapTime(
+        targetTimeMs: Long,
+        snapPoints: List<Long>,
+        isSnappingEnabled: Boolean = true,
+        thresholdMs: Long = TimelineEngineState.SNAP_THRESHOLD_MS
+    ): Long {
+        if (!isSnappingEnabled || snapPoints.isEmpty()) return targetTimeMs
+        return TimelineUtils.snapTime(targetTimeMs, snapPoints, thresholdMs)
     }
 
     /**
@@ -123,5 +165,23 @@ object TimelineGestureHandler {
                 accumulatedTrimDx = 0f
             }
         )
+    }
+
+    /**
+     * Modular pointerInput modifier for pinch-to-zoom scaling of timeline.
+     */
+    fun Modifier.timelinePinchZoomGesture(
+        currentZoom: Float,
+        onZoomChange: (Float) -> Unit
+    ): Modifier = this.pointerInput(Unit) {
+        detectTransformGestures { _, _, zoom, _ ->
+            if (zoom != 1.0f) {
+                val newZoom = (currentZoom * zoom).coerceIn(
+                    TimelineEngineState.MIN_ZOOM,
+                    TimelineEngineState.MAX_ZOOM
+                )
+                onZoomChange(newZoom)
+            }
+        }
     }
 }

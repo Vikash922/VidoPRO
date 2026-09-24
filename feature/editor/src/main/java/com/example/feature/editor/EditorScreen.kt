@@ -959,6 +959,7 @@ fun EditorScreen(
                             onAddMedia = { onNavigateMediaPicker(TrackType.VIDEO) },
                             onLongPressClip = { clipId -> onEvent(EditorEvent.LongPressClip(clipId)) },
                             onMoveKeyframe = { clipId, kfId, newMs -> onEvent(EditorEvent.MoveKeyframe(clipId, kfId, newMs)) },
+                            onSwitchMode = { newMode -> timelineMode = newMode },
                             modifier = Modifier.fillMaxSize()
                         )
 
