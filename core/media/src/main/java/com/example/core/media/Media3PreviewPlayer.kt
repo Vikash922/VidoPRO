@@ -60,6 +60,7 @@ class Media3PreviewPlayer(
         .build()
 
     private val audioPlayers = mutableListOf<ExoPlayer>()
+    private val overlayPlayers = mutableMapOf<String, ExoPlayer>()
 
     override val player: Player get() = exoPlayer
 
@@ -77,6 +78,7 @@ class Media3PreviewPlayer(
 
     private var clipsList: List<Clip> = emptyList()
     private var audioClipsList: List<Clip> = emptyList()
+    private var videoOverlayClips: List<Clip> = emptyList()
     private var audioLayersSegments: List<List<AudioTimelineSegment>> = emptyList()
     private val mediaSourceFactory = DefaultMediaSourceFactory(context.applicationContext)
     private var currentPlaybackSpeed: Float = 1.0f
@@ -96,10 +98,24 @@ class Media3PreviewPlayer(
                     }
                     if (!p.isPlaying) p.play()
                 }
+                for (clip in videoOverlayClips) {
+                    val p = overlayPlayers[clip.id] ?: continue
+                    val curPos = _currentPositionMs.value
+                    if (curPos >= clip.startTimeMs && curPos < clip.endTimeMs) {
+                        if (p.playbackState == Player.STATE_ENDED) {
+                            val targetOffsetMs = ((curPos - clip.startTimeMs) * clip.speed).toLong()
+                            p.seekTo(targetOffsetMs)
+                        }
+                        if (!p.isPlaying) p.play()
+                    }
+                }
             } else {
                 stopPositionTicker()
                 updatePositionFromPlayer()
                 for (p in audioPlayers) {
+                    if (p.isPlaying) p.pause()
+                }
+                for (p in overlayPlayers.values) {
                     if (p.isPlaying) p.pause()
                 }
             }
@@ -111,15 +127,28 @@ class Media3PreviewPlayer(
                 for (p in audioPlayers) {
                     if (p.isPlaying) p.pause()
                 }
+                for (p in overlayPlayers.values) {
+                    if (p.isPlaying) p.pause()
+                }
             } else if (playbackState == Player.STATE_READY && exoPlayer.isPlaying) {
                 for (p in audioPlayers) {
                     if (!p.isPlaying) p.play()
+                }
+                for (clip in videoOverlayClips) {
+                    val p = overlayPlayers[clip.id] ?: continue
+                    val curPos = _currentPositionMs.value
+                    if (curPos >= clip.startTimeMs && curPos < clip.endTimeMs && !p.isPlaying) {
+                        p.play()
+                    }
                 }
             } else if (playbackState == Player.STATE_ENDED) {
                 _isPlaying.value = false
                 stopPositionTicker()
                 _currentPositionMs.value = _durationMs.value
                 for (p in audioPlayers) {
+                    p.pause()
+                }
+                for (p in overlayPlayers.values) {
                     p.pause()
                 }
             }
@@ -139,6 +168,9 @@ class Media3PreviewPlayer(
             _isBuffering.value = false
             stopPositionTicker()
             for (p in audioPlayers) {
+                p.pause()
+            }
+            for (p in overlayPlayers.values) {
                 p.pause()
             }
         }
@@ -258,8 +290,73 @@ class Media3PreviewPlayer(
         }
 
         seekAudioTo(_currentPositionMs.value)
+        syncOverlayPlayerPositions(_currentPositionMs.value)
         if (exoPlayer.isPlaying) {
             for (player in audioPlayers) player.play()
+        }
+    }
+
+    override fun setOverlayClips(clips: List<Clip>, assets: Map<String, Asset>) {
+        assetsMap = assets
+        val videoClips = clips.filter {
+            it.type == com.example.core.model.ClipType.VIDEO ||
+                assets[it.assetId]?.mediaType == com.example.core.model.MediaType.VIDEO
+        }
+        videoOverlayClips = videoClips
+
+        val validIds = videoClips.map { it.id }.toSet()
+        val toRemove = overlayPlayers.keys.filter { it !in validIds }
+        for (id in toRemove) {
+            overlayPlayers.remove(id)?.apply {
+                clearMediaItems()
+                release()
+            }
+        }
+
+        for (clip in videoClips) {
+            val player = overlayPlayers.getOrPut(clip.id) {
+                ExoPlayer.Builder(context.applicationContext)
+                    .setRenderersFactory(renderersFactory)
+                    .setLoadControl(loadControl)
+                    .build()
+            }
+            val mediaItem = buildMediaItem(clip, assets) ?: continue
+            val currentItem = player.currentMediaItem
+            val needsUpdate = currentItem == null ||
+                currentItem.mediaId != clip.id ||
+                currentItem.localConfiguration?.uri?.toString() != assets[clip.assetId]?.uri
+
+            if (needsUpdate) {
+                player.setMediaItem(mediaItem)
+                player.prepare()
+            }
+
+            player.playbackParameters = PlaybackParameters(clip.speed.coerceIn(0.1f, 4.0f) * currentPlaybackSpeed)
+            player.volume = (clip.volume ?: 1f).coerceIn(0f, 1f) * currentVolume
+        }
+
+        syncOverlayPlayerPositions(_currentPositionMs.value)
+    }
+
+    override fun getOverlayPlayer(clipId: String): Player? = overlayPlayers[clipId]
+
+    private fun syncOverlayPlayerPositions(timelinePos: Long) {
+        for (clip in videoOverlayClips) {
+            val player = overlayPlayers[clip.id] ?: continue
+            val isActive = timelinePos >= clip.startTimeMs && timelinePos < clip.endTimeMs
+            val targetOffsetMs = if (timelinePos < clip.startTimeMs) {
+                0L
+            } else if (timelinePos >= clip.endTimeMs) {
+                (clip.durationMs * clip.speed).toLong()
+            } else {
+                ((timelinePos - clip.startTimeMs) * clip.speed).toLong()
+            }
+            player.seekTo(targetOffsetMs)
+            if (isActive && exoPlayer.isPlaying) {
+                if (!player.isPlaying) player.play()
+            } else {
+                if (player.isPlaying) player.pause()
+            }
         }
     }
 
@@ -274,11 +371,28 @@ class Media3PreviewPlayer(
             if (player.playbackState == Player.STATE_IDLE) player.prepare()
             player.play()
         }
+
+        for (clip in videoOverlayClips) {
+            val player = overlayPlayers[clip.id] ?: continue
+            val curPos = _currentPositionMs.value
+            val isActive = curPos >= clip.startTimeMs && curPos < clip.endTimeMs
+            if (isActive) {
+                if (player.playbackState == Player.STATE_ENDED) {
+                    val targetOffsetMs = ((curPos - clip.startTimeMs) * clip.speed).toLong()
+                    player.seekTo(targetOffsetMs)
+                }
+                if (player.playbackState == Player.STATE_IDLE) player.prepare()
+                player.play()
+            } else {
+                player.pause()
+            }
+        }
     }
 
     override fun pause() {
         exoPlayer.pause()
         for (player in audioPlayers) player.pause()
+        for (player in overlayPlayers.values) player.pause()
     }
 
     override fun seekTo(timelinePositionMs: Long) {
@@ -301,6 +415,7 @@ class Media3PreviewPlayer(
         }
 
         seekAudioTo(clamped)
+        syncOverlayPlayerPositions(clamped)
     }
 
     private fun seekAudioTo(timelinePositionMs: Long) {
@@ -356,6 +471,10 @@ class Media3PreviewPlayer(
                 player.playbackParameters = PlaybackParameters(s)
             }
         }
+        for (clip in videoOverlayClips) {
+            val player = overlayPlayers[clip.id] ?: continue
+            player.playbackParameters = PlaybackParameters(clip.speed.coerceIn(0.1f, 4.0f) * s)
+        }
     }
 
     override fun setVolume(volume: Float) {
@@ -372,6 +491,10 @@ class Media3PreviewPlayer(
                 player.volume = v
             }
         }
+        for (clip in videoOverlayClips) {
+            val player = overlayPlayers[clip.id] ?: continue
+            player.volume = (clip.volume ?: 1f).coerceIn(0f, 1f) * v
+        }
     }
 
     override fun release() {
@@ -382,6 +505,10 @@ class Media3PreviewPlayer(
             player.release()
         }
         audioPlayers.clear()
+        for (player in overlayPlayers.values) {
+            player.release()
+        }
+        overlayPlayers.clear()
     }
 
     // ── Internal helpers ─────────────────────────────────────────────────────
@@ -447,6 +574,29 @@ class Media3PreviewPlayer(
                         val audioTimelinePos = currentSegment.startTimeMs + player.currentPosition
                         if (abs(audioTimelinePos - timelinePos) > 100L) {
                             seekAudioPlayerTo(i, timelinePos)
+                        }
+                    }
+                }
+
+                // Overlay synchronization & drift correction during playback
+                for (clip in videoOverlayClips) {
+                    val player = overlayPlayers[clip.id] ?: continue
+                    val isActive = timelinePos >= clip.startTimeMs && timelinePos < clip.endTimeMs
+                    if (isActive) {
+                        if (!player.isPlaying && player.playbackState != Player.STATE_ENDED) {
+                            player.play()
+                        }
+                        val expectedOffsetMs = ((timelinePos - clip.startTimeMs) * clip.speed).toLong()
+                        val currentOverlayPos = player.currentPosition
+                        if (abs(currentOverlayPos - expectedOffsetMs) > 100L) {
+                            player.seekTo(expectedOffsetMs)
+                        }
+                    } else {
+                        if (player.isPlaying) {
+                            player.pause()
+                        }
+                        if (timelinePos < clip.startTimeMs && player.currentPosition != 0L) {
+                            player.seekTo(0L)
                         }
                     }
                 }

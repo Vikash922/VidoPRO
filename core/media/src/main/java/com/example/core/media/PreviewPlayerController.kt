@@ -19,6 +19,8 @@ interface PreviewPlayerController {
 
     fun setClips(clips: List<Clip>, assets: Map<String, Asset>)
     fun setAudioClips(clips: List<Clip>, assets: Map<String, Asset>) {}
+    fun setOverlayClips(clips: List<Clip>, assets: Map<String, Asset>) {}
+    fun getOverlayPlayer(clipId: String): Player? = null
     fun play()
     fun pause()
     fun seekTo(timelinePositionMs: Long)

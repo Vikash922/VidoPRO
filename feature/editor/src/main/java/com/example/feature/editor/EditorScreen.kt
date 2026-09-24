@@ -91,6 +91,7 @@ import com.example.core.common.TimeUtils
 import com.example.core.media.CanvasCoordinateHelper
 import com.example.core.media.KeyframeEvaluator
 import com.example.core.model.ClipType
+import com.example.core.model.MediaType
 import com.example.core.model.TrackType
 import com.example.core.ui.components.LoadingView
 import com.example.feature.timeline.engine.TimelineAction
@@ -115,6 +116,7 @@ fun EditorScreen(
     onNavigateExport: (projectId: String) -> Unit,
     onNavigateMediaPicker: (TrackType) -> Unit = {},
     onTimelineAction: (TimelineAction) -> Unit = {},
+    getOverlayPlayer: (String) -> Player? = { null },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -506,23 +508,50 @@ fun EditorScreen(
                         activeOverlayClips.forEach { overlayClip ->
                             val asset = uiState.assets[overlayClip.assetId] ?: return@forEach
                             val isSelected = uiState.selectedClipId == overlayClip.id
+                            val isVideo = overlayClip.type == ClipType.VIDEO || asset.mediaType == MediaType.VIDEO
+                            val overlayPlayer = if (isVideo) getOverlayPlayer(overlayClip.id) else null
 
-                            val baseWidth = 160.dp
-                            val baseHeight = 110.dp
+                            val density = LocalDensity.current
+                            val canvasWidthPx = with(density) { canvasWidth.toPx() }
+                            val canvasHeightPx = with(density) { canvasHeight.toPx() }
+                            val projectWidth = uiState.project?.width ?: 1080
+                            val projectHeight = uiState.project?.height ?: 1920
+
+                            // Calculate aspect-ratio-correct base dimensions
+                            val assetWidth = asset.width ?: 160
+                            val assetHeight = asset.height ?: 110
+                            val assetRatio = if (assetWidth > 0 && assetHeight > 0) {
+                                assetWidth.toFloat() / assetHeight.toFloat()
+                            } else {
+                                160f / 110f
+                            }
+                            val baseWidth = with(density) { (projectWidth * 0.42f * (canvasWidthPx / projectWidth)).toDp() }
+                            val baseHeight = (baseWidth.value / assetRatio).dp
+
+                            val currentT = overlayClip.transform
+                            val previewTransform = remember(currentT, canvasWidthPx, canvasHeightPx, projectWidth, projectHeight) {
+                                CanvasCoordinateHelper.toPreviewCoordinates(
+                                    currentT,
+                                    canvasWidthPx = canvasWidthPx,
+                                    canvasHeightPx = canvasHeightPx,
+                                    projectWidth = projectWidth,
+                                    projectHeight = projectHeight
+                                )
+                            }
 
                             Box(
                                 modifier = Modifier
                                     .offset {
                                         IntOffset(
-                                            overlayClip.transform.x.roundToInt(),
-                                            overlayClip.transform.y.roundToInt()
+                                            previewTransform.x.roundToInt(),
+                                            previewTransform.y.roundToInt()
                                         )
                                     }
                                     .graphicsLayer {
-                                        scaleX = overlayClip.transform.scaleX
-                                        scaleY = overlayClip.transform.scaleY
-                                        rotationZ = overlayClip.transform.rotation
-                                        alpha = overlayClip.transform.opacity
+                                        scaleX = previewTransform.scaleX
+                                        scaleY = previewTransform.scaleY
+                                        rotationZ = previewTransform.rotation
+                                        alpha = previewTransform.opacity
                                     }
                                     .size(baseWidth, baseHeight)
                                     .pointerInput(overlayClip.id) {
@@ -541,11 +570,18 @@ fun EditorScreen(
                                                 onTimelineAction(TimelineAction.SelectClip(overlayClip.id))
                                                 timelineMode = TimelineMode.OVERLAY
                                             }
-                                            val currentT = overlayClip.transform
+                                            val (deltaX, deltaY) = CanvasCoordinateHelper.fromPreviewPan(
+                                                panX = pan.x,
+                                                panY = pan.y,
+                                                canvasWidthPx = canvasWidthPx,
+                                                canvasHeightPx = canvasHeightPx,
+                                                projectWidth = projectWidth,
+                                                projectHeight = projectHeight
+                                            )
                                             val newScale = (currentT.scaleX * zoom).coerceIn(0.1f, 10.0f)
                                             val newRotation = (currentT.rotation + rotation) % 360f
-                                            val newX = currentT.x + pan.x
-                                            val newY = currentT.y + pan.y
+                                            val newX = currentT.x + deltaX
+                                            val newY = currentT.y + deltaY
                                             onEvent(
                                                 EditorEvent.ChangeClipTransform(
                                                     currentT.copy(
@@ -561,14 +597,37 @@ fun EditorScreen(
                                         }
                                     }
                             ) {
-                                AsyncImage(
-                                    model = asset.uri,
-                                    contentDescription = "Overlay",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(4.dp))
-                                )
+                                if (isVideo && overlayPlayer != null) {
+                                    AndroidView(
+                                        factory = { ctx ->
+                                            (android.view.LayoutInflater.from(ctx).inflate(R.layout.texture_player_view, null) as PlayerView).apply {
+                                                this.player = overlayPlayer
+                                                useController = false
+                                                layoutParams = ViewGroup.LayoutParams(
+                                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                                )
+                                            }
+                                        },
+                                        update = { view ->
+                                            if (view.player != overlayPlayer) {
+                                                view.player = overlayPlayer
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(RoundedCornerShape(4.dp))
+                                    )
+                                } else {
+                                    AsyncImage(
+                                        model = asset.uri,
+                                        contentDescription = "Overlay",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(RoundedCornerShape(4.dp))
+                                    )
+                                }
 
                                 if (isSelected) {
                                     // Bounding Box Outline

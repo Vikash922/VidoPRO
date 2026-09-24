@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.Player
 import com.example.core.data.repository.AssetRepository
 import com.example.core.data.repository.ProjectRepository
 import com.example.core.media.PreviewPlayerController
@@ -140,6 +141,7 @@ class EditorViewModel(
             val visibleTracks = project.tracks.filter { it.isVisible }
             val videoClips = visibleTracks.filter { it.type == TrackType.VIDEO }.flatMap { it.clips }
             val audioClips = visibleTracks.filter { it.type == TrackType.AUDIO }.flatMap { it.clips }
+            val overlayClips = visibleTracks.filter { it.type == TrackType.OVERLAY }.flatMap { it.clips }
             val allClips = project.tracks.flatMap { it.clips }
             val assetMap = _uiState.value.assets.toMutableMap()
             assetRepository?.let { repo ->
@@ -156,8 +158,11 @@ class EditorViewModel(
             _uiState.update { it.copy(assets = assetMap) }
             previewPlayer?.setClips(videoClips, assetMap)
             previewPlayer?.setAudioClips(audioClips, assetMap)
+            previewPlayer?.setOverlayClips(overlayClips, assetMap)
         }
     }
+
+    fun getOverlayPlayer(clipId: String): Player? = previewPlayer?.getOverlayPlayer(clipId)
 
     fun onEvent(event: EditorEvent) {
         when (event) {

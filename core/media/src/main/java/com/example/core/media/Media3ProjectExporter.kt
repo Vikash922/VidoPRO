@@ -42,6 +42,7 @@ class Media3ProjectExporter(
     private var activeTransformer: Transformer? = null
     private var progressJob: Job? = null
     private var activeTextOverlay: TextOverlayGenerator? = null
+    private var activeVideoOverlay: VideoOverlayGenerator? = null
     private var activeSilenceFile: File? = null
 
     override suspend fun export(
@@ -144,13 +145,14 @@ class Media3ProjectExporter(
                 }
             }
 
-            // Parse Image Overlays (PiP)
+            // Parse Visual Overlays (PiP - Moving Videos and Images)
             val overlayTracks = project.tracks.filter { it.type == TrackType.OVERLAY && it.isVisible }
-            val imageClips = overlayTracks.flatMap { it.clips }
-            if (imageClips.isNotEmpty()) {
+            val overlayClips = overlayTracks.flatMap { it.clips }
+            if (overlayClips.isNotEmpty()) {
                 try {
-                    val imageOverlay = ImageOverlayGenerator(context, imageClips, assets, settings.width, settings.height)
-                    val overlayEffect = androidx.media3.effect.OverlayEffect(com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(imageOverlay))
+                    val videoOverlay = VideoOverlayGenerator(context, overlayClips, assets, settings.width, settings.height)
+                    activeVideoOverlay = videoOverlay
+                    val overlayEffect = androidx.media3.effect.OverlayEffect(com.google.common.collect.ImmutableList.of<androidx.media3.effect.TextureOverlay>(videoOverlay))
                     videoEffects.add(overlayEffect)
                 } catch (e: Exception) {
                     // Fallback if OverlayEffect fails
@@ -163,15 +165,27 @@ class Media3ProjectExporter(
             sequences.add(EditedMediaItemSequence.Builder(editedMediaItems).build())
 
             // Include multi-track Audio Sequences with precise timeline gap handling (DEV-069, DEV-070, FIX-06)
+            // Includes both audio tracks and audible video overlay clips (PiP with volume > 0)
             val audioTracks = project.tracks.filter { it.type == TrackType.AUDIO && it.isVisible }
             val videoDurationMs = clips.maxOfOrNull { it.endTimeMs } ?: project.durationMs
             val totalTimelineDurationMs = maxOf(videoDurationMs, project.durationMs)
 
-            val mappedTracksSegments = audioTracks.flatMap { track ->
-                AudioTimelineMapper.partitionIntoNonOverlappingLayers(track.clips).mapNotNull { layer ->
-                    val segments = AudioTimelineMapper.mapClipsToSegments(layer, assets, totalTimelineDurationMs)
-                    if (segments.any { it is AudioTimelineSegment.ClipSegment }) segments else null
-                }
+            val audioTrackLayers = audioTracks.flatMap { track ->
+                AudioTimelineMapper.partitionIntoNonOverlappingLayers(track.clips)
+            }
+            val audibleOverlayClips = overlayTracks.flatMap { it.clips }.filter {
+                (it.volume ?: 1f) > 0f && (it.type == ClipType.VIDEO || assets[it.assetId]?.mediaType == MediaType.VIDEO)
+            }
+            val overlayAudioLayers = if (audibleOverlayClips.isNotEmpty()) {
+                AudioTimelineMapper.partitionIntoNonOverlappingLayers(audibleOverlayClips)
+            } else {
+                emptyList()
+            }
+            val allAudioLayers = audioTrackLayers + overlayAudioLayers
+
+            val mappedTracksSegments = allAudioLayers.mapNotNull { layer ->
+                val segments = AudioTimelineMapper.mapClipsToSegments(layer, assets, totalTimelineDurationMs)
+                if (segments.any { it is AudioTimelineSegment.ClipSegment }) segments else null
             }
 
             if (mappedTracksSegments.isNotEmpty()) {
@@ -292,6 +306,8 @@ class Media3ProjectExporter(
             activeTransformer = null
             activeTextOverlay?.release()
             activeTextOverlay = null
+            activeVideoOverlay?.close()
+            activeVideoOverlay = null
             activeSilenceFile?.let { if (it.exists()) it.delete() }
             activeSilenceFile = null
         }
@@ -307,6 +323,8 @@ class Media3ProjectExporter(
         activeTransformer = null
         activeTextOverlay?.release()
         activeTextOverlay = null
+        activeVideoOverlay?.close()
+        activeVideoOverlay = null
         activeSilenceFile?.let { if (it.exists()) it.delete() }
         activeSilenceFile = null
     }

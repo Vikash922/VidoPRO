@@ -203,7 +203,8 @@ class MainActivity : ComponentActivity() {
                             onNavigateMediaPicker = { trackType -> 
                                 selectedTrackTypeForPicker = trackType
                                 showMediaPicker = true 
-                            }
+                            },
+                            getOverlayPlayer = editorViewModel::getOverlayPlayer
                         )
                     }
                 } else {
