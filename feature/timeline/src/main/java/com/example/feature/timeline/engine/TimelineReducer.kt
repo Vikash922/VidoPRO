@@ -281,17 +281,17 @@ object TimelineReducer {
         splitPointMs: Long
     ): TimelineEngineState {
         val clip = state.findClip(clipId) ?: return state
-        val minDuration = 50L
+        val minDuration = TimelineEngineState.MIN_CLIP_DURATION_MS
 
         // Validation: split point must be within clip bounds and not too close to ends
         val minValidSplit = clip.startTimeMs + minDuration
         val maxValidSplit = clip.endTimeMs - minDuration
 
-        if (minValidSplit >= maxValidSplit) {
-            return state // Clip is too short to be split
+        if (splitPointMs < minValidSplit || splitPointMs > maxValidSplit) {
+            return state // Safe no-op if split point is invalid
         }
 
-        val clampedSplit = splitPointMs.coerceIn(minValidSplit, maxValidSplit)
+        val clampedSplit = splitPointMs
         val firstDuration = clampedSplit - clip.startTimeMs
         val secondDuration = clip.endTimeMs - clampedSplit
 
@@ -581,13 +581,13 @@ object TimelineReducer {
      * ExoPlayer sequential playback stays in perfect sync.
      */
     fun resolveMainTrackOverlaps(clips: List<Clip>): List<Clip> {
-        if (clips.isEmpty()) return clips
+        if (clips.size <= 1) return clips
         val sorted = clips.sortedWith(compareBy<Clip> { it.startTimeMs }.thenBy { it.id })
         val resolved = mutableListOf<Clip>()
         var currentEndTime = 0L
 
         sorted.forEach { clip ->
-            val actualStart = currentEndTime
+            val actualStart = maxOf(clip.startTimeMs, currentEndTime)
             val updated = if (actualStart != clip.startTimeMs) {
                 clip.copy(startTimeMs = actualStart)
             } else {

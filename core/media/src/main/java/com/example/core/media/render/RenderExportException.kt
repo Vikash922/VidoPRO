@@ -23,7 +23,7 @@ sealed class RenderExportException(
         RenderExportException(message)
 
     class OutOfMemoryRenderException(message: String = "Out of memory during frame rendering/compositing", cause: Throwable? = null) :
-        RenderExportException(message, cause)
+        RenderExportException(if (message.contains("Out of memory")) message else "Out of memory: $message", cause)
 
     class CancelledExportException(message: String = "Export was cancelled by user or system") :
         RenderExportException(message)

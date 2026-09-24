@@ -161,7 +161,7 @@ data class EffectStack(
         } else {
             effects + effect
         }
-        return EffectStack(updated.sortedBy { it.order })
+        return EffectStack(updated)
     }
     fun add(effect: Effect): EffectStack = withEffect(effect)
     fun update(effect: Effect): EffectStack = withEffect(effect)
@@ -176,7 +176,7 @@ data class EffectStack(
         val mutable = effects.toMutableList()
         val item = mutable.removeAt(fromIndex)
         mutable.add(toIndex, item)
-        return EffectStack(mutable.mapIndexed { idx, e -> e.copy(order = idx) })
+        return EffectStack(mutable)
     }
 }
 

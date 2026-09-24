@@ -23,18 +23,27 @@ class TimelineHistory(
         redoStack.clear()
     }
 
-    fun record(currentState: TimelineEngineState) = pushState(currentState)
+    fun record(currentState: TimelineEngineState) {
+        if (undoStack.lastOrNull() != currentState) {
+            pushState(currentState)
+        }
+    }
 
     fun undo(currentState: TimelineEngineState): TimelineEngineState? {
         if (undoStack.isEmpty()) return null
+        if (undoStack.lastOrNull() == currentState) {
+            undoStack.removeLast()
+        }
+        if (undoStack.isEmpty()) return null
         redoStack.addLast(currentState)
-        return undoStack.removeLast()
+        return undoStack.last()
     }
 
     fun redo(currentState: TimelineEngineState): TimelineEngineState? {
         if (redoStack.isEmpty()) return null
-        undoStack.addLast(currentState)
-        return redoStack.removeLast()
+        val nextState = redoStack.removeLast()
+        undoStack.addLast(nextState)
+        return nextState
     }
 
     fun clear() {

@@ -34,7 +34,14 @@ object KeyframeEvaluator {
         val posX = evaluateProperty(clip.keyframes, KeyframeProperty.POSITION_X, timeMs, baseTransform.x)
         val posY = evaluateProperty(clip.keyframes, KeyframeProperty.POSITION_Y, timeMs, baseTransform.y)
         val scaleX = evaluateProperty(clip.keyframes, KeyframeProperty.SCALE_X, timeMs, baseTransform.scaleX)
-        val scaleY = evaluateProperty(clip.keyframes, KeyframeProperty.SCALE_Y, timeMs, baseTransform.scaleY)
+        val hasScaleYKeyframes = clip.keyframes.any { it.property == KeyframeProperty.SCALE_Y }
+        val scaleY = if (hasScaleYKeyframes) {
+            evaluateProperty(clip.keyframes, KeyframeProperty.SCALE_Y, timeMs, baseTransform.scaleY)
+        } else if (clip.keyframes.any { it.property == KeyframeProperty.SCALE_X }) {
+            scaleX
+        } else {
+            baseTransform.scaleY
+        }
         val rotation = evaluateRotation(clip.keyframes, timeMs, baseTransform.rotation)
         val opacity = evaluateProperty(clip.keyframes, KeyframeProperty.OPACITY, timeMs, baseTransform.opacity)
 
@@ -227,7 +234,36 @@ object KeyframeEvaluator {
     fun evaluateEffects(clip: Clip, timeMs: Long): List<com.example.core.model.Effect> {
         if (clip.keyframes.isEmpty()) return clip.effects
 
-        return clip.effects.map { eff ->
+        val effectTypesPresent = clip.effects.map { it.type }.toMutableSet()
+        val allEffects = clip.effects.toMutableList()
+
+        val effectPropertyMap = listOf(
+            KeyframeProperty.BRIGHTNESS to com.example.core.model.EffectType.BRIGHTNESS,
+            KeyframeProperty.CONTRAST to com.example.core.model.EffectType.CONTRAST,
+            KeyframeProperty.SATURATION to com.example.core.model.EffectType.SATURATION,
+            KeyframeProperty.EXPOSURE to com.example.core.model.EffectType.EXPOSURE,
+            KeyframeProperty.TEMPERATURE to com.example.core.model.EffectType.TEMPERATURE,
+            KeyframeProperty.TINT to com.example.core.model.EffectType.TINT,
+            KeyframeProperty.HIGHLIGHTS to com.example.core.model.EffectType.HIGHLIGHTS,
+            KeyframeProperty.SHADOWS to com.example.core.model.EffectType.SHADOWS
+        )
+
+        for ((prop, type) in effectPropertyMap) {
+            if (!effectTypesPresent.contains(type) && clip.keyframes.any { it.property == prop }) {
+                allEffects.add(
+                    com.example.core.model.Effect(
+                        id = "kf_${clip.id}_$prop",
+                        clipId = clip.id,
+                        type = type,
+                        order = allEffects.size,
+                        parameters = mapOf(prop to 0f)
+                    )
+                )
+                effectTypesPresent.add(type)
+            }
+        }
+
+        return allEffects.map { eff ->
             when (eff.type) {
                 com.example.core.model.EffectType.BRIGHTNESS -> {
                     val v = evaluateProperty(clip.keyframes, KeyframeProperty.BRIGHTNESS, timeMs, eff.parameters["value"] ?: eff.parameters["brightness"] ?: 0f)

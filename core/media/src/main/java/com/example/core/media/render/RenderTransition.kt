@@ -42,5 +42,5 @@ data class RenderTransition(
      * Returns whether the transition window is currently active at [projectTimeMs].
      */
     fun isActiveAt(projectTimeMs: Long): Boolean =
-        projectTimeMs >= startTimeMs && projectTimeMs < endTimeMs
+        projectTimeMs in startTimeMs..endTimeMs
 }
