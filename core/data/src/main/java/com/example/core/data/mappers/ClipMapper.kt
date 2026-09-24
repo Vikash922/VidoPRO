@@ -9,7 +9,9 @@ import com.example.core.database.entities.TransformEntity
 import com.example.core.database.entities.TransitionEntity
 import com.example.core.database.relations.ClipWithDetails
 import com.example.core.model.Asset
+import com.example.core.model.BlendMode
 import com.example.core.model.Clip
+import com.example.core.model.ClipMask
 import com.example.core.model.ClipType
 import com.example.core.model.Effect
 import com.example.core.model.EffectType
