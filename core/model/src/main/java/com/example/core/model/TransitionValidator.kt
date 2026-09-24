@@ -13,17 +13,26 @@ object TransitionValidator {
     const val MIN_TRANSITION_DURATION_MS = 100L
     const val DEFAULT_TRANSITION_DURATION_MS = 1000L
 
-    /**
-     * Determines maximum valid transition duration between two adjacent clips.
-     * Transition duration cannot exceed the duration of either clip.
-     */
-    fun getMaxDurationMs(firstClip: Clip, secondClip: Clip): Long {
-        return minOf(firstClip.durationMs, secondClip.durationMs)
+    fun maxTransitionDuration(clipADurationMs: Long, clipBDurationMs: Long): Long {
+        return minOf(clipADurationMs, clipBDurationMs)
     }
 
-    /**
-     * Validates and safely clamps transition duration to safe boundaries.
-     */
+    fun getMaxDurationMs(firstClip: Clip, secondClip: Clip): Long {
+        return maxTransitionDuration(firstClip.durationMs, secondClip.durationMs)
+    }
+
+    fun validateAndClamp(durationMs: Long, clipADurationMs: Long, clipBDurationMs: Long): Long {
+        val maxDuration = maxTransitionDuration(clipADurationMs, clipBDurationMs)
+        if (maxDuration < MIN_TRANSITION_DURATION_MS) return 0L
+        return durationMs.coerceIn(MIN_TRANSITION_DURATION_MS, maxDuration)
+    }
+
+    fun isValidTransitionDuration(durationMs: Long, clipADurationMs: Long, clipBDurationMs: Long): Boolean {
+        val maxDuration = maxTransitionDuration(clipADurationMs, clipBDurationMs)
+        if (maxDuration < MIN_TRANSITION_DURATION_MS) return false
+        return durationMs in MIN_TRANSITION_DURATION_MS..maxDuration
+    }
+
     fun validate(
         firstClip: Clip,
         secondClip: Clip,

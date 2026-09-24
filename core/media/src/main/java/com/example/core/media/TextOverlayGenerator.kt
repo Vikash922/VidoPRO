@@ -162,7 +162,7 @@ class TextOverlayGenerator(
      * Recycles the reusable bitmap and clears cached state to eliminate memory leaks.
      */
     @Synchronized
-    fun release() {
+    override fun release() {
         lastRenderedStates = null
         reusableCanvas = null
         reusableBitmap?.let {
