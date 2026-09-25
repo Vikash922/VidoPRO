@@ -39,18 +39,18 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
-  val releaseKeystorePath = System.getenv("KEYSTORE_FILE")
-    ?: (project.findProperty("KEYSTORE_FILE") as? String)
-    ?: (project.findProperty("keystoreFile") as? String)
-  val releaseKeystorePassword = System.getenv("KEYSTORE_PASSWORD")
-    ?: (project.findProperty("KEYSTORE_PASSWORD") as? String)
-    ?: (project.findProperty("keystorePassword") as? String)
-  val releaseKeyAlias = System.getenv("KEY_ALIAS")
-    ?: (project.findProperty("KEY_ALIAS") as? String)
-    ?: (project.findProperty("keyAlias") as? String)
-  val releaseKeyPassword = System.getenv("KEY_PASSWORD")
-    ?: (project.findProperty("KEY_PASSWORD") as? String)
-    ?: (project.findProperty("keyPassword") as? String)
+  val releaseKeystorePath = System.getenv("KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
+    ?: (project.findProperty("KEYSTORE_FILE") as? String)?.takeIf { it.isNotBlank() }
+    ?: (project.findProperty("keystoreFile") as? String)?.takeIf { it.isNotBlank() }
+  val releaseKeystorePassword = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+    ?: (project.findProperty("KEYSTORE_PASSWORD") as? String)?.takeIf { it.isNotBlank() }
+    ?: (project.findProperty("keystorePassword") as? String)?.takeIf { it.isNotBlank() }
+  val releaseKeyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
+    ?: (project.findProperty("KEY_ALIAS") as? String)?.takeIf { it.isNotBlank() }
+    ?: (project.findProperty("keyAlias") as? String)?.takeIf { it.isNotBlank() }
+  val releaseKeyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+    ?: (project.findProperty("KEY_PASSWORD") as? String)?.takeIf { it.isNotBlank() }
+    ?: (project.findProperty("keyPassword") as? String)?.takeIf { it.isNotBlank() }
 
   val releaseKeystoreFile = releaseKeystorePath?.let { file(it) } ?: file("release.keystore")
   val isReleaseSigningConfigured = releaseKeystoreFile.exists() &&

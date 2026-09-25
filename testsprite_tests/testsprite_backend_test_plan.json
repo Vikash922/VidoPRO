@@ -1,0 +1,7 @@
+[
+  {
+    "id": "TC001",
+    "title": "post_create_project_with_name_and_aspect_ratio",
+    "description": "Test creating a new project by posting a name and aspect ratio, verify the project is saved with default metadata, and confirm it appears in the recent projects list ordered by updatedAt."
+  }
+]
