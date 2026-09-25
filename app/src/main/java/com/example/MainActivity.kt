@@ -204,7 +204,8 @@ class MainActivity : ComponentActivity() {
                                 selectedTrackTypeForPicker = trackType
                                 showMediaPicker = true 
                             },
-                            getOverlayPlayer = editorViewModel::getOverlayPlayer
+                            getOverlayPlayer = editorViewModel::getOverlayPlayer,
+                            onPreviewQualityChanged = previewPlayer::setPreviewQuality
                         )
                     }
                 } else {

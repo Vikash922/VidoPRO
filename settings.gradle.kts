@@ -12,8 +12,8 @@ pluginManagement {
   }
 }
 
-plugins { id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0" }
-
+// Keep builds usable in offline/air-gapped environments. The project does not declare a
+// Java toolchain, so Foojay's automatic toolchain-provisioning plugin is unnecessary.
 dependencyResolutionManagement {
   repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
   repositories {
