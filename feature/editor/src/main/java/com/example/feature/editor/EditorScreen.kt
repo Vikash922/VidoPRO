@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -77,6 +79,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -98,6 +103,7 @@ import androidx.media3.ui.PlayerView
 import com.example.core.common.TimeUtils
 import com.example.core.media.CanvasCoordinateHelper
 import com.example.core.media.KeyframeEvaluator
+import com.example.core.media.PreviewQuality
 import com.example.core.media.render.CanvasConfig
 import com.example.core.media.render.RenderScene
 import com.example.core.media.render.RenderSceneBuilder
@@ -113,7 +119,7 @@ import com.example.feature.timeline.engine.TimelineAction
  * Features:
  * - Live Video playback with Media3 PlayerView (plays real video when media is added)
  * - Tapping video preview plays/pauses
- * - Interactive Resolution Dropdown (720P, 1080P, 2K, 4K)
+ * - Interactive preview-quality selector that never changes export quality
  * - Undo / Redo / Fullscreen controls
  * - Fully working tool buttons
  * - Clicking timeline does NOT open bottom sheet
@@ -129,12 +135,13 @@ fun EditorScreen(
     onNavigateMediaPicker: (TrackType) -> Unit = {},
     onTimelineAction: (TimelineAction) -> Unit = {},
     getOverlayPlayer: (String) -> Player? = { null },
+    onPreviewQualityChanged: (PreviewQuality) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val bgColor = Color(0xFF0A0D14)
     var isFullscreen by remember { mutableStateOf(false) }
-    var selectedResolution by remember { mutableStateOf("1080P") }
+    var selectedPreviewQuality by remember { mutableStateOf(PreviewQuality.AUTO) }
     var showResolutionMenu by remember { mutableStateOf(false) }
     var timelineMode by remember { mutableStateOf(TimelineMode.MAIN) }
 
@@ -147,7 +154,7 @@ fun EditorScreen(
         containerColor = bgColor,
         topBar = {
             if (!isFullscreen) {
-                // Top Bar: Back | Project Name | Resolution Dropdown | Undo | Redo | Export
+                // Top Bar: Back | Project Name | preview quality | Undo | Redo | Export
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -201,7 +208,7 @@ fun EditorScreen(
                                     .padding(horizontal = 8.dp, vertical = 5.dp)
                             ) {
                                 Text(
-                                    selectedResolution,
+                                    selectedPreviewQuality.label,
                                     color = Color.White,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -220,11 +227,21 @@ fun EditorScreen(
                                 onDismissRequest = { showResolutionMenu = false },
                                 modifier = Modifier.background(Color(0xFF1E2230))
                             ) {
-                                listOf("720P", "1080P", "2K", "4K").forEach { res ->
+                                PreviewQuality.entries.forEach { quality ->
                                     DropdownMenuItem(
-                                        text = { Text(res, color = Color.White, fontSize = 13.sp) },
+                                        text = {
+                                            Column {
+                                                Text(quality.label, color = Color.White, fontSize = 13.sp)
+                                                Text(
+                                                    "Preview only — export stays original",
+                                                    color = Color.White.copy(alpha = 0.55f),
+                                                    fontSize = 10.sp
+                                                )
+                                            }
+                                        },
                                         onClick = {
-                                            selectedResolution = res
+                                            selectedPreviewQuality = quality
+                                            onPreviewQualityChanged(quality)
                                             showResolutionMenu = false
                                         }
                                     )
@@ -924,6 +941,20 @@ fun EditorScreen(
                             }
                         }
 
+                        // Always-visible preview timecode.
+                        Text(
+                            text = TimeUtils.formatTimecode(uiState.playheadPositionMs),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(8.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Black.copy(alpha = 0.62f))
+                                .padding(horizontal = 7.dp, vertical = 4.dp)
+                        )
+
                         // Canvas Aspect Ratio Badge (tappable quick shortcut)
                         Box(
                             modifier = Modifier
@@ -1577,18 +1608,34 @@ fun EditorToolButton(
     isSelected: Boolean = false,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.92f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "toolButtonScale"
+    )
+    val containerColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFF34305A) else Color(0xFF171B27),
+        label = "toolButtonColor"
+    )
+    val iconColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFFB9A7FF) else Color.White,
+        label = "toolIconColor"
+    )
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) Color(0xFF1E2230) else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(RoundedCornerShape(12.dp))
+            .background(containerColor)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = if (isSelected) Color(0xFF00D2FF) else Color.White,
+            tint = iconColor,
             modifier = Modifier.size(22.dp)
         )
         Spacer(modifier = Modifier.height(4.dp))
@@ -1596,7 +1643,7 @@ fun EditorToolButton(
             text = label,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
-            color = if (isSelected) Color.White else Color.White.copy(alpha = 0.75f)
+            color = if (isSelected) Color.White else Color.White.copy(alpha = 0.72f)
         )
     }
 }

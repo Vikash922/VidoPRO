@@ -7,6 +7,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.SilenceMediaSource
 import com.example.core.model.Asset
@@ -31,11 +32,11 @@ import com.example.core.media.render.TimeMapping
  * Media3 ExoPlayer implementation of PreviewPlayerController and PreviewRenderer.
  *
  * Optimisations (media3 1.5.1):
- *  - EXTENSION_RENDERER_MODE_PREFER → hardware codec preference for 4K.
+ *  - Platform decoders remain first choice; optional extensions are only a fallback.
  *  - enableDecoderFallback = true   → graceful fallback if hardware H.265/AV1 unavailable.
  *  - LoadControl tuned for local file editing: low min-buffer, fast seek.
  *  - setClips() preserves playhead after clip-list change (fixes split reset to 0).
- *  - Ticker at 16ms for 60fps smooth playhead updates.
+ *  - Timeline ticker at 30fps so UI work does not compete with high-frame-rate decoding.
  */
 class Media3PreviewPlayer(
     context: Context,
@@ -46,8 +47,9 @@ class Media3PreviewPlayer(
 
     private val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(appContext)
         .setEnableDecoderFallback(true)
-        // Prefer hardware-accelerated codec extensions over platform codecs
-        .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+        // Prefer platform codecs. A bundled extension can be software-only, so preferring it
+        // can turn a hardware-decodable 4K60 stream into a stuttering software decode.
+        .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 
     // Tuned for local file editing: small buffers = fast seek, low latency
     private val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
@@ -61,9 +63,13 @@ class Media3PreviewPlayer(
         .build()
 
 
+    private val trackSelector = DefaultTrackSelector(appContext)
+    private var previewQuality = PreviewQuality.AUTO
+
     private val exoPlayer: ExoPlayer = ExoPlayer.Builder(appContext)
         .setRenderersFactory(renderersFactory)
         .setLoadControl(loadControl)
+        .setTrackSelector(trackSelector)
         .build()
 
     private val audioPlayers = mutableListOf<ExoPlayer>()
@@ -583,6 +589,15 @@ class Media3PreviewPlayer(
         }
     }
 
+    override fun setPreviewQuality(quality: PreviewQuality) {
+        if (previewQuality == quality) return
+        previewQuality = quality
+        trackSelector.setParameters(
+            trackSelector.buildUponParameters()
+                .setMaxVideoSize(quality.maxWidth, quality.maxHeight)
+        )
+    }
+
     override fun setVolume(volume: Float) {
         val v = volume.coerceIn(0f, 1f)
         currentVolume = v
@@ -647,13 +662,17 @@ class Media3PreviewPlayer(
         }
     }
 
-    /** Ticker runs at 16ms (~60fps) for smooth playhead animation. */
+    /**
+     * Keep timeline state at 30fps. The video surface renders independently at its native
+     * frame rate, while recomposing a multi-track Compose editor 60 times per second steals
+     * UI/GPU time from 4K60 decoding.
+     */
     private fun startPositionTicker() {
         tickerJob?.cancel()
         tickerJob = scope.launch {
             while (isActive) {
                 updatePositionFromPlayer()
-                delay(16L) // 60fps
+                delay(33L)
             }
         }
     }
