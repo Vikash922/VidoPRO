@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import com.example.core.model.Asset
 import com.example.core.model.Track
 import com.example.core.model.TransitionType
@@ -60,11 +61,21 @@ fun VideoTrack(
 
             val onSelectCb = remember(clip.id) { { onSelectClip(clip.id) } }
             val onLongCb = remember(clip.id) { { onLongPressClip(clip.id) } }
-            val onMoveCb = remember(clip.id) { { deltaMs: Long -> onMoveClipDelta(clip.id, deltaMs) } }
-            val onTrimStartCb = remember(clip.id) { { deltaMs: Long -> onTrimStartDelta(clip.id, deltaMs) } }
-            val onTrimEndCb = remember(clip.id) { { deltaMs: Long -> onTrimEndDelta(clip.id, deltaMs) } }
-            val onMoveKfCb = remember(clip.id) {
-                { kfId: String, newMs: Long -> onMoveKeyframe(clip.id, kfId, newMs) }
+            val onMoveCb = remember(clip.id, track.isLocked) {
+                if (track.isLocked) { { _: Long -> } }
+                else { deltaMs: Long -> onMoveClipDelta(clip.id, deltaMs) }
+            }
+            val onTrimStartCb = remember(clip.id, track.isLocked) {
+                if (track.isLocked) { { _: Long -> } }
+                else { deltaMs: Long -> onTrimStartDelta(clip.id, deltaMs) }
+            }
+            val onTrimEndCb = remember(clip.id, track.isLocked) {
+                if (track.isLocked) { { _: Long -> } }
+                else { deltaMs: Long -> onTrimEndDelta(clip.id, deltaMs) }
+            }
+            val onMoveKfCb = remember(clip.id, track.isLocked) {
+                if (track.isLocked) { { _: String, _: Long -> } }
+                else { kfId: String, newMs: Long -> onMoveKeyframe(clip.id, kfId, newMs) }
             }
 
             ClipCard(
@@ -82,9 +93,13 @@ fun VideoTrack(
                 onTrimEndDelta = onTrimEndCb,
                 onMoveKeyframe = onMoveKfCb,
                 onSelectKeyframe = onSelectKeyframe,
-                modifier = Modifier.offset {
-                    IntOffset((clip.startTimeMs * pixelsPerMs).roundToInt(), 0)
-                }
+                modifier = Modifier
+                    .offset {
+                        IntOffset((clip.startTimeMs * pixelsPerMs).roundToInt(), 0)
+                    }
+                    .graphicsLayer {
+                        alpha = if (track.isVisible) 1f else 0.45f
+                    }
             )
         }
 

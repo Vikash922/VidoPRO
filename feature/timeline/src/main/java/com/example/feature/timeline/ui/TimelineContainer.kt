@@ -19,10 +19,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -111,7 +120,17 @@ fun TimelineContainer(
 
     val visibleTracks = remember(state.tracks, timelineMode) {
         when (timelineMode) {
-            TimelineMode.MAIN -> state.tracks.filter { it.type == TrackType.VIDEO }
+            TimelineMode.MAIN -> {
+                val orderMap = mapOf(
+                    TrackType.VIDEO to 0,
+                    TrackType.OVERLAY to 1,
+                    TrackType.TEXT to 2,
+                    TrackType.AUDIO to 3
+                )
+                state.tracks.sortedWith(
+                    compareBy<Track> { orderMap[it.type] ?: 4 }.thenBy { it.order }
+                )
+            }
             TimelineMode.OVERLAY -> state.tracks.filter { it.type == TrackType.OVERLAY }
             TimelineMode.AUDIO -> state.tracks.filter { it.type == TrackType.AUDIO }
             TimelineMode.TEXT -> state.tracks.filter { it.type == TrackType.TEXT }
@@ -137,13 +156,14 @@ fun TimelineContainer(
             onSwitchMode = onSwitchMode
         )
 
-        // ── 2. Timeline Body (Sidebar + Viewport) ─────────────────────────────
+        // ── 2. Timeline Body (Layer Sidebar + Viewport) ────────────────────────
         Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
 
-            // Left track type indicator sidebar
-            TrackSidebar(
+            // Left layer control sidebar
+            LayerSidebar(
                 visibleTracks = visibleTracks,
                 timelineMode = timelineMode,
+                onAction = onAction,
                 onAddMedia = onAddMedia,
                 onAddSubTrackMedia = onAddSubTrackMedia
             )
@@ -206,70 +226,183 @@ fun TimelineContainer(
 }
 
 /**
- * Sidebar displaying track type badges (Video, Overlay, Text, Audio).
+ * LayerSidebar: Compact layer-control area on the left side (Alight Motion & CapCut inspired).
+ * Displays:
+ * - Header aligned with TimeRuler (30.dp height)
+ * - Row for each visible track (64.dp height matching track lane)
+ * - Layer Type Badge with icon and name (Video, Overlay, Text, Audio)
+ * - Visibility toggle (Eye icon: Visibility / VisibilityOff)
+ * - Lock toggle (Lock icon: Lock / LockOpen)
+ * - Mute toggle (Speaker icon: VolumeUp / VolumeOff) for Audio / Video
  */
 @Composable
-private fun TrackSidebar(
+private fun LayerSidebar(
     visibleTracks: List<Track>,
     timelineMode: TimelineMode,
+    onAction: (TimelineAction) -> Unit,
     onAddMedia: () -> Unit,
     onAddSubTrackMedia: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
-            .width(44.dp)
+            .width(66.dp)
             .fillMaxHeight()
-            .background(Color(0xFF0D1018))
-            .padding(top = 32.dp) // align below time ruler
+            .background(Color(0xFF0F121A))
     ) {
-        if (visibleTracks.isEmpty()) {
+        // Aligned with TimeRuler (30.dp height)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(30.dp)
+                .background(Color(0xFF13171F))
+                .padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "LAYERS",
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
+            )
             Box(
-                Modifier
-                    .size(44.dp, 64.dp)
+                modifier = Modifier
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1E2838))
                     .clickable {
                         if (timelineMode == TimelineMode.MAIN) onAddMedia() else onAddSubTrackMedia()
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF1E2230))
-                        .border(1.dp, Color(0xFF384055), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Add Track",
+                    tint = Color.White,
+                    modifier = Modifier.size(11.dp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(2.dp))
+
+        if (visibleTracks.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .clickable {
+                        if (timelineMode == TimelineMode.MAIN) onAddMedia() else onAddSubTrackMedia()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1E2230))
+                            .border(1.dp, Color(0xFF384055), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text("Add Layer", color = Color.White.copy(alpha = 0.45f), fontSize = 9.sp)
                 }
             }
         } else {
             visibleTracks.forEach { track ->
-                Box(Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.Center) {
-                    when (track.type) {
-                        TrackType.VIDEO -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Image, null, tint = Color.White.copy(.55f), modifier = Modifier.size(17.dp))
-                            Text("Video", color = Color.White.copy(.4f), fontSize = 8.sp)
-                        }
-                        TrackType.OVERLAY -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Layers, null, tint = Color(0xFF9C27B0).copy(.9f), modifier = Modifier.size(17.dp))
-                            Text("OVL", color = Color.White.copy(.4f), fontSize = 8.sp)
-                        }
-                        TrackType.TEXT -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.TextFields, null, tint = Color(0xFF4CAF50).copy(.9f), modifier = Modifier.size(17.dp))
-                            Text("Text", color = Color.White.copy(.4f), fontSize = 8.sp)
-                        }
-                        TrackType.AUDIO -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val isMuted = track.clips.isNotEmpty() && track.clips.all { (it.volume ?: 1f) == 0f }
+                val trackAccent = when (track.type) {
+                    TrackType.VIDEO -> Color(0xFF6B4BFF)
+                    TrackType.OVERLAY -> Color(0xFF9C27B0)
+                    TrackType.TEXT -> Color(0xFF4CAF50)
+                    TrackType.AUDIO -> Color(0xFF00D2FF)
+                }
+                val trackLabel = when (track.type) {
+                    TrackType.VIDEO -> "Video"
+                    TrackType.OVERLAY -> "Overlay"
+                    TrackType.TEXT -> "Text"
+                    TrackType.AUDIO -> "Audio"
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .background(Color(0xFF0D1018))
+                        .border(
+                            width = 0.5.dp,
+                            color = if (track.isLocked) Color(0xFFFFB74D).copy(alpha = 0.35f) else Color.White.copy(alpha = 0.05f)
+                        )
+                        .padding(horizontal = 4.dp, vertical = 6.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Track title indicator
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Box(
-                                Modifier
-                                    .size(26.dp)
+                                modifier = Modifier
+                                    .size(6.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF0F3658))
-                                    .border(1.dp, Color(0xFF00D2FF), CircleShape)
-                                    .clickable { onAddSubTrackMedia() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Add, null, tint = Color(0xFF00D2FF), modifier = Modifier.size(14.dp))
+                                    .background(trackAccent)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = trackLabel,
+                                color = Color.White.copy(alpha = if (track.isVisible) 0.85f else 0.4f),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                        }
+
+                        // Layer control buttons: Visibility, Lock, Mute
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Visibility Toggle (Eye)
+                            Icon(
+                                imageVector = if (track.isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = if (track.isVisible) "Hide layer" else "Show layer",
+                                tint = if (track.isVisible) Color.White.copy(alpha = 0.85f) else Color(0xFFEF5350),
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clickable { onAction(TimelineAction.ToggleTrackVisibility(track.id)) }
+                            )
+
+                            // Lock Toggle (Lock)
+                            Icon(
+                                imageVector = if (track.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                contentDescription = if (track.isLocked) "Unlock layer" else "Lock layer",
+                                tint = if (track.isLocked) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.35f),
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clickable { onAction(TimelineAction.ToggleTrackLock(track.id)) }
+                            )
+
+                            // Mute Toggle (Speaker) - for Audio and Video tracks
+                            if (track.type == TrackType.AUDIO || track.type == TrackType.VIDEO) {
+                                Icon(
+                                    imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                    contentDescription = if (isMuted) "Unmute layer" else "Mute layer",
+                                    tint = if (isMuted) Color(0xFFEF5350) else Color.White.copy(alpha = 0.55f),
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clickable { onAction(TimelineAction.MuteTrack(track.id, !isMuted)) }
+                                )
+                            } else {
+                                Spacer(Modifier.width(16.dp))
                             }
                         }
                     }

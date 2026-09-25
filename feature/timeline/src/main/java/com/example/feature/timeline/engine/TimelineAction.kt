@@ -82,5 +82,11 @@ sealed interface TimelineAction {
     data class UpdateTransition(val transition: com.example.core.model.Transition) : TimelineAction
     /** Removes a transition. */
     data class RemoveTransition(val transitionId: String) : TimelineAction
+    /** Toggles visibility of an entire track layer (eye icon). */
+    data class ToggleTrackVisibility(val trackId: String) : TimelineAction
+    /** Toggles lock state of an entire track layer (lock icon). */
+    data class ToggleTrackLock(val trackId: String) : TimelineAction
+    /** Mutes or unmutes a track layer by setting clip volumes to 0 or 1. */
+    data class MuteTrack(val trackId: String, val mute: Boolean) : TimelineAction
 }
 

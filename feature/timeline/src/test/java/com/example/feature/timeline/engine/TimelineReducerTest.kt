@@ -266,4 +266,62 @@ class TimelineReducerTest {
         assertEquals(1.4f, updatedClip.effects[0].parameters["value"]!!, 0.001f)
         assertEquals(1, stateAfter.selectedClip?.effects?.size)
     }
+
+    @Test
+    fun testToggleTrackVisibilityAndLock() {
+        val trackId = "track_vis"
+        val track = Track(id = trackId, projectId = "proj_1", type = TrackType.VIDEO, order = 0, isVisible = true, isLocked = false)
+        val initialState = createInitialState(listOf(track))
+
+        val hiddenState = TimelineReducer.reduce(initialState, TimelineAction.ToggleTrackVisibility(trackId))
+        assertEquals(false, hiddenState.tracks.first().isVisible)
+
+        val visibleAgainState = TimelineReducer.reduce(hiddenState, TimelineAction.ToggleTrackVisibility(trackId))
+        assertEquals(true, visibleAgainState.tracks.first().isVisible)
+
+        val lockedState = TimelineReducer.reduce(visibleAgainState, TimelineAction.ToggleTrackLock(trackId))
+        assertEquals(true, lockedState.tracks.first().isLocked)
+
+        val unlockedState = TimelineReducer.reduce(lockedState, TimelineAction.ToggleTrackLock(trackId))
+        assertEquals(false, unlockedState.tracks.first().isLocked)
+    }
+
+    @Test
+    fun testLockedTrackPreventsSplitAndTrimAndMove() {
+        val trackId = "track_locked"
+        val clip = createTestClip(id = "clip_1", trackId = trackId, startTimeMs = 0L, durationMs = 4000L)
+        val lockedTrack = Track(id = trackId, projectId = "proj_1", type = TrackType.VIDEO, order = 0, isLocked = true, clips = listOf(clip))
+        val initialState = createInitialState(listOf(lockedTrack))
+
+        // Attempt split
+        val splitAttempt = TimelineReducer.reduce(initialState, TimelineAction.SplitClip("clip_1", 2000L))
+        assertEquals("Locked track should not split clip", 1, splitAttempt.tracks.first().clips.size)
+
+        // Attempt trim
+        val trimAttempt = TimelineReducer.reduce(initialState, TimelineAction.TrimStart("clip_1", 1000L))
+        assertEquals("Locked track should not trim start", 0L, trimAttempt.tracks.first().clips.first().startTimeMs)
+
+        // Attempt move
+        val moveAttempt = TimelineReducer.reduce(initialState, TimelineAction.MoveClip("clip_1", trackId, 2000L))
+        assertEquals("Locked track should not move clip", 0L, moveAttempt.tracks.first().clips.first().startTimeMs)
+
+        // Attempt delete
+        val deleteAttempt = TimelineReducer.reduce(initialState, TimelineAction.DeleteClip("clip_1"))
+        assertEquals("Locked track should not delete clip", 1, deleteAttempt.tracks.first().clips.size)
+    }
+
+    @Test
+    fun testMuteTrack() {
+        val trackId = "track_audio"
+        val clip1 = createTestClip(id = "clip_a1", trackId = trackId, startTimeMs = 0L, durationMs = 2000L).copy(volume = 1f)
+        val clip2 = createTestClip(id = "clip_a2", trackId = trackId, startTimeMs = 2000L, durationMs = 2000L).copy(volume = 0.8f)
+        val track = Track(id = trackId, projectId = "proj_1", type = TrackType.AUDIO, order = 0, clips = listOf(clip1, clip2))
+        val initialState = createInitialState(listOf(track))
+
+        val mutedState = TimelineReducer.reduce(initialState, TimelineAction.MuteTrack(trackId, mute = true))
+        assertTrue(mutedState.tracks.first().clips.all { it.volume == 0f })
+
+        val unmutedState = TimelineReducer.reduce(mutedState, TimelineAction.MuteTrack(trackId, mute = false))
+        assertTrue(unmutedState.tracks.first().clips.all { it.volume == 1f })
+    }
 }

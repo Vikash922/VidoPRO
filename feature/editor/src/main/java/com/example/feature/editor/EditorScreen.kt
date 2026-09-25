@@ -65,6 +65,10 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material3.DropdownMenu
@@ -143,30 +147,50 @@ fun EditorScreen(
         containerColor = bgColor,
         topBar = {
             if (!isFullscreen) {
-                // Top Bar: Close (X) | 1080P Dropdown | Solid Purple Export Button
+                // Top Bar: Back | Project Name | Resolution Dropdown | Undo | Redo | Export
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
                         .background(bgColor)
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clickable { onNavigateBack() }
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .clickable { onNavigateBack() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = uiState.project?.name?.ifBlank { "Untitled Project" } ?: "Untitled Project",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                    }
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Resolution selector dropdown (NO GRADIENTS)
+                        // Resolution selector dropdown
                         Box {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -174,7 +198,7 @@ fun EditorScreen(
                                     .clip(RoundedCornerShape(6.dp))
                                     .background(Color(0xFF1E2230))
                                     .clickable { showResolutionMenu = true }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
                             ) {
                                 Text(
                                     selectedResolution,
@@ -182,12 +206,12 @@ fun EditorScreen(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
-                                Spacer(Modifier.width(4.dp))
+                                Spacer(Modifier.width(3.dp))
                                 Icon(
                                     Icons.Default.KeyboardArrowDown,
                                     contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
+                                    tint = Color.White.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(15.dp)
                                 )
                             }
 
@@ -198,7 +222,7 @@ fun EditorScreen(
                             ) {
                                 listOf("720P", "1080P", "2K", "4K").forEach { res ->
                                     DropdownMenuItem(
-                                        text = { Text(res, color = Color.White) },
+                                        text = { Text(res, color = Color.White, fontSize = 13.sp) },
                                         onClick = {
                                             selectedResolution = res
                                             showResolutionMenu = false
@@ -208,20 +232,52 @@ fun EditorScreen(
                             }
                         }
 
-                        // Export button — SOLID WHITE (NO GRADIENT)
+                        // Undo
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .clickable(enabled = uiState.canUndo) { onEvent(EditorEvent.UndoClicked) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Undo,
+                                contentDescription = "Undo",
+                                tint = if (uiState.canUndo) Color.White else Color.White.copy(alpha = 0.25f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        // Redo
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .clickable(enabled = uiState.canRedo) { onEvent(EditorEvent.RedoClicked) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Redo,
+                                contentDescription = "Redo",
+                                tint = if (uiState.canRedo) Color.White else Color.White.copy(alpha = 0.25f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        // Export button
                         Box(
                             modifier = Modifier
                                 .height(32.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(Color.White)
                                 .clickable { uiState.project?.id?.let { onNavigateExport(it) } }
-                                .padding(horizontal = 18.dp),
+                                .padding(horizontal = 14.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "Export",
                                 color = Color(0xFF0A0D14),
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -889,79 +945,167 @@ fun EditorScreen(
                 }
 
             if (!isFullscreen) {
-                // Time Controls Bar: 00:08 / 00:32 | Play/Pause | Undo | Redo | Fullscreen
+                // Precision Transport Bar: Timecode | Prev Boundary | -1s | Play/Pause | +1s | Next Boundary | Keyframe Diamond | Fullscreen
+                val allBoundaries = remember(uiState.project?.tracks, uiState.durationMs) {
+                    val set = sortedSetOf<Long>()
+                    set.add(0L)
+                    if (uiState.durationMs > 0L) {
+                        set.add(uiState.durationMs)
+                    }
+                    uiState.project?.tracks?.forEach { track ->
+                        track.clips.forEach { clip ->
+                            set.add(clip.startTimeMs)
+                            set.add(clip.endTimeMs)
+                            clip.keyframes.forEach { kf -> set.add(kf.timeMs) }
+                        }
+                    }
+                    set.toList()
+                }
+
+                val prevBoundary = remember(allBoundaries, uiState.playheadPositionMs) {
+                    allBoundaries.filter { it < uiState.playheadPositionMs - 50L }.maxOrNull() ?: 0L
+                }
+
+                val nextBoundary = remember(allBoundaries, uiState.playheadPositionMs, uiState.durationMs) {
+                    allBoundaries.filter { it > uiState.playheadPositionMs + 50L }.minOrNull() ?: uiState.durationMs
+                }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(bgColor)
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     // Timecode display
-                    Text(
-                        text = "${TimeUtils.formatDuration(uiState.playheadPositionMs)} / ${TimeUtils.formatDuration(uiState.durationMs)}",
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    // Play/Pause button
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF1E2230))
-                            .clickable { onEvent(EditorEvent.PlayPauseClicked) },
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 4.dp)
                     ) {
-                        Icon(
-                            imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = "Play/Pause",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
+                        Text(
+                            text = TimeUtils.formatDuration(uiState.playheadPositionMs),
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = " / ${TimeUtils.formatDuration(uiState.durationMs)}",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Normal
                         )
                     }
 
-                    // Undo, Redo, Keyframe, Fullscreen icons
+                    // Transport controls: Boundary navigation, Step -1s/+1s, Play/Pause, Keyframe Diamond, Fullscreen
                     Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Undo,
-                            contentDescription = "Undo",
-                            tint = if (uiState.canUndo) Color.White else Color.White.copy(alpha = 0.2f),
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clickable(enabled = uiState.canUndo) { onEvent(EditorEvent.UndoClicked) }
-                        )
-                        Spacer(Modifier.width(14.dp))
-                        Icon(
-                            Icons.AutoMirrored.Filled.Redo,
-                            contentDescription = "Redo",
-                            tint = if (uiState.canRedo) Color.White else Color.White.copy(alpha = 0.2f),
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clickable(enabled = uiState.canRedo) { onEvent(EditorEvent.RedoClicked) }
-                        )
-                        Spacer(Modifier.width(14.dp))
-                        // Keyframe Diamond Button
+                        // Previous Boundary
                         Box(
                             modifier = Modifier
-                                .size(22.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(if (uiState.selectedClipId != null) Color(0xFF1E2230) else Color.Transparent)
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .clickable { onEvent(EditorEvent.SeekTo(prevBoundary)) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.SkipPrevious,
+                                contentDescription = "Previous Boundary",
+                                tint = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        // Step -1s
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
                                 .clickable {
+                                    val targetMs = (uiState.playheadPositionMs - 1000L).coerceAtLeast(0L)
+                                    onEvent(EditorEvent.SeekTo(targetMs))
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.FastRewind,
+                                contentDescription = "Rewind 1s",
+                                tint = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        // Play/Pause button
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF1E2230))
+                                .clickable { onEvent(EditorEvent.PlayPauseClicked) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (uiState.isPlaying) "Pause" else "Play",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Step +1s
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .clickable {
+                                    val targetMs = (uiState.playheadPositionMs + 1000L).coerceAtMost(uiState.durationMs)
+                                    onEvent(EditorEvent.SeekTo(targetMs))
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.FastForward,
+                                contentDescription = "Forward 1s",
+                                tint = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        // Next Boundary
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .clickable { onEvent(EditorEvent.SeekTo(nextBoundary)) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.SkipNext,
+                                contentDescription = "Next Boundary",
+                                tint = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        // Keyframe Diamond Button
+                        val activeClip = uiState.selectedClip
+                        val hasKeyframeAtPlayhead = activeClip != null && activeClip.keyframes.any {
+                            kotlin.math.abs(it.timeMs - uiState.playheadPositionMs) <= 50L
+                        }
+                        val isClipSelected = uiState.selectedClipId != null
+
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isClipSelected) Color(0xFF1E2230) else Color.Transparent)
+                                .clickable(enabled = isClipSelected) {
                                     onEvent(EditorEvent.ToggleKeyframeAtPlayhead)
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            val activeClip = uiState.selectedClip
-                            val hasKeyframeAtPlayhead = activeClip != null && activeClip.keyframes.any {
-                                kotlin.math.abs(it.timeMs - uiState.playheadPositionMs) <= 50L
-                            }
                             Canvas(modifier = Modifier.size(14.dp)) {
                                 val path = Path().apply {
                                     moveTo(size.width / 2f, 0f)
@@ -971,11 +1115,11 @@ fun EditorScreen(
                                     close()
                                 }
                                 val diamondColor = if (hasKeyframeAtPlayhead) {
-                                    Color(0xFFFFD600)
-                                } else if (uiState.selectedClipId != null) {
-                                    Color(0xFF00D2FF)
+                                    Color(0xFFFFD600) // Alight Motion active keyframe gold/yellow
+                                } else if (isClipSelected) {
+                                    Color(0xFF00D2FF) // Add keyframe cyan
                                 } else {
-                                    Color.White.copy(alpha = 0.7f)
+                                    Color.White.copy(alpha = 0.25f)
                                 }
                                 drawPath(
                                     path = path,
@@ -984,15 +1128,21 @@ fun EditorScreen(
                             }
                         }
 
-                        Spacer(Modifier.width(14.dp))
-                        Icon(
-                            Icons.Default.Fullscreen,
-                            contentDescription = "Fullscreen",
-                            tint = Color.White.copy(alpha = 0.8f),
+                        // Fullscreen
+                        Box(
                             modifier = Modifier
-                                .size(20.dp)
-                                .clickable { isFullscreen = true }
-                        )
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .clickable { isFullscreen = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Fullscreen,
+                                contentDescription = "Fullscreen",
+                                tint = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
 
@@ -1057,12 +1207,12 @@ fun EditorScreen(
                     }
                 }
 
-                // BOTTOM TOOLBAR (Solid flat colors, NO GRADIENTS)
+                // BOTTOM TOOLBAR (CapCut + Alight Motion styled ribbon)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(bgColor)
-                        .padding(vertical = 10.dp, horizontal = 4.dp)
+                        .padding(vertical = 8.dp, horizontal = 8.dp)
                 ) {
                     val scrollState = rememberScrollState()
 
@@ -1070,25 +1220,18 @@ fun EditorScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(scrollState),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (timelineMode == TimelineMode.MAIN) {
                             if (uiState.selectedClipId == null) {
                                 // Primary tools
                                 EditorToolButton(EditorTool.EDIT, Icons.Default.ContentCut) { onEvent(EditorEvent.SetEditSheetVisible(true)) }
-                                Spacer(Modifier.width(20.dp))
-                                EditorToolButton(EditorTool.CANVAS, Icons.Default.AspectRatio) { onEvent(EditorEvent.SetCanvasSheetVisible(true)) }
-                                Spacer(Modifier.width(20.dp))
                                 EditorToolButton(EditorTool.AUDIO, Icons.Default.Audiotrack) { timelineMode = TimelineMode.AUDIO }
-                                Spacer(Modifier.width(20.dp))
                                 EditorToolButton(EditorTool.TEXT, Icons.Default.Title) { timelineMode = TimelineMode.TEXT }
-                                Spacer(Modifier.width(20.dp))
                                 EditorToolButton(EditorTool.OVERLAY, Icons.Default.Layers) { timelineMode = TimelineMode.OVERLAY }
-                                Spacer(Modifier.width(20.dp))
                                 EditorToolButton(EditorTool.EFFECTS, Icons.Default.AutoFixHigh) { onEvent(EditorEvent.SetFiltersSheetVisible(true)) }
-                                Spacer(Modifier.width(20.dp))
                                 EditorToolButton(EditorTool.FILTERS, Icons.Default.ColorLens) { onEvent(EditorEvent.SetFiltersSheetVisible(true)) }
-                                Spacer(Modifier.width(20.dp))
+                                EditorToolButton(EditorTool.CANVAS, Icons.Default.AspectRatio) { onEvent(EditorEvent.SetCanvasSheetVisible(true)) }
                                 EditorToolButton(EditorTool.TRANSITION, Icons.AutoMirrored.Filled.ArrowForward) { onEvent(EditorEvent.ToolClicked(EditorTool.TRANSITION)) }
                             } else {
                                 // Clip-specific tools for selected clip
@@ -1096,114 +1239,93 @@ fun EditorScreen(
                                 EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
                                     onEvent(EditorEvent.SplitSelectedClip)
                                 }
-                                Spacer(Modifier.width(18.dp))
-                                EditorToolButton(EditorTool.TRANSITION, Icons.AutoMirrored.Filled.ArrowForward) { onEvent(EditorEvent.ToolClicked(EditorTool.TRANSITION)) }
-                                Spacer(Modifier.width(18.dp))
                                 if (clip?.type == ClipType.TEXT) {
                                     EditorToolButton(EditorTool.TEXT, Icons.Default.Title) {
                                         onEvent(EditorEvent.SetTextSheetVisible(true))
                                     }
-                                    Spacer(Modifier.width(18.dp))
                                 }
-                                if (clip?.type == ClipType.VIDEO) {
+                                if (clip?.type == ClipType.VIDEO || clip?.type == ClipType.AUDIO) {
                                     EditorToolButton(EditorTool.SPEED, Icons.Default.Speed) {
                                         onEvent(EditorEvent.SetSpeedSheetVisible(true))
                                     }
-                                    Spacer(Modifier.width(18.dp))
-                                }
-                                if (clip?.type == ClipType.VIDEO || clip?.type == ClipType.AUDIO) {
                                     EditorToolButton(EditorTool.VOLUME, Icons.Default.VolumeUp) {
                                         onEvent(EditorEvent.SetVolumeSheetVisible(true))
                                     }
-                                    Spacer(Modifier.width(18.dp))
+                                }
+                                if (clip?.type == ClipType.VIDEO || clip?.type == ClipType.IMAGE) {
+                                    EditorToolButton(EditorTool.TRANSFORM, Icons.Default.CropRotate) {
+                                        onEvent(EditorEvent.SetTransformSheetVisible(true))
+                                    }
+                                    EditorToolButton(EditorTool.MASK, Icons.Default.CropFree) {
+                                        onEvent(EditorEvent.SetMaskSheetVisible(true))
+                                    }
+                                    EditorToolButton(EditorTool.BLEND, Icons.Default.Opacity) {
+                                        onEvent(EditorEvent.SetBlendSheetVisible(true))
+                                    }
+                                }
+                                EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
+                                    onEvent(EditorEvent.SetKeyframeSheetVisible(true))
+                                }
+                                if (clip?.type == ClipType.VIDEO) {
+                                    EditorToolButton(EditorTool.TRANSITION, Icons.AutoMirrored.Filled.ArrowForward) {
+                                        onEvent(EditorEvent.ToolClicked(EditorTool.TRANSITION))
+                                    }
                                 }
                                 EditorToolButton(EditorTool.DUPLICATE, Icons.Default.ContentCopy) {
                                     onEvent(EditorEvent.DuplicateSelectedClip)
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
                                     onEvent(EditorEvent.DeleteSelectedClip)
                                 }
-                                Spacer(Modifier.width(18.dp))
-                                EditorToolButton(EditorTool.TRANSFORM, Icons.Default.CropRotate) {
-                                    onEvent(EditorEvent.SetTransformSheetVisible(true))
-                                }
-                                Spacer(Modifier.width(18.dp))
-                                EditorToolButton(EditorTool.MASK, Icons.Default.CropFree) {
-                                    onEvent(EditorEvent.SetMaskSheetVisible(true))
-                                }
-                                Spacer(Modifier.width(18.dp))
-                                EditorToolButton(EditorTool.BLEND, Icons.Default.Opacity) {
-                                    onEvent(EditorEvent.SetBlendSheetVisible(true))
-                                }
-                                Spacer(Modifier.width(18.dp))
-                                EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
-                                    onEvent(EditorEvent.SetKeyframeSheetVisible(true))
-                                }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.BEATS, Icons.Default.GraphicEq) {
                                     onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs))
                                 }
-                                // ── Multi-select group controls ──────────────
+                                // Multi-select group controls
                                 if (uiState.isMultiSelectMode) {
-                                    Spacer(Modifier.width(18.dp))
                                     EditorToolButton("Group", Icons.Default.Folder) {
                                         onEvent(EditorEvent.GroupSelectedClips)
                                     }
                                 }
                                 if (uiState.selectedGroupId != null) {
-                                    Spacer(Modifier.width(18.dp))
                                     EditorToolButton("Ungroup", Icons.Default.FolderOff) {
                                         onEvent(EditorEvent.UngroupSelectedClips)
                                     }
                                 }
-
                             }
                         } else if (timelineMode == TimelineMode.OVERLAY) {
-
                             EditorToolButton("Back", Icons.AutoMirrored.Filled.ArrowBack) {
                                 timelineMode = TimelineMode.MAIN
                                 onEvent(EditorEvent.SelectClip(null))
                                 onTimelineAction(TimelineAction.SelectClip(null))
                             }
-                            Spacer(Modifier.width(18.dp))
                             EditorToolButton("Add", Icons.Default.Add) {
                                 onNavigateMediaPicker(TrackType.OVERLAY)
                             }
-                            Spacer(Modifier.width(18.dp))
                             EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
                                 onEvent(EditorEvent.SplitSelectedClip)
                             }
-                            Spacer(Modifier.width(18.dp))
                             if (uiState.selectedClipId != null) {
                                 EditorToolButton(EditorTool.TRANSFORM, Icons.Default.CropRotate) {
                                     onEvent(EditorEvent.SetTransformSheetVisible(true))
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.SPEED, Icons.Default.Speed) {
                                     onEvent(EditorEvent.SetSpeedSheetVisible(true))
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.VOLUME, Icons.Default.VolumeUp) {
                                     onEvent(EditorEvent.SetVolumeSheetVisible(true))
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DUPLICATE, Icons.Default.ContentCopy) {
                                     onEvent(EditorEvent.DuplicateSelectedClip)
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
                                     onEvent(EditorEvent.DeleteSelectedClip)
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.MASK, Icons.Default.CropFree) {
                                     onEvent(EditorEvent.SetMaskSheetVisible(true))
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.BLEND, Icons.Default.Opacity) {
                                     onEvent(EditorEvent.SetBlendSheetVisible(true))
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
                                     onEvent(EditorEvent.SetKeyframeSheetVisible(true))
                                 }
@@ -1214,32 +1336,25 @@ fun EditorScreen(
                                 onEvent(EditorEvent.SelectClip(null))
                                 onTimelineAction(TimelineAction.SelectClip(null))
                             }
-                            Spacer(Modifier.width(18.dp))
                             EditorToolButton("Add", Icons.Default.Add) {
                                 onNavigateMediaPicker(TrackType.AUDIO)
                             }
-                            Spacer(Modifier.width(18.dp))
                             EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
                                 onEvent(EditorEvent.SplitSelectedClip)
                             }
-                            Spacer(Modifier.width(18.dp))
                             if (uiState.selectedClipId != null) {
                                 EditorToolButton(EditorTool.VOLUME, Icons.Default.VolumeUp) {
                                     onEvent(EditorEvent.SetVolumeSheetVisible(true))
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.SPEED, Icons.Default.Speed) {
                                     onEvent(EditorEvent.SetSpeedSheetVisible(true))
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DUPLICATE, Icons.Default.ContentCopy) {
                                     onEvent(EditorEvent.DuplicateSelectedClip)
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
                                     onEvent(EditorEvent.DeleteSelectedClip)
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.BEATS, Icons.Default.GraphicEq) {
                                     onTimelineAction(TimelineAction.ToggleBeatMarker(uiState.playheadPositionMs))
                                 }
@@ -1250,28 +1365,22 @@ fun EditorScreen(
                                 onEvent(EditorEvent.SelectClip(null))
                                 onTimelineAction(TimelineAction.SelectClip(null))
                             }
-                            Spacer(Modifier.width(18.dp))
                             EditorToolButton("Add", Icons.Default.Add) {
                                 onEvent(EditorEvent.SetTextSheetVisible(true))
                             }
-                            Spacer(Modifier.width(18.dp))
                             EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
                                 onEvent(EditorEvent.SplitSelectedClip)
                             }
-                            Spacer(Modifier.width(18.dp))
                             if (uiState.selectedClipId != null) {
                                 EditorToolButton(EditorTool.TEXT, Icons.Default.Title) {
                                     onEvent(EditorEvent.SetTextSheetVisible(true))
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DUPLICATE, Icons.Default.ContentCopy) {
                                     onEvent(EditorEvent.DuplicateSelectedClip)
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.DELETE, Icons.Default.Delete) {
                                     onEvent(EditorEvent.DeleteSelectedClip)
                                 }
-                                Spacer(Modifier.width(18.dp))
                                 EditorToolButton(EditorTool.KEYFRAME, Icons.Default.Star) {
                                     onEvent(EditorEvent.SetKeyframeSheetVisible(true))
                                 }
@@ -1462,29 +1571,42 @@ fun EditorScreen(
 }
 
 @Composable
-fun EditorToolButton(label: String, icon: ImageVector, onClick: () -> Unit) {
+fun EditorToolButton(
+    label: String,
+    icon: ImageVector,
+    isSelected: Boolean = false,
+    onClick: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) Color(0xFF1E2230) else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = Color.White,
-            modifier = Modifier.size(24.dp)
+            tint = if (isSelected) Color(0xFF00D2FF) else Color.White,
+            modifier = Modifier.size(22.dp)
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,
             fontSize = 11.sp,
-            color = Color.White.copy(alpha = 0.7f)
+            fontWeight = FontWeight.Medium,
+            color = if (isSelected) Color.White else Color.White.copy(alpha = 0.75f)
         )
     }
 }
 
 @Composable
-fun EditorToolButton(tool: EditorTool, icon: ImageVector, onClick: () -> Unit) {
-    EditorToolButton(label = tool.label, icon = icon, onClick = onClick)
+fun EditorToolButton(
+    tool: EditorTool,
+    icon: ImageVector,
+    isSelected: Boolean = false,
+    onClick: () -> Unit
+) {
+    EditorToolButton(label = tool.label, icon = icon, isSelected = isSelected, onClick = onClick)
 }

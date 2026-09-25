@@ -737,6 +737,15 @@ class EditorViewModel(
             is TimelineAction.UpdateClipTransform -> {
                 UpdateClipTransformCommand(action.clipId, action.transform, preActionState)
             }
+            is TimelineAction.ToggleTrackVisibility -> {
+                StateSnapshotCommand("Toggle track visibility", action, preActionState)
+            }
+            is TimelineAction.ToggleTrackLock -> {
+                StateSnapshotCommand("Toggle track lock", action, preActionState)
+            }
+            is TimelineAction.MuteTrack -> {
+                StateSnapshotCommand(if (action.mute) "Mute track" else "Unmute track", action, preActionState)
+            }
             else -> null
         }
 

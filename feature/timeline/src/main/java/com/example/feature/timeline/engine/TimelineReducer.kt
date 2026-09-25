@@ -82,6 +82,9 @@ object TimelineReducer {
             is TimelineAction.AddTransition -> handleAddTransition(state, action.transition)
             is TimelineAction.UpdateTransition -> handleUpdateTransition(state, action.transition)
             is TimelineAction.RemoveTransition -> handleRemoveTransition(state, action.transitionId)
+            is TimelineAction.ToggleTrackVisibility -> handleToggleTrackVisibility(state, action.trackId)
+            is TimelineAction.ToggleTrackLock -> handleToggleTrackLock(state, action.trackId)
+            is TimelineAction.MuteTrack -> handleMuteTrack(state, action.trackId, action.mute)
         }
     }
 
@@ -141,6 +144,9 @@ object TimelineReducer {
         newStartTimeMs: Long
     ): TimelineEngineState {
         val sourceClip = state.findClip(clipId) ?: return state
+        val sourceTrack = state.tracks.find { it.id == sourceClip.trackId }
+        val targetTrack = state.tracks.find { it.id == targetTrackId }
+        if (sourceTrack?.isLocked == true || targetTrack?.isLocked == true) return state
         val safeStartTime = newStartTimeMs.coerceAtLeast(0L)
 
         val updatedTracks = state.tracks.map { track ->
@@ -186,6 +192,8 @@ object TimelineReducer {
         newStartTimeMs: Long
     ): TimelineEngineState {
         val clip = state.findClip(clipId) ?: return state
+        val parentTrack = state.tracks.find { it.clips.any { c -> c.id == clipId } }
+        if (parentTrack?.isLocked == true) return state
         val originalEnd = clip.endTimeMs
         val minDuration = TimelineEngineState.MIN_CLIP_DURATION_MS
 
@@ -230,6 +238,8 @@ object TimelineReducer {
         newEndTimeMs: Long
     ): TimelineEngineState {
         val clip = state.findClip(clipId) ?: return state
+        val parentTrack = state.tracks.find { it.clips.any { c -> c.id == clipId } }
+        if (parentTrack?.isLocked == true) return state
         val minDuration = TimelineEngineState.MIN_CLIP_DURATION_MS
         val minAllowedEndTime = clip.startTimeMs + minDuration
 
@@ -281,6 +291,8 @@ object TimelineReducer {
         splitPointMs: Long
     ): TimelineEngineState {
         val clip = state.findClip(clipId) ?: return state
+        val parentTrack = state.tracks.find { it.clips.any { c -> c.id == clipId } }
+        if (parentTrack?.isLocked == true) return state
         val minDuration = TimelineEngineState.MIN_CLIP_DURATION_MS
 
         // Validation: split point must be within clip bounds and not too close to ends
@@ -340,6 +352,8 @@ object TimelineReducer {
     }
 
     private fun handleDeleteClip(state: TimelineEngineState, clipId: String): TimelineEngineState {
+        val parentTrack = state.tracks.find { it.clips.any { c -> c.id == clipId } }
+        if (parentTrack?.isLocked == true) return state
         val updatedTracks = state.tracks.map { track ->
             if (track.clips.any { it.id == clipId }) {
                 val remaining = track.clips.filterNot { it.id == clipId }
@@ -365,6 +379,7 @@ object TimelineReducer {
     private fun handleDuplicateClip(state: TimelineEngineState, clipId: String): TimelineEngineState {
         val clip = state.findClip(clipId) ?: return state
         val targetTrack = state.findTrackForClip(clipId) ?: return state
+        if (targetTrack.isLocked) return state
 
         val duplicateClip = clip.copy(
             id = UUID.randomUUID().toString(),
@@ -825,6 +840,30 @@ object TimelineReducer {
             track.copy(transitions = track.transitions.filterNot { it.id == transitionId })
         }
         return state.copy(tracks = updatedTracks)
+    }
+
+    private fun handleToggleTrackVisibility(state: TimelineEngineState, trackId: String): TimelineEngineState {
+        val updated = state.tracks.map { track ->
+            if (track.id == trackId) track.copy(isVisible = !track.isVisible) else track
+        }
+        return state.copy(tracks = updated)
+    }
+
+    private fun handleToggleTrackLock(state: TimelineEngineState, trackId: String): TimelineEngineState {
+        val updated = state.tracks.map { track ->
+            if (track.id == trackId) track.copy(isLocked = !track.isLocked) else track
+        }
+        return state.copy(tracks = updated)
+    }
+
+    private fun handleMuteTrack(state: TimelineEngineState, trackId: String, mute: Boolean): TimelineEngineState {
+        val updated = state.tracks.map { track ->
+            if (track.id == trackId) {
+                val targetVol = if (mute) 0f else 1f
+                track.copy(clips = track.clips.map { it.copy(volume = targetVol) })
+            } else track
+        }
+        return state.copy(tracks = updated)
     }
 }
 

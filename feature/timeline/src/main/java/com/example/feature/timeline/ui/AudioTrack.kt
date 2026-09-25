@@ -19,6 +19,8 @@ import com.example.core.model.Asset
 import com.example.core.model.Track
 import kotlin.math.roundToInt
 
+import androidx.compose.ui.graphics.graphicsLayer
+
 /**
  * Dedicated track component for audio clips.
  * Supports waveform rendering, volume cues, gap-aware placement, trimming, and multi-selection.
@@ -68,11 +70,21 @@ fun AudioTrack(
 
             val onSelectCb = remember(clip.id) { { onSelectClip(clip.id) } }
             val onLongCb = remember(clip.id) { { onLongPressClip(clip.id) } }
-            val onMoveCb = remember(clip.id) { { deltaMs: Long -> onMoveClipDelta(clip.id, deltaMs) } }
-            val onTrimStartCb = remember(clip.id) { { deltaMs: Long -> onTrimStartDelta(clip.id, deltaMs) } }
-            val onTrimEndCb = remember(clip.id) { { deltaMs: Long -> onTrimEndDelta(clip.id, deltaMs) } }
-            val onMoveKfCb = remember(clip.id) {
-                { kfId: String, newMs: Long -> onMoveKeyframe(clip.id, kfId, newMs) }
+            val onMoveCb = remember(clip.id, track.isLocked) {
+                if (track.isLocked) { { _: Long -> } }
+                else { deltaMs: Long -> onMoveClipDelta(clip.id, deltaMs) }
+            }
+            val onTrimStartCb = remember(clip.id, track.isLocked) {
+                if (track.isLocked) { { _: Long -> } }
+                else { deltaMs: Long -> onTrimStartDelta(clip.id, deltaMs) }
+            }
+            val onTrimEndCb = remember(clip.id, track.isLocked) {
+                if (track.isLocked) { { _: Long -> } }
+                else { deltaMs: Long -> onTrimEndDelta(clip.id, deltaMs) }
+            }
+            val onMoveKfCb = remember(clip.id, track.isLocked) {
+                if (track.isLocked) { { _: String, _: Long -> } }
+                else { kfId: String, newMs: Long -> onMoveKeyframe(clip.id, kfId, newMs) }
             }
 
             ClipCard(
@@ -90,9 +102,13 @@ fun AudioTrack(
                 onTrimEndDelta = onTrimEndCb,
                 onMoveKeyframe = onMoveKfCb,
                 onSelectKeyframe = onSelectKeyframe,
-                modifier = Modifier.offset {
-                    IntOffset((clip.startTimeMs * pixelsPerMs).roundToInt(), 0)
-                }
+                modifier = Modifier
+                    .offset {
+                        IntOffset((clip.startTimeMs * pixelsPerMs).roundToInt(), 0)
+                    }
+                    .graphicsLayer {
+                        alpha = if (track.isVisible) 1f else 0.45f
+                    }
             )
         }
     }
