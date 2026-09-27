@@ -32,13 +32,24 @@ import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.Opacity
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculateCentroidSize
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateRotation
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -46,10 +57,14 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CropRotate
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
 import coil.compose.AsyncImage
@@ -78,6 +93,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -116,6 +132,65 @@ import com.example.core.ui.components.LoadingView
 import com.example.feature.timeline.engine.TimelineAction
 
 /**
+ * Unified gesture handler that cleanly supports single-tap selection
+ * and multi-touch pinch-to-zoom / pan / rotate transformations.
+ */
+private suspend fun PointerInputScope.detectTapAndTransform(
+    onTap: () -> Unit,
+    onGesture: (centroid: Offset, pan: Offset, zoom: Float, rotation: Float) -> Unit
+) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        var zoom = 1f
+        var rotation = 0f
+        var pan = Offset.Zero
+        var pastTouchSlop = false
+        val touchSlop = viewConfiguration.touchSlop
+
+        do {
+            val event = awaitPointerEvent()
+            val canceled = event.changes.any { it.isConsumed }
+            if (!canceled) {
+                val zoomChange = event.calculateZoom()
+                val rotationChange = event.calculateRotation()
+                val panChange = event.calculatePan()
+
+                if (!pastTouchSlop) {
+                    zoom *= zoomChange
+                    rotation += rotationChange
+                    pan += panChange
+
+                    val centroidSize = event.calculateCentroidSize(useCurrent = false)
+                    val touchSlopZoom = kotlin.math.abs(1 - zoom) * centroidSize
+                    val touchSlopRotation = kotlin.math.abs(rotation * kotlin.math.PI.toFloat() / 180f * centroidSize)
+                    val touchSlopPan = pan.getDistance()
+
+                    if (touchSlopPan > touchSlop || touchSlopZoom > touchSlop || touchSlopRotation > touchSlop) {
+                        pastTouchSlop = true
+                    }
+                }
+
+                if (pastTouchSlop) {
+                    val centroid = event.calculateCentroid(useCurrent = false)
+                    if (zoomChange != 1f || rotationChange != 0f || panChange != Offset.Zero) {
+                        onGesture(centroid, panChange, zoomChange, rotationChange)
+                    }
+                    event.changes.forEach {
+                        if (it.positionChanged()) {
+                            it.consume()
+                        }
+                    }
+                }
+            }
+        } while (!canceled && event.changes.any { it.pressed })
+
+        if (!pastTouchSlop) {
+            onTap()
+        }
+    }
+}
+
+/**
  * Editor Screen — Clean solid dark mode UI without gradients.
  * Features:
  * - Live Video playback with Media3 PlayerView (plays real video when media is added)
@@ -150,6 +225,32 @@ fun EditorScreen(
         uiState.project?.tracks?.any { it.clips.isNotEmpty() } == true
     }
 
+    // Mobile Navigation: Android Back button gracefully handles sheets, modes, selection before exiting
+    BackHandler(enabled = true) {
+        when {
+            uiState.isEditSheetVisible -> onEvent(EditorEvent.SetEditSheetVisible(false))
+            uiState.isTransformSheetVisible -> onEvent(EditorEvent.SetTransformSheetVisible(false))
+            uiState.isSpeedSheetVisible -> onEvent(EditorEvent.SetSpeedSheetVisible(false))
+            uiState.isVolumeSheetVisible -> onEvent(EditorEvent.SetVolumeSheetVisible(false))
+            uiState.isFiltersSheetVisible -> onEvent(EditorEvent.SetFiltersSheetVisible(false))
+            uiState.isCanvasSheetVisible -> onEvent(EditorEvent.SetCanvasSheetVisible(false))
+            uiState.isTextSheetVisible -> onEvent(EditorEvent.SetTextSheetVisible(false))
+            uiState.isMaskSheetVisible -> onEvent(EditorEvent.SetMaskSheetVisible(false))
+            uiState.isBlendSheetVisible -> onEvent(EditorEvent.SetBlendSheetVisible(false))
+            uiState.isKeyframeSheetVisible -> onEvent(EditorEvent.SetKeyframeSheetVisible(false))
+            timelineMode != TimelineMode.MAIN -> {
+                timelineMode = TimelineMode.MAIN
+                onEvent(EditorEvent.SelectClip(null))
+                onTimelineAction(TimelineAction.SelectClip(null))
+            }
+            uiState.selectedClipId != null -> {
+                onEvent(EditorEvent.SelectClip(null))
+                onTimelineAction(TimelineAction.SelectClip(null))
+            }
+            else -> onNavigateBack()
+        }
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = bgColor,
@@ -159,8 +260,9 @@ fun EditorScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp)
                         .background(bgColor)
+                        .statusBarsPadding()
+                        .height(52.dp)
                         .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -313,6 +415,24 @@ fun EditorScreen(
             val isCompactScreen = maxHeight < 640.dp
             val timelineHeight = if (isCompactScreen) 160.dp else if (maxHeight < 800.dp) 190.dp else 220.dp
 
+            val mainTrack = uiState.project?.tracks?.find { it.type == TrackType.VIDEO }
+            val mainClips = mainTrack?.clips ?: emptyList()
+            val activeMainClip = uiState.selectedClip?.takeIf { it.type == ClipType.VIDEO }
+                ?: mainClips.find { uiState.playheadPositionMs in it.startTimeMs..it.endTimeMs }
+                ?: mainClips.firstOrNull()
+
+            val activeOverlayClips = remember(uiState.project?.tracks, uiState.playheadPositionMs) {
+                uiState.project?.tracks
+                    ?.filter { it.type == TrackType.OVERLAY && it.isVisible }
+                    ?.flatMap { it.clips }
+                    ?.filter { clip ->
+                        clip.isVisible &&
+                        uiState.playheadPositionMs >= clip.startTimeMs &&
+                        uiState.playheadPositionMs <= clip.endTimeMs &&
+                        clip.assetId != null
+                    } ?: emptyList()
+            }
+
             Column(modifier = Modifier.fillMaxSize()) {
 
                 // VIDEO PREVIEW AREA — Real Live PlayerView (Media3 ExoPlayer) on Project Canvas
@@ -323,13 +443,7 @@ fun EditorScreen(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xFF0A0D14))
-                        .border(1.dp, Color(0xFF1F2432), RoundedCornerShape(8.dp))
-                        .pointerInput(Unit) {
-                            detectTapGestures {
-                                onEvent(EditorEvent.SelectClip(null))
-                                onTimelineAction(TimelineAction.SelectClip(null))
-                            }
-                        },
+                        .border(1.dp, Color(0xFF1F2432), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     val viewportWidth = maxWidth
@@ -470,35 +584,52 @@ fun EditorScreen(
                                         alpha = previewTransform.opacity
                                     }
                                     .then(if (mainMaskShape != null) Modifier.clip(mainMaskShape) else Modifier)
-                                    .pointerInput(activeMainClip?.id, isMainVideoSelected) {
-                                        if (activeMainClip != null && isMainVideoSelected) {
-                                            detectTransformGestures { _, pan, zoom, rotation ->
-                                                val currentT = activeMainClip.transform
-                                                val (deltaX, deltaY) = canvasConfig.previewPanToProject(
-                                                    panX = pan.x,
-                                                    panY = pan.y,
-                                                    previewWidthPx = canvasWidthPx,
-                                                    previewHeightPx = canvasHeightPx
-                                                )
-                                                val newX = currentT.x + deltaX
-                                                val newY = currentT.y + deltaY
-                                                val newScale = (currentT.scaleX * zoom).coerceIn(0.1f, 10.0f)
-                                                val rawRot = (currentT.rotation + rotation) % 360f
-                                                val newRot = if (rawRot < 0f) rawRot + 360f else rawRot
-
-                                                onEvent(
-                                                    EditorEvent.ChangeClipTransform(
-                                                        currentT.copy(
-                                                            x = newX,
-                                                            y = newY,
-                                                            scaleX = newScale,
-                                                            scaleY = newScale,
-                                                            rotation = newRot
-                                                        ),
-                                                        clipId = activeMainClip.id
+                                    .pointerInput(activeMainClip?.id) {
+                                        if (activeMainClip != null) {
+                                            detectTapAndTransform(
+                                                onTap = {
+                                                    if (isMainVideoSelected) {
+                                                        onEvent(EditorEvent.SelectClip(null))
+                                                        onTimelineAction(TimelineAction.SelectClip(null))
+                                                    } else {
+                                                        onEvent(EditorEvent.SelectClip(activeMainClip.id))
+                                                        onTimelineAction(TimelineAction.SelectClip(activeMainClip.id))
+                                                        timelineMode = TimelineMode.MAIN
+                                                    }
+                                                },
+                                                onGesture = { _, pan, zoom, rotation ->
+                                                    if (!isMainVideoSelected) {
+                                                        onEvent(EditorEvent.SelectClip(activeMainClip.id))
+                                                        onTimelineAction(TimelineAction.SelectClip(activeMainClip.id))
+                                                        timelineMode = TimelineMode.MAIN
+                                                    }
+                                                    val (deltaX, deltaY) = canvasConfig.previewPanToProject(
+                                                        panX = pan.x,
+                                                        panY = pan.y,
+                                                        previewWidthPx = canvasWidthPx,
+                                                        previewHeightPx = canvasHeightPx
                                                     )
-                                                )
-                                            }
+                                                    val currentT = activeMainClip.transform
+                                                    val newX = currentT.x + deltaX
+                                                    val newY = currentT.y + deltaY
+                                                    val newScale = (currentT.scaleX * zoom).coerceIn(0.1f, 10.0f)
+                                                    val rawRot = (currentT.rotation + rotation) % 360f
+                                                    val newRot = if (rawRot < 0f) rawRot + 360f else rawRot
+
+                                                    onEvent(
+                                                        EditorEvent.ChangeClipTransform(
+                                                            currentT.copy(
+                                                                x = newX,
+                                                                y = newY,
+                                                                scaleX = newScale,
+                                                                scaleY = newScale,
+                                                                rotation = newRot
+                                                            ),
+                                                            clipId = activeMainClip.id
+                                                        )
+                                                    )
+                                                }
+                                            )
                                         }
                                     }
                             ) {
@@ -540,25 +671,14 @@ fun EditorScreen(
                                             }
                                         }
                                     },
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .pointerInput(uiState.selectedClipId) {
-                                            detectTapGestures {
-                                                if (uiState.selectedClipId != null) {
-                                                    onEvent(EditorEvent.SelectClip(null))
-                                                    onTimelineAction(TimelineAction.SelectClip(null))
-                                                } else {
-                                                    onEvent(EditorEvent.PlayPauseClicked)
-                                                }
-                                            }
-                                        }
+                                    modifier = Modifier.fillMaxSize()
                                 )
 
                                 if (isMainVideoSelected) {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .border(1.5.dp, Color(0xFF6B4BFF).copy(alpha = 0.8f), RoundedCornerShape(2.dp))
+                                            .border(2.dp, Color(0xFF6B4BFF), RoundedCornerShape(2.dp))
                                     )
                                 }
                             }
@@ -695,44 +815,42 @@ fun EditorScreen(
                                     }
                                     .size(baseWidth, baseHeight)
                                     .pointerInput(overlayClip.id) {
-                                        detectTapGestures(
+                                        detectTapAndTransform(
                                             onTap = {
                                                 onEvent(EditorEvent.SelectClip(overlayClip.id))
                                                 onTimelineAction(TimelineAction.SelectClip(overlayClip.id))
                                                 timelineMode = TimelineMode.OVERLAY
+                                            },
+                                            onGesture = { _, pan, zoom, rotation ->
+                                                if (uiState.selectedClipId != overlayClip.id) {
+                                                    onEvent(EditorEvent.SelectClip(overlayClip.id))
+                                                    onTimelineAction(TimelineAction.SelectClip(overlayClip.id))
+                                                    timelineMode = TimelineMode.OVERLAY
+                                                }
+                                                val (deltaX, deltaY) = canvasConfig.previewPanToProject(
+                                                    panX = pan.x,
+                                                    panY = pan.y,
+                                                    previewWidthPx = canvasWidthPx,
+                                                    previewHeightPx = canvasHeightPx
+                                                )
+                                                val newScale = (currentT.scaleX * zoom).coerceIn(0.1f, 10.0f)
+                                                val newRotation = (currentT.rotation + rotation) % 360f
+                                                val newX = currentT.x + deltaX
+                                                val newY = currentT.y + deltaY
+                                                onEvent(
+                                                    EditorEvent.ChangeClipTransform(
+                                                        currentT.copy(
+                                                            x = newX,
+                                                            y = newY,
+                                                            scaleX = newScale,
+                                                            scaleY = newScale,
+                                                            rotation = newRotation
+                                                        ),
+                                                        clipId = overlayClip.id
+                                                    )
+                                                )
                                             }
                                         )
-                                    }
-                                    .pointerInput(overlayClip.id) {
-                                        detectTransformGestures { _, pan, zoom, rotation ->
-                                            if (uiState.selectedClipId != overlayClip.id) {
-                                                onEvent(EditorEvent.SelectClip(overlayClip.id))
-                                                onTimelineAction(TimelineAction.SelectClip(overlayClip.id))
-                                                timelineMode = TimelineMode.OVERLAY
-                                            }
-                                            val (deltaX, deltaY) = canvasConfig.previewPanToProject(
-                                                panX = pan.x,
-                                                panY = pan.y,
-                                                previewWidthPx = canvasWidthPx,
-                                                previewHeightPx = canvasHeightPx
-                                            )
-                                            val newScale = (currentT.scaleX * zoom).coerceIn(0.1f, 10.0f)
-                                            val newRotation = (currentT.rotation + rotation) % 360f
-                                            val newX = currentT.x + deltaX
-                                            val newY = currentT.y + deltaY
-                                            onEvent(
-                                                EditorEvent.ChangeClipTransform(
-                                                    currentT.copy(
-                                                        x = newX,
-                                                        y = newY,
-                                                        scaleX = newScale,
-                                                        scaleY = newScale,
-                                                        rotation = newRotation
-                                                    ),
-                                                    clipId = overlayClip.id
-                                                )
-                                            )
-                                        }
                                     }
                             ) {
                                 if (isVideo && overlayPlayer != null) {
@@ -974,6 +1092,142 @@ fun EditorScreen(
                             )
                         }
                     }
+
+                    // FLOATING ZOOM CONTROLS (Pinch + Buttons for Overlay and Main Video)
+                    val activeTransformClip = uiState.selectedClip ?: activeMainClip
+                    if (activeTransformClip != null && hasClips) {
+                        val activeScale = activeTransformClip.transform.scaleX
+                        val isOverlayActive = activeTransformClip.type == ClipType.OVERLAY || activeTransformClip.id != activeMainClip?.id
+
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(8.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color(0xDD111624),
+                            border = BorderStroke(1.dp, Color(0xFF2C354D))
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (isOverlayActive) "Overlay" else "Main Video",
+                                    color = if (isOverlayActive) Color(0xFFC084FC) else Color(0xFF818CF8),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(start = 6.dp, end = 4.dp)
+                                )
+
+                                // Zoom Out [-]
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF1E2538))
+                                        .clickable {
+                                            val currentT = activeTransformClip.transform
+                                            val newScale = (currentT.scaleX - 0.1f).coerceIn(0.1f, 10.0f)
+                                            onEvent(
+                                                EditorEvent.ChangeClipTransform(
+                                                    currentT.copy(scaleX = newScale, scaleY = newScale),
+                                                    clipId = activeTransformClip.id
+                                                )
+                                            )
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Remove,
+                                        contentDescription = "Zoom Out",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+
+                                Spacer(Modifier.width(4.dp))
+
+                                // Scale display badge: click to reset to 100%
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFF222B40))
+                                        .clickable {
+                                            val currentT = activeTransformClip.transform
+                                            onEvent(
+                                                EditorEvent.ChangeClipTransform(
+                                                    currentT.copy(scaleX = 1.0f, scaleY = 1.0f, x = 0f, y = 0f),
+                                                    clipId = activeTransformClip.id
+                                                )
+                                            )
+                                        }
+                                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${(activeScale * 100).roundToInt()}%",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+
+                                Spacer(Modifier.width(4.dp))
+
+                                // Zoom In [+]
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF1E2538))
+                                        .clickable {
+                                            val currentT = activeTransformClip.transform
+                                            val newScale = (currentT.scaleX + 0.1f).coerceIn(0.1f, 10.0f)
+                                            onEvent(
+                                                EditorEvent.ChangeClipTransform(
+                                                    currentT.copy(scaleX = newScale, scaleY = newScale),
+                                                    clipId = activeTransformClip.id
+                                                )
+                                            )
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = "Zoom In",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+
+                                Spacer(Modifier.width(4.dp))
+
+                                // Fit / Reset Button
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFF1E2538))
+                                        .clickable {
+                                            onEvent(
+                                                EditorEvent.ChangeClipTransform(
+                                                    com.example.core.model.Transform.IDENTITY,
+                                                    clipId = activeTransformClip.id
+                                                )
+                                            )
+                                        }
+                                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Fit",
+                                        color = Color.White.copy(alpha = 0.85f),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
             if (!isFullscreen) {
@@ -1121,6 +1375,30 @@ fun EditorScreen(
                             )
                         }
 
+                        // Quick Split at Playhead
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF1E2230))
+                                .clickable {
+                                    val targetClipId = when (timelineMode) {
+                                        TimelineMode.OVERLAY -> uiState.selectedClipId ?: activeOverlayClips.firstOrNull()?.id
+                                        TimelineMode.MAIN -> uiState.selectedClipId ?: activeMainClip?.id
+                                        else -> uiState.selectedClipId
+                                    }
+                                    onTimelineAction(TimelineAction.SplitAtPlayhead(targetClipId))
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.CallSplit,
+                                contentDescription = "Split at playhead",
+                                tint = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
                         // Keyframe Diamond Button
                         val activeClip = uiState.selectedClip
                         val hasKeyframeAtPlayhead = activeClip != null && activeClip.keyframes.any {
@@ -1244,6 +1522,7 @@ fun EditorScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(bgColor)
+                        .navigationBarsPadding()
                         .padding(vertical = 8.dp, horizontal = 8.dp)
                 ) {
                     val scrollState = rememberScrollState()
@@ -1257,6 +1536,10 @@ fun EditorScreen(
                         if (timelineMode == TimelineMode.MAIN) {
                             if (uiState.selectedClipId == null) {
                                 // Primary tools
+                                EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
+                                    val targetClipId = activeMainClip?.id
+                                    onTimelineAction(TimelineAction.SplitAtPlayhead(targetClipId))
+                                }
                                 EditorToolButton(EditorTool.EDIT, Icons.Default.ContentCut) { onEvent(EditorEvent.SetEditSheetVisible(true)) }
                                 EditorToolButton(EditorTool.AUDIO, Icons.Default.Audiotrack) { timelineMode = TimelineMode.AUDIO }
                                 EditorToolButton(EditorTool.TEXT, Icons.Default.Title) { timelineMode = TimelineMode.TEXT }
@@ -1334,7 +1617,8 @@ fun EditorScreen(
                                 onNavigateMediaPicker(TrackType.OVERLAY)
                             }
                             EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
-                                onEvent(EditorEvent.SplitSelectedClip)
+                                val targetClipId = uiState.selectedClipId ?: activeOverlayClips.firstOrNull()?.id
+                                onTimelineAction(TimelineAction.SplitAtPlayhead(targetClipId))
                             }
                             if (uiState.selectedClipId != null) {
                                 EditorToolButton(EditorTool.TRANSFORM, Icons.Default.CropRotate) {
@@ -1372,7 +1656,9 @@ fun EditorScreen(
                                 onNavigateMediaPicker(TrackType.AUDIO)
                             }
                             EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
-                                onEvent(EditorEvent.SplitSelectedClip)
+                                val audioClips = uiState.project?.tracks?.find { it.type == TrackType.AUDIO }?.clips ?: emptyList()
+                                val targetClipId = uiState.selectedClipId ?: audioClips.find { uiState.playheadPositionMs in it.startTimeMs..it.endTimeMs }?.id
+                                onTimelineAction(TimelineAction.SplitAtPlayhead(targetClipId))
                             }
                             if (uiState.selectedClipId != null) {
                                 EditorToolButton(EditorTool.VOLUME, Icons.Default.VolumeUp) {
@@ -1401,7 +1687,9 @@ fun EditorScreen(
                                 onEvent(EditorEvent.SetTextSheetVisible(true))
                             }
                             EditorToolButton(EditorTool.SPLIT, Icons.Default.CallSplit) {
-                                onEvent(EditorEvent.SplitSelectedClip)
+                                val textClips = uiState.project?.tracks?.find { it.type == TrackType.TEXT }?.clips ?: emptyList()
+                                val targetClipId = uiState.selectedClipId ?: textClips.find { uiState.playheadPositionMs in it.startTimeMs..it.endTimeMs }?.id
+                                onTimelineAction(TimelineAction.SplitAtPlayhead(targetClipId))
                             }
                             if (uiState.selectedClipId != null) {
                                 EditorToolButton(EditorTool.TEXT, Icons.Default.Title) {
@@ -1425,6 +1713,7 @@ fun EditorScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .statusBarsPadding()
                         .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1439,7 +1728,6 @@ fun EditorScreen(
                             Icon(Icons.Default.FullscreenExit, contentDescription = null, tint = Color.White)
                             Spacer(Modifier.width(8.dp))
                             Text("Exit Fullscreen", color = Color.White, fontSize = 13.sp)
-                        }
                     }
                 }
             }

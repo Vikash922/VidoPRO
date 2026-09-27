@@ -49,7 +49,10 @@ fun ExportScreen(
         containerColor = Color(0xFF0F111A),
         topBar = {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -70,6 +73,7 @@ fun ExportScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
+                    .navigationBarsPadding()
                     .verticalScroll(scrollState)
                     .padding(horizontal = 24.dp)
             ) {

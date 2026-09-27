@@ -62,6 +62,7 @@ fun EditBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
         ) {
             Row(

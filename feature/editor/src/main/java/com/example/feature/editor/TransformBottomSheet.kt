@@ -11,6 +11,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CropRotate
@@ -85,6 +89,7 @@ fun TransformBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
                 .padding(horizontal = AppSpacing.lg, vertical = AppSpacing.sm)
                 .verticalScroll(rememberScrollState())
         ) {
@@ -121,7 +126,7 @@ fun TransformBottomSheet(
 
             Spacer(modifier = Modifier.height(AppSpacing.md))
 
-            // 1. SCALE CONTROLS
+            // 1. SCALE CONTROLS WITH DIRECT ZOOM BUTTONS
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -134,36 +139,54 @@ fun TransformBottomSheet(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "Scale / Zoom",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text(
-                            text = "${String.format("%.2f", scale)}x",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Zoom Out [-]
+                            IconButton(
+                                onClick = { emitChange(s = (scale - 0.1f).coerceIn(0.1f, 5.0f)) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(Icons.Default.Remove, contentDescription = "Zoom Out", modifier = Modifier.size(16.dp))
+                            }
+                            Text(
+                                text = "${String.format("%.2f", scale)}x",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 6.dp)
+                            )
+                            // Zoom In [+]
+                            IconButton(
+                                onClick = { emitChange(s = (scale + 0.1f).coerceIn(0.1f, 5.0f)) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Zoom In", modifier = Modifier.size(16.dp))
+                            }
+                        }
                     }
                     Spacer(modifier = Modifier.height(AppSpacing.xs))
                     Slider(
-                        value = scale,
+                        value = scale.coerceIn(0.1f, 5.0f),
                         onValueChange = { emitChange(s = it) },
-                        valueRange = 0.5f..3.0f,
-                        steps = 25,
+                        valueRange = 0.1f..5.0f,
+                        steps = 49,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf(0.5f, 1.0f, 1.5f, 2.0f).forEach { preset ->
+                        listOf(0.5f, 1.0f, 1.5f, 2.0f, 3.0f).forEach { preset ->
                             FilterChip(
-                                selected = (scale - preset).let { kotlin.math.abs(it) < 0.05f },
+                                selected = kotlin.math.abs(scale - preset) < 0.05f,
                                 onClick = { emitChange(s = preset) },
-                                label = { Text("${preset}x") },
+                                label = { Text(if (preset == 1.0f) "1.0x (Fit)" else "${preset}x") },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
