@@ -1728,6 +1728,7 @@ fun EditorScreen(
                             Icon(Icons.Default.FullscreenExit, contentDescription = null, tint = Color.White)
                             Spacer(Modifier.width(8.dp))
                             Text("Exit Fullscreen", color = Color.White, fontSize = 13.sp)
+                        }
                     }
                 }
             }
