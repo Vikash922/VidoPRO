@@ -1097,7 +1097,7 @@ fun EditorScreen(
                     val activeTransformClip = uiState.selectedClip ?: activeMainClip
                     if (activeTransformClip != null && hasClips) {
                         val activeScale = activeTransformClip.transform.scaleX
-                        val isOverlayActive = activeTransformClip.type == ClipType.OVERLAY || activeTransformClip.id != activeMainClip?.id
+                        val isOverlayActive = activeTransformClip.id != activeMainClip?.id
 
                         Surface(
                             modifier = Modifier
@@ -1210,7 +1210,7 @@ fun EditorScreen(
                                         .clickable {
                                             onEvent(
                                                 EditorEvent.ChangeClipTransform(
-                                                    com.example.core.model.Transform.IDENTITY,
+                                                    com.example.core.model.Transform.DEFAULT,
                                                     clipId = activeTransformClip.id
                                                 )
                                             )
