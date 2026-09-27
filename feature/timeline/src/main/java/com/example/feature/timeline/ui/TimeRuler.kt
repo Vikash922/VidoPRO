@@ -58,15 +58,29 @@ fun TimeRuler(
     val tickColorMinor = remember { EditorColors.timelineRuler.copy(alpha = 0.35f) }
     val bgLineColor = remember { EditorColors.timelineRuler.copy(alpha = 0.25f) }
 
-    // Interval between major ticks in ms (adaptive based on pixelsPerMs)
+    // Interval between major ticks in ms (adaptive based on pixelsPerMs for optimal legibility at any zoom)
     val majorIntervalMs: Long = remember(pixelsPerMs) {
         when {
-            pixelsPerMs >= 0.2f -> 1000L  // every 1s
-            pixelsPerMs >= 0.08f -> 2000L // every 2s
-            else -> 5000L                 // every 5s
+            pixelsPerMs >= 0.4f -> 200L     // every 200ms
+            pixelsPerMs >= 0.2f -> 500L     // every 500ms
+            pixelsPerMs >= 0.1f -> 1000L    // every 1s
+            pixelsPerMs >= 0.05f -> 2000L   // every 2s
+            pixelsPerMs >= 0.02f -> 5000L   // every 5s
+            pixelsPerMs >= 0.008f -> 10000L // every 10s
+            else -> 30000L                  // every 30s
         }
     }
-    val minorIntervalMs: Long = remember(majorIntervalMs) { majorIntervalMs / 5 }
+    val minorIntervalMs: Long = remember(majorIntervalMs) {
+        when {
+            majorIntervalMs <= 200L -> 50L
+            majorIntervalMs <= 500L -> 100L
+            majorIntervalMs <= 1000L -> 200L
+            majorIntervalMs <= 2000L -> 500L
+            majorIntervalMs <= 5000L -> 1000L
+            majorIntervalMs <= 10000L -> 2000L
+            else -> 5000L
+        }
+    }
 
     Box(
         modifier = modifier
@@ -135,7 +149,15 @@ fun TimeRuler(
                 )
 
                 if (isMajor) {
-                    val timecode = TimeUtils.formatDuration(currentMs)
+                    val timecode = if (majorIntervalMs < 1000L) {
+                        val sec = currentMs / 1000L
+                        val subSec = (currentMs % 1000L) / 100L
+                        val min = sec / 60L
+                        val remSec = sec % 60L
+                        String.format(java.util.Locale.US, "%02d:%02d.%d", min, remSec, subSec)
+                    } else {
+                        TimeUtils.formatDuration(currentMs)
+                    }
                     drawContext.canvas.nativeCanvas.drawText(
                         timecode,
                         x + 4f,

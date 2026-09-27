@@ -36,7 +36,7 @@ data class TimelineEngineState(
     }
 
     companion object {
-        const val MIN_CLIP_DURATION_MS = 500L
+        const val MIN_CLIP_DURATION_MS = 100L
         const val DEFAULT_ZOOM = 1.0f
         const val MIN_ZOOM = 0.25f
         const val MAX_ZOOM = 4.0f

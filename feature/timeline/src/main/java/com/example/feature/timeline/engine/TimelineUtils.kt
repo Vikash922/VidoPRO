@@ -2,6 +2,7 @@ package com.example.feature.timeline.engine
 
 import com.example.core.model.Track
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Pure Kotlin utilities for timeline math, coordinate conversions, and snapping logic.
@@ -95,5 +96,30 @@ object TimelineUtils {
      */
     fun clampPlayhead(positionMs: Long, durationMs: Long): Long {
         return positionMs.coerceIn(0L, durationMs.coerceAtLeast(0L))
+    }
+
+    /**
+     * Calculates the new horizontal scroll offset when timeline zoom level changes,
+     * perfectly preserving the screen position of the focal point (pinch centroid or playhead).
+     *
+     * @param currentScrollPx Current horizontal scroll offset in pixels.
+     * @param oldZoom Previous zoom level.
+     * @param newZoom Target zoom level.
+     * @param focalScreenXPx Horizontal screen coordinate of the focal point in pixels.
+     * @return Clamped new scroll offset in pixels anchored to the focal point.
+     */
+    fun calculateAnchoredScrollOffset(
+        currentScrollPx: Int,
+        oldZoom: Float,
+        newZoom: Float,
+        focalScreenXPx: Float
+    ): Int {
+        val oldPixelsPerMs = calculatePixelsPerMs(oldZoom)
+        val newPixelsPerMs = calculatePixelsPerMs(newZoom)
+        if (oldPixelsPerMs <= 0f) return currentScrollPx
+
+        val focalTimeMs = ((currentScrollPx + focalScreenXPx) / oldPixelsPerMs).toLong()
+        val targetScroll = (focalTimeMs * newPixelsPerMs) - focalScreenXPx
+        return targetScroll.roundToInt().coerceAtLeast(0)
     }
 }

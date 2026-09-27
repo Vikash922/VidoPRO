@@ -168,20 +168,35 @@ object TimelineGestureHandler {
     }
 
     /**
-     * Modular pointerInput modifier for pinch-to-zoom scaling of timeline.
+     * Modular pointerInput modifier for pinch-to-zoom scaling of timeline with focal point tracking.
+     * Uses [currentZoomProvider] to avoid closure staleness and captures touch centroid X for anchored zooming.
+     */
+    fun Modifier.timelinePinchZoomWithFocal(
+        currentZoomProvider: () -> Float,
+        onZoomChange: (newZoom: Float, focalXPx: Float) -> Unit
+    ): Modifier = this.pointerInput(Unit) {
+        detectTransformGestures { centroid, _, zoom, _ ->
+            if (zoom != 1.0f) {
+                val current = currentZoomProvider()
+                val newZoom = (current * zoom).coerceIn(
+                    TimelineEngineState.MIN_ZOOM,
+                    TimelineEngineState.MAX_ZOOM
+                )
+                if (kotlin.math.abs(newZoom - current) >= 0.001f) {
+                    onZoomChange(newZoom, centroid.x)
+                }
+            }
+        }
+    }
+
+    /**
+     * Backward-compatible modular pointerInput modifier for pinch-to-zoom scaling of timeline.
      */
     fun Modifier.timelinePinchZoomGesture(
         currentZoom: Float,
         onZoomChange: (Float) -> Unit
-    ): Modifier = this.pointerInput(Unit) {
-        detectTransformGestures { _, _, zoom, _ ->
-            if (zoom != 1.0f) {
-                val newZoom = (currentZoom * zoom).coerceIn(
-                    TimelineEngineState.MIN_ZOOM,
-                    TimelineEngineState.MAX_ZOOM
-                )
-                onZoomChange(newZoom)
-            }
-        }
-    }
+    ): Modifier = timelinePinchZoomWithFocal(
+        currentZoomProvider = { currentZoom },
+        onZoomChange = { newZoom, _ -> onZoomChange(newZoom) }
+    )
 }

@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.example.core.model.Asset
 import com.example.core.model.Track
 import com.example.core.model.TrackType
-import com.example.feature.timeline.ui.TimelineGestureHandler.timelinePinchZoomGesture
+import com.example.feature.timeline.ui.TimelineGestureHandler.timelinePinchZoomWithFocal
 
 /**
  * TimelineViewport responsibility:
@@ -75,6 +75,7 @@ fun TimelineViewport(
     onAddMedia: () -> Unit = {},
     onAddSubTrackMedia: () -> Unit = {},
     onZoomChange: (Float) -> Unit = {},
+    onZoomChangeWithFocal: (newZoom: Float, focalXPx: Float) -> Unit = { zoom, _ -> onZoomChange(zoom) },
     modifier: Modifier = Modifier
 ) {
     val beatColor = Color(0xFFFF2D75)
@@ -83,9 +84,9 @@ fun TimelineViewport(
         modifier = modifier
             .fillMaxHeight()
             .horizontalScroll(scrollState)
-            .timelinePinchZoomGesture(
-                currentZoom = zoomLevel,
-                onZoomChange = onZoomChange
+            .timelinePinchZoomWithFocal(
+                currentZoomProvider = { zoomLevel },
+                onZoomChange = onZoomChangeWithFocal
             )
     ) {
         Box(

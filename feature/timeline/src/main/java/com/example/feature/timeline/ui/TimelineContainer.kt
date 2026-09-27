@@ -50,7 +50,10 @@ import com.example.core.model.TrackType
 import com.example.feature.timeline.engine.TimelineAction
 import com.example.feature.timeline.engine.TimelineEngineState
 import com.example.feature.timeline.engine.TimelineUtils
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 enum class TimelineMode { MAIN, OVERLAY, AUDIO, TEXT }
 
@@ -120,6 +123,38 @@ fun TimelineContainer(
         multiSelectedClipIds = multiSelectedClipIds
     )
 
+    val coroutineScope = rememberCoroutineScope()
+
+    val handleZoomChange: (Float, Float?) -> Unit = { newZoom, focalXPx ->
+        val oldZoom = state.zoomLevel
+        val clampedZoom = newZoom.coerceIn(TimelineEngineState.MIN_ZOOM, TimelineEngineState.MAX_ZOOM)
+        if (kotlin.math.abs(clampedZoom - oldZoom) >= 0.001f) {
+            val oldPixelsPerMs = TimelineUtils.calculatePixelsPerMs(oldZoom)
+            val newPixelsPerMs = TimelineUtils.calculatePixelsPerMs(clampedZoom)
+
+            val focalX = focalXPx ?: run {
+                val playheadScreenX = (state.playheadPositionMs * oldPixelsPerMs) - scrollState.value
+                if (playheadScreenX in 0f..scrollState.viewportSize.toFloat()) {
+                    playheadScreenX
+                } else {
+                    scrollState.viewportSize / 2f
+                }
+            }
+
+            val targetScroll = TimelineUtils.calculateAnchoredScrollOffset(
+                currentScrollPx = scrollState.value,
+                oldZoom = oldZoom,
+                newZoom = clampedZoom,
+                focalScreenXPx = focalX
+            )
+
+            onAction(TimelineAction.SetZoom(clampedZoom))
+            coroutineScope.launch {
+                scrollState.scrollTo(targetScroll)
+            }
+        }
+    }
+
     val visibleTracks = remember(state.tracks, timelineMode) {
         when (timelineMode) {
             TimelineMode.MAIN -> {
@@ -153,7 +188,7 @@ fun TimelineContainer(
             onBackToMain = onBackToMain,
             onAddSubTrackMedia = onAddSubTrackMedia,
             onToggleSnapping = { onAction(TimelineAction.SetSnapping(!state.isSnappingEnabled)) },
-            onZoomChange = { newZoom -> onAction(TimelineAction.SetZoom(newZoom)) },
+            onZoomChange = { newZoom -> handleZoomChange(newZoom, null) },
             onToggleBeatMarker = { ms -> onAction(TimelineAction.ToggleBeatMarker(ms)) },
             onSwitchMode = onSwitchMode
         )
@@ -220,7 +255,8 @@ fun TimelineContainer(
                 onEditTransition = onEditTransition,
                 onAddMedia = onAddMedia,
                 onAddSubTrackMedia = onAddSubTrackMedia,
-                onZoomChange = { newZoom -> onAction(TimelineAction.SetZoom(newZoom)) },
+                onZoomChange = { newZoom -> handleZoomChange(newZoom, null) },
+                onZoomChangeWithFocal = { newZoom, focalX -> handleZoomChange(newZoom, focalX) },
                 modifier = Modifier.weight(1f)
             )
         }

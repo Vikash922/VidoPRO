@@ -324,4 +324,127 @@ class TimelineReducerTest {
         val unmutedState = TimelineReducer.reduce(mutedState, TimelineAction.MuteTrack(trackId, mute = false))
         assertTrue(unmutedState.tracks.first().clips.all { it.volume == 1f })
     }
+
+    @Test
+    fun testSplitClipWithSpeedFactor() {
+        val trackId = "track_1"
+        // 4000ms duration at 2.0x speed means 8000ms of source media (from 1000ms to 9000ms)
+        val clip = createTestClip(
+            id = "clip_fast",
+            trackId = trackId,
+            startTimeMs = 0L,
+            durationMs = 4000L,
+            inPointMs = 1000L,
+            outPointMs = 9000L
+        ).copy(speed = 2.0f)
+        val track = Track(id = trackId, projectId = "proj_1", type = TrackType.VIDEO, order = 0, clips = listOf(clip))
+        val initialState = createInitialState(listOf(track))
+
+        // Split at 2000ms (halfway on timeline)
+        val splitState = TimelineReducer.reduce(
+            initialState,
+            TimelineAction.SplitClip(clipId = "clip_fast", splitPointMs = 2000L)
+        )
+
+        val updatedClips = splitState.tracks[0].clips
+        assertEquals(2, updatedClips.size)
+
+        val firstClip = updatedClips[0]
+        val secondClip = updatedClips[1]
+
+        // First clip: duration 2000ms, elapsed in source = 2000 * 2.0 = 4000ms -> outPoint = 1000 + 4000 = 5000ms
+        assertEquals(0L, firstClip.startTimeMs)
+        assertEquals(2000L, firstClip.durationMs)
+        assertEquals(1000L, firstClip.inPointMs)
+        assertEquals(5000L, firstClip.outPointMs)
+        assertEquals(2.0f, firstClip.speed, 0.001f)
+
+        // Second clip: duration 2000ms, inPoint = 5000ms, outPoint = 9000ms
+        assertEquals(2000L, secondClip.startTimeMs)
+        assertEquals(2000L, secondClip.durationMs)
+        assertEquals(5000L, secondClip.inPointMs)
+        assertEquals(9000L, secondClip.outPointMs)
+        assertEquals(2.0f, secondClip.speed, 0.001f)
+    }
+
+    @Test
+    fun testTrimStartAndEndWithSpeedFactor() {
+        val trackId = "track_1"
+        // 4000ms duration at 2.0x speed means 8000ms of source media
+        val clip = createTestClip(
+            id = "clip_trim_speed",
+            trackId = trackId,
+            startTimeMs = 0L,
+            durationMs = 4000L,
+            inPointMs = 1000L,
+            outPointMs = 9000L
+        ).copy(speed = 2.0f)
+        val track = Track(id = trackId, projectId = "proj_1", type = TrackType.VIDEO, order = 0, clips = listOf(clip))
+        val initialState = createInitialState(listOf(track)).copy(isSnappingEnabled = false)
+
+        // Trim start from 0L to 1000L (+1000ms on timeline -> +2000ms in source asset)
+        val trimmedStart = TimelineReducer.reduce(
+            initialState,
+            TimelineAction.TrimStart("clip_trim_speed", 1000L)
+        )
+        val clipAfterStartTrim = trimmedStart.tracks[0].clips[0]
+        assertEquals(1000L, clipAfterStartTrim.startTimeMs)
+        assertEquals(3000L, clipAfterStartTrim.durationMs)
+        assertEquals(3000L, clipAfterStartTrim.inPointMs) // 1000 + (1000 * 2.0)
+
+        // Trim end from 4000L to 2000L (duration becomes 1000ms, outPoint becomes 3000 + 1000*2 = 5000L)
+        val trimmedEnd = TimelineReducer.reduce(
+            trimmedStart,
+            TimelineAction.TrimEnd("clip_trim_speed", 2000L)
+        )
+        val clipAfterEndTrim = trimmedEnd.tracks[0].clips[0]
+        assertEquals(1000L, clipAfterEndTrim.startTimeMs)
+        assertEquals(1000L, clipAfterEndTrim.durationMs)
+        assertEquals(5000L, clipAfterEndTrim.outPointMs) // 3000 + (1000 * 2.0)
+    }
+
+    @Test
+    fun testSplitClipClonesEffectsWithUniqueIds() {
+        val trackId = "track_1"
+        val effect = com.example.core.model.Effect(
+            id = "eff_orig",
+            clipId = "clip_with_fx",
+            type = com.example.core.model.EffectType.BRIGHTNESS,
+            parameters = mapOf("value" to 0.5f)
+        )
+        val clip = createTestClip(
+            id = "clip_with_fx",
+            trackId = trackId,
+            startTimeMs = 0L,
+            durationMs = 4000L
+        ).copy(effects = listOf(effect))
+        val track = Track(id = trackId, projectId = "proj_1", type = TrackType.VIDEO, order = 0, clips = listOf(clip))
+        val initialState = createInitialState(listOf(track))
+
+        val splitState = TimelineReducer.reduce(
+            initialState,
+            TimelineAction.SplitClip("clip_with_fx", 2000L)
+        )
+        val secondClip = splitState.tracks[0].clips[1]
+        assertEquals(1, secondClip.effects.size)
+        val secondEff = secondClip.effects[0]
+        assertEquals(secondClip.id, secondEff.clipId)
+        assertTrue("Cloned effect must have a new unique ID", secondEff.id != "eff_orig")
+    }
+
+    @Test
+    fun testCalculateAnchoredScrollOffset() {
+        // Timeline at 1.0x zoom (0.06 px/ms). User is looking at scroll = 600px with focal touch at 300px.
+        // Total pixel X = 900px -> focal time = 900 / 0.06 = 15000ms.
+        // Zoom in to 2.0x (0.12 px/ms).
+        // 15000ms at 0.12 px/ms = 1800px.
+        // Anchored new scroll should be 1800 - 300 = 1500px.
+        val newScroll = TimelineUtils.calculateAnchoredScrollOffset(
+            currentScrollPx = 600,
+            oldZoom = 1.0f,
+            newZoom = 2.0f,
+            focalScreenXPx = 300f
+        )
+        assertEquals(1500, newScroll)
+    }
 }

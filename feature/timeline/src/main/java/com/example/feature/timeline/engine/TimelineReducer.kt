@@ -147,7 +147,27 @@ object TimelineReducer {
         val sourceTrack = state.tracks.find { it.id == sourceClip.trackId }
         val targetTrack = state.tracks.find { it.id == targetTrackId }
         if (sourceTrack?.isLocked == true || targetTrack?.isLocked == true) return state
-        val safeStartTime = newStartTimeMs.coerceAtLeast(0L)
+
+        val targetStartTime = if (state.isSnappingEnabled) {
+            val snapPoints = TimelineUtils.calculateSnapPoints(state.tracks, clipId) +
+                state.playheadPositionMs +
+                state.beatMarkers
+            val snappedStart = TimelineUtils.snapTime(newStartTimeMs, snapPoints.toList())
+            if (snappedStart != newStartTimeMs) {
+                snappedStart
+            } else {
+                val endCandidate = newStartTimeMs + sourceClip.durationMs
+                val snappedEnd = TimelineUtils.snapTime(endCandidate, snapPoints.toList())
+                if (snappedEnd != endCandidate) {
+                    snappedEnd - sourceClip.durationMs
+                } else {
+                    newStartTimeMs
+                }
+            }
+        } else {
+            newStartTimeMs
+        }
+        val safeStartTime = targetStartTime.coerceAtLeast(0L)
 
         val updatedTracks = state.tracks.map { track ->
             when (track.id) {
@@ -163,7 +183,7 @@ object TimelineReducer {
                         keyframes = shiftedKeyframes
                     )
                     val combined = remainingClips + movedClip
-                    val resolved = if (track.type == TrackType.VIDEO) {
+                    val resolved = if (track.type == TrackType.VIDEO && track.order == 0) {
                         resolveMainTrackOverlaps(combined)
                     } else {
                         combined.sortedBy { it.startTimeMs }
@@ -197,12 +217,23 @@ object TimelineReducer {
         val originalEnd = clip.endTimeMs
         val minDuration = TimelineEngineState.MIN_CLIP_DURATION_MS
 
+        val targetStartTime = if (state.isSnappingEnabled) {
+            val snapPoints = TimelineUtils.calculateSnapPoints(state.tracks, clipId) +
+                state.playheadPositionMs +
+                state.beatMarkers
+            TimelineUtils.snapTime(newStartTimeMs, snapPoints.toList())
+        } else {
+            newStartTimeMs
+        }
+
         // Boundary safety: newStartTimeMs must not push duration below minDuration
         val maxAllowedStartTime = originalEnd - minDuration
-        val clampedStartTime = newStartTimeMs.coerceIn(0L, maxAllowedStartTime)
+        val clampedStartTime = targetStartTime.coerceIn(0L, maxAllowedStartTime)
         val deltaMs = clampedStartTime - clip.startTimeMs
 
-        val newInPoint = (clip.inPointMs + deltaMs).coerceAtLeast(0L)
+        // Correct speed-aware inPoint calculation
+        val assetDeltaMs = (deltaMs * clip.speed).toLong()
+        val newInPoint = (clip.inPointMs + assetDeltaMs).coerceAtLeast(0L)
         val newDuration = (originalEnd - clampedStartTime).coerceAtLeast(minDuration)
 
         val updatedTracks = state.tracks.map { track ->
@@ -217,7 +248,7 @@ object TimelineReducer {
                         )
                     } else c
                 }
-                val resolved = if (track.type == TrackType.VIDEO) {
+                val resolved = if (track.type == TrackType.VIDEO && track.order == 0) {
                     resolveMainTrackOverlaps(updatedClips)
                 } else updatedClips
                 val sanitizedTransitions = sanitizeTransitions(track.copy(clips = resolved))
@@ -243,9 +274,18 @@ object TimelineReducer {
         val minDuration = TimelineEngineState.MIN_CLIP_DURATION_MS
         val minAllowedEndTime = clip.startTimeMs + minDuration
 
-        val clampedEndTime = newEndTimeMs.coerceAtLeast(minAllowedEndTime)
+        val targetEndTime = if (state.isSnappingEnabled) {
+            val snapPoints = TimelineUtils.calculateSnapPoints(state.tracks, clipId) +
+                state.playheadPositionMs +
+                state.beatMarkers
+            TimelineUtils.snapTime(newEndTimeMs, snapPoints.toList())
+        } else {
+            newEndTimeMs
+        }
+
+        val clampedEndTime = targetEndTime.coerceAtLeast(minAllowedEndTime)
         val newDuration = clampedEndTime - clip.startTimeMs
-        val newOutPoint = clip.inPointMs + newDuration
+        val newOutPoint = clip.inPointMs + (newDuration * clip.speed).toLong()
 
         val updatedTracks = state.tracks.map { track ->
             if (track.clips.any { it.id == clipId }) {
@@ -258,7 +298,7 @@ object TimelineReducer {
                         )
                     } else c
                 }
-                val resolved = if (track.type == TrackType.VIDEO) {
+                val resolved = if (track.type == TrackType.VIDEO && track.order == 0) {
                     resolveMainTrackOverlaps(updatedClips)
                 } else updatedClips
                 val sanitizedTransitions = sanitizeTransitions(track.copy(clips = resolved))
@@ -307,19 +347,33 @@ object TimelineReducer {
         val firstDuration = clampedSplit - clip.startTimeMs
         val secondDuration = clip.endTimeMs - clampedSplit
 
+        // Speed-aware source media offset calculation
+        val assetElapsedMs = (firstDuration * clip.speed).toLong()
+        val splitAssetTimeMs = clip.inPointMs + assetElapsedMs
+
         val firstClip = clip.copy(
             durationMs = firstDuration,
-            outPointMs = clip.inPointMs + firstDuration,
+            outPointMs = splitAssetTimeMs,
             keyframes = clip.keyframes.filter { it.timeMs <= clampedSplit }
         )
 
         val secondClipId = UUID.randomUUID().toString()
+        val clonedEffects = clip.effects.map { eff ->
+            eff.copy(id = UUID.randomUUID().toString(), clipId = secondClipId)
+        }
+        val clonedMask = clip.mask?.copy(id = UUID.randomUUID().toString())
+
         val secondClip = clip.copy(
             id = secondClipId,
             startTimeMs = clampedSplit,
             durationMs = secondDuration,
-            inPointMs = clip.inPointMs + firstDuration,
+            inPointMs = splitAssetTimeMs,
             outPointMs = clip.outPointMs,
+            speed = clip.speed,
+            volume = clip.volume,
+            groupId = clip.groupId,
+            effects = clonedEffects,
+            mask = clonedMask,
             keyframes = clip.keyframes.filter { it.timeMs >= clampedSplit }.map {
                 it.copy(id = UUID.randomUUID().toString(), clipId = secondClipId)
             }
@@ -336,7 +390,10 @@ object TimelineReducer {
                         newClips.add(c)
                     }
                 }
-                val resolvedClips = if (track.type == TrackType.VIDEO) resolveMainTrackOverlaps(newClips) else newClips
+                val resolvedClips = if (track.type == TrackType.VIDEO && track.order == 0) {
+                    resolveMainTrackOverlaps(newClips)
+                } else newClips
+
                 val remappedTransitions = track.transitions.map { trans ->
                     if (trans.firstClipId == clipId) trans.copy(firstClipId = secondClipId) else trans
                 }

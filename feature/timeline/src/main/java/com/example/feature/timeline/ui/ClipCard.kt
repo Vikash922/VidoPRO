@@ -93,8 +93,9 @@ fun ClipCard(
 ) {
     val haptic = LocalHapticFeedback.current
     val clipWidthDp = remember(clip.durationMs, pixelsPerMs) {
-        maxOf(48.dp, (clip.durationMs * pixelsPerMs).dp)
+        maxOf(24.dp, (clip.durationMs * pixelsPerMs).dp)
     }
+    val handleWidth = if (clipWidthDp < 48.dp) 12.dp else 20.dp
 
     // Border color priority: multiSelected (blue) > selected (white) > grouped (amber) > type default
     val borderColor = remember(clip.type, isSelected, isMultiSelected, clip.groupId) {
@@ -158,7 +159,7 @@ fun ClipCard(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = if (isSelected) 20.dp else 0.dp)
+                .padding(horizontal = if (isSelected) handleWidth else 0.dp)
                 .pointerInput(clip.id, pixelsPerMs, clip.startTimeMs) {
                     detectTapGestures(
                         onTap = { offset ->
@@ -425,7 +426,7 @@ fun ClipCard(
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .width(20.dp)
+                    .width(handleWidth)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
                     .background(Color.White)
@@ -449,7 +450,7 @@ fun ClipCard(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                     contentDescription = "Trim Left",
                     tint = Color(0xFF0A0D14),
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(if (handleWidth < 16.dp) 12.dp else 16.dp)
                 )
             }
         }
@@ -459,7 +460,7 @@ fun ClipCard(
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .width(20.dp)
+                    .width(handleWidth)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(topEnd = 6.dp, bottomEnd = 6.dp))
                     .background(Color.White)
@@ -483,7 +484,7 @@ fun ClipCard(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = "Trim Right",
                     tint = Color(0xFF0A0D14),
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(if (handleWidth < 16.dp) 12.dp else 16.dp)
                 )
             }
         }
